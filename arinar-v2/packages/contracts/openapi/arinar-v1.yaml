@@ -1,0 +1,730 @@
+openapi: 3.1.0
+info:
+  title: Arinar API
+  version: 1.0.0
+  description: |
+    Arinar V2 API - AI-native knowledge platform with multi-agent realtime discussions.
+    
+    **Model Provider Policy**: This system uses OpenRouter for LLM access, not direct OpenAI/Anthropic integrations.
+  contact:
+    name: Arinar Platform Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.arinar.dev
+    description: Development environment
+  - url: https://api.arinar.com
+    description: Production
+
+tags:
+  - name: health
+    description: Health check endpoints
+  - name: debates
+    description: Debate session management
+  - name: participants
+    description: Debate participant management
+  - name: events
+    description: Realtime event stream
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns service health status
+      tags:
+        - health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /debates:
+    post:
+      operationId: createDebate
+      summary: Create new debate session
+      description: Creates a new debate session in draft state
+      tags:
+        - debates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDebateRequest'
+      responses:
+        '201':
+          description: Debate created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebateResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /debates/run:
+    post:
+      operationId: runDebate
+      summary: Run debate-in-a-box (M1)
+      description: |
+        Executes a complete 5-turn round-robin debate with 3 agents.
+        Returns summary, minutes of meeting, action items, and full event history.
+        
+        **OpenRouter BYOK**: Requires user-provided OpenRouter API key per request.
+      tags:
+        - debates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DebateRunRequest'
+      responses:
+        '200':
+          description: Debate completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebateRunResponse'
+        '400':
+          description: Invalid request (wrong number of agents, missing fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid OpenRouter API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /debates/{debate_id}/participants:
+    post:
+      operationId: addParticipant
+      summary: Add participant to debate
+      description: Adds an agent or human participant to the debate
+      tags:
+        - participants
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddParticipantRequest'
+      responses:
+        '201':
+          description: Participant added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantResponse'
+        '404':
+          description: Debate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /debates/{debate_id}/start:
+    post:
+      operationId: startDebate
+      summary: Start debate session
+      description: Transitions debate from draft/preflight to live state
+      tags:
+        - debates
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      responses:
+        '200':
+          description: Debate started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebateResponse'
+        '404':
+          description: Debate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /debates/{debate_id}/intervene:
+    post:
+      operationId: interveneDebate
+      summary: Intervene in debate
+      description: Manual or policy-triggered intervention in active debate
+      tags:
+        - debates
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterventionRequest'
+      responses:
+        '200':
+          description: Intervention created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterventionResponse'
+        '404':
+          description: Debate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /debates/{debate_id}/end:
+    post:
+      operationId: endDebate
+      summary: End debate session
+      description: Transitions debate to synthesis/closed state
+      tags:
+        - debates
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EndDebateRequest'
+      responses:
+        '200':
+          description: Debate ended successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebateResponse'
+        '404':
+          description: Debate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /debates/{debate_id}/events:
+    get:
+      operationId: getDebateEvents
+      summary: Get debate events
+      description: Retrieves paginated event stream for a debate session
+      tags:
+        - events
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: cursor
+          in: query
+          description: Pagination cursor for next page
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of events to return (max 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventsResponse'
+        '404':
+          description: Debate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    DebateIdParam:
+      name: debate_id
+      in: path
+      description: Debate session UUID
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [up, down]
+            queue:
+              type: string
+              enum: [up, down]
+
+    CreateDebateRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          maxLength: 5000
+        timebox_minutes:
+          type: integer
+          minimum: 5
+          maximum: 480
+          default: 60
+        policy_config:
+          type: object
+          properties:
+            internet_research_enabled:
+              type: boolean
+              default: false
+            tool_calling_enabled:
+              type: boolean
+              default: false
+            max_tokens_per_response:
+              type: integer
+              minimum: 100
+              maximum: 4000
+            strict_citation_mode:
+              type: boolean
+              default: true
+
+    DebateResponse:
+      type: object
+      required:
+        - debate_id
+        - title
+        - state
+        - created_at
+        - updated_at
+      properties:
+        debate_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        state:
+          $ref: '#/components/schemas/DebateState'
+        timebox_minutes:
+          type: integer
+        policy_config:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+
+    DebateState:
+      type: string
+      enum:
+        - draft
+        - preflight
+        - live
+        - paused
+        - synthesis
+        - closed
+        - archived
+    
+    DebateRunRequest:
+      type: object
+      required:
+        - problem_statement
+        - agents
+        - openrouter_api_key
+      properties:
+        problem_statement:
+          type: string
+          description: Problem or topic to discuss
+          minLength: 10
+          maxLength: 5000
+        agents:
+          type: array
+          description: Exactly 3 agents for M1
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/AgentInput'
+        openrouter_api_key:
+          type: string
+          description: OpenRouter API key (BYOK - Bring Your Own Key)
+          minLength: 1
+        debate_title:
+          type: string
+          description: Optional debate title
+          default: "Untitled Debate"
+          maxLength: 500
+    
+    AgentInput:
+      type: object
+      required:
+        - name
+        - role
+        - model_id
+      properties:
+        name:
+          type: string
+          description: Agent display name
+          minLength: 1
+          maxLength: 100
+        role:
+          type: string
+          description: Agent role description
+          minLength: 1
+          maxLength: 500
+        model_id:
+          type: string
+          description: OpenRouter model ID (e.g. anthropic/claude-3.5-sonnet)
+          minLength: 1
+    
+    DebateRunResponse:
+      type: object
+      required:
+        - debate_id
+        - status
+        - outputs
+        - event_history
+      properties:
+        debate_id:
+          type: string
+          format: uuid
+          description: Generated debate session ID
+        status:
+          type: string
+          enum: [completed, failed]
+          description: Final debate status
+        outputs:
+          type: object
+          required:
+            - summary
+            - minutes_of_meeting
+            - action_items
+          properties:
+            summary:
+              type: string
+              description: High-level summary (2-3 sentences)
+            minutes_of_meeting:
+              type: string
+              description: Detailed minutes of meeting (200-300 words)
+            action_items:
+              type: array
+              description: Concrete action items
+              items:
+                type: string
+        event_history:
+          type: array
+          description: Ordered list of debate events (turns)
+          items:
+            type: object
+            required:
+              - event_id
+              - turn
+              - agent
+              - message
+            properties:
+              event_id:
+                type: string
+                format: uuid
+              turn:
+                type: integer
+                minimum: 1
+                maximum: 5
+              agent:
+                type: string
+              message:
+                type: string
+
+    AddParticipantRequest:
+      type: object
+      required:
+        - participant_type
+        - role_name
+      properties:
+        participant_type:
+          type: string
+          enum: [agent, human]
+        role_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        agent_config:
+          type: object
+          properties:
+            model_id:
+              type: string
+              description: OpenRouter model identifier
+            temperature:
+              type: number
+              minimum: 0
+              maximum: 2
+            system_prompt:
+              type: string
+
+    ParticipantResponse:
+      type: object
+      required:
+        - participant_id
+        - debate_id
+        - participant_type
+        - role_name
+        - created_at
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+        debate_id:
+          type: string
+          format: uuid
+        participant_type:
+          type: string
+          enum: [agent, human]
+        role_name:
+          type: string
+        agent_config:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    InterventionRequest:
+      type: object
+      required:
+        - intent
+        - question_or_instruction
+      properties:
+        intent:
+          type: string
+          enum:
+            - clarify
+            - challenge
+            - re_scope
+            - request_evidence
+            - decision_check
+        target_agents:
+          type: array
+          items:
+            type: string
+            format: uuid
+        question_or_instruction:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        blocking:
+          type: boolean
+          default: false
+          description: If true, pauses normal queue until addressed
+
+    InterventionResponse:
+      type: object
+      required:
+        - intervention_id
+        - debate_id
+        - created_at
+      properties:
+        intervention_id:
+          type: string
+          format: uuid
+        debate_id:
+          type: string
+          format: uuid
+        intent:
+          type: string
+        target_agents:
+          type: array
+          items:
+            type: string
+            format: uuid
+        question_or_instruction:
+          type: string
+        blocking:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    EndDebateRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+
+    EventsResponse:
+      type: object
+      required:
+        - events
+        - has_more
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebateEvent'
+        next_cursor:
+          type: string
+          description: Cursor for next page of results
+        has_more:
+          type: boolean
+
+    DebateEvent:
+      type: object
+      required:
+        - event_id
+        - debate_id
+        - event_type
+        - sender_type
+        - created_at
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        debate_id:
+          type: string
+          format: uuid
+        event_type:
+          $ref: '#/components/schemas/EventType'
+        sender_type:
+          type: string
+          enum: [agent, human, system]
+        sender_id:
+          type: string
+          format: uuid
+        mentions:
+          type: array
+          items:
+            type: string
+            format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        content:
+          type: object
+          description: Event-specific payload
+        citation_refs:
+          type: array
+          items:
+            type: object
+            properties:
+              source_id:
+                type: string
+              excerpt:
+                type: string
+              url:
+                type: string
+                format: uri
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 3
+        created_at:
+          type: string
+          format: date-time
+
+    EventType:
+      type: string
+      enum:
+        # Core message events
+        - agent_message
+        - human_message
+        - agent_question
+        - agent_rebuttal
+        - intervention
+        - evidence_request
+        - evidence_response
+        - summary_update
+        - decision_candidate
+        - decision_finalized
+        # Nudge protocol
+        - pre_turn_nudge
+        - nudge_approved
+        - nudge_rejected
+        # Research protocol (policy-controlled)
+        - research_request
+        - research_result
+        - research_denied
+        # Knowledge import
+        - knowledge_imported
+        - knowledge_rejected
+        # Response handling
+        - unknown_response
+        # Tool calling (MCP future)
+        - tool_call_request
+        - tool_call_result
+        - tool_call_denied
+        # Voice/transcription
+        - voice_transcript_partial
+        - voice_transcript_final
+        - voice_tts_started
+        - voice_tts_completed
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time

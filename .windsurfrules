@@ -1,0 +1,102 @@
+# Multi-AI Discussion System - FastAPI Backend
+
+This is the backend service for the Multi-AI Debate System, a platform that enables users to orchestrate sophisticated debates between multiple AI models with distinct roles.
+
+## Features
+
+- **Scalable AI Model Integration**: Supports N number of AI models
+- **Four-Layer Memory Architecture**: Short-term, long-term, episodic, and semantic memory
+- **Real-time WebSocket Communication**: For live debate sessions
+- **Role-Based AI Participants**: Configurable AI roles with specialized personas
+- **Supabase Integration**: For authentication and database storage
+
+## Development Setup
+
+### Prerequisites
+
+- Python 3.8+
+- Virtual Environment
+- Supabase account and API keys
+
+### Installation
+
+1. **Activate the virtual environment**:
+
+```bash
+# Navigate to the fastapi directory
+cd fastapi
+
+# Activate the virtual environment
+source venv/bin/activate  # On Unix/MacOS
+```
+
+2. **Install dependencies**:
+
+```bash
+pip install -r requirements.txt
+```
+
+3. **Create a .env file**:
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit the .env file with your configuration
+```
+
+4. **Run the development server**:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+The API will be available at `http://localhost:8000`.
+
+## API Documentation
+
+When the server is running, access the interactive API documentation at:
+
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## Project Structure
+
+```
+fastapi/
+├── app/
+│   ├── api/              # API routes
+│   ├── core/             # Core configuration
+│   ├── models/           # Data models
+│   ├── services/         # Business logic
+│   └── main.py           # Main application entry point
+├── agents/               # AI agent implementations
+├── venv/                 # Virtual environment
+├── requirements.txt      # Dependencies
+├── .env                  # Environment variables (not in git)
+└── README.md             # This file
+```
+
+## Key Components
+
+- **AI Registry**: Manages available AI models
+- **Memory Manager**: Implements the 4-layer memory architecture 
+- **Debate Orchestrator**: Coordinates debate flow and AI participation
+- **WebSocket Server**: Provides real-time communication
+
+## AI Model Integration
+
+The system is designed to support any number of AI models. To add a new model:
+
+1. Use the API endpoint `POST /api/ai-models` to register the model
+2. Provide the necessary configuration (API keys via environment variables)
+3. The model will be available for selection in debate role assignments
+
+## Memory System
+
+The memory system implements a sophisticated 4-layer architecture:
+
+1. **Short-Term Memory**: Current debate context
+2. **Long-Term Memory**: Persistent storage across sessions
+3. **Episodic Memory**: Records of specific past interactions
+4. **Semantic Memory**: Structured factual knowledge
