@@ -2,6 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
+import psycopg2.extras
 from .database import get_db_connection, get_cursor
 from .state_machine import DebateState, DebateStateMachine, StateTransitionError
 
@@ -18,8 +19,8 @@ class DebateService:
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
             cursor.execute("""
-                SELECT debate_id, workspace_id, title, state, policy_config, 
-                       created_at, updated_at
+                SELECT debate_id, workspace_id, title, description, state, 
+                       policy_config, created_at, updated_at
                 FROM debates
                 WHERE debate_id = %s
             """, (debate_id,))
@@ -36,6 +37,7 @@ class DebateService:
         """Create new debate in pending state"""
         debate_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
+        policy_json = psycopg2.extras.Json(policy_config or {})
         
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
@@ -50,7 +52,7 @@ class DebateService:
                 workspace_id,
                 title,
                 DebateState.PENDING.value,
-                policy_config or {},
+                policy_json,
                 now,
                 now
             ))
@@ -94,7 +96,7 @@ class DebateService:
                 'system_message',
                 'system',
                 self._get_next_sequence(cursor, debate_id),
-                {'text': 'Debate started', 'action': 'start'},
+                psycopg2.extras.Json({'text': 'Debate started', 'action': 'start'}),
                 datetime.now(timezone.utc)
             ))
         
@@ -135,7 +137,7 @@ class DebateService:
                 'system_message',
                 'system',
                 self._get_next_sequence(cursor, debate_id),
-                {'text': 'Debate paused', 'action': 'pause'},
+                psycopg2.extras.Json({'text': 'Debate paused', 'action': 'pause'}),
                 datetime.now(timezone.utc)
             ))
         
@@ -176,7 +178,7 @@ class DebateService:
                 'system_message',
                 'system',
                 self._get_next_sequence(cursor, debate_id),
-                {'text': 'Debate resumed', 'action': 'resume'},
+                psycopg2.extras.Json({'text': 'Debate resumed', 'action': 'resume'}),
                 datetime.now(timezone.utc)
             ))
         
@@ -216,11 +218,11 @@ class DebateService:
                 'intervention',
                 'human',
                 self._get_next_sequence(cursor, debate_id),
-                {
+                psycopg2.extras.Json({
                     'text': message,
                     'tagged_agents': tagged_agents or [],
                     'action': 'intervene'
-                },
+                }),
                 datetime.now(timezone.utc)
             ))
         
@@ -266,7 +268,7 @@ class DebateService:
                 'system_message',
                 'system',
                 self._get_next_sequence(cursor, debate_id),
-                {'text': 'Debate ended', 'action': 'end'},
+                psycopg2.extras.Json({'text': 'Debate ended', 'action': 'end'}),
                 datetime.now(timezone.utc)
             ))
         
@@ -276,10 +278,10 @@ class DebateService:
     def _get_next_sequence(self, cursor, debate_id: str) -> int:
         """Get next sequence number for debate events"""
         cursor.execute("""
-            SELECT COALESCE(MAX(sequence_number), 0) + 1
+            SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_seq
             FROM events
             WHERE debate_id = %s
         """, (debate_id,))
         
         result = cursor.fetchone()
-        return result[0] if result else 1
+        return result['next_seq'] if result else 1

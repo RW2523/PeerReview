@@ -2,6 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any
+import psycopg2.extras
 from .openrouter_client import OpenRouterClient
 from .database import get_db_connection, get_cursor
 
@@ -44,8 +45,7 @@ class DebateEngine:
         
         # Generate IDs
         debate_id = str(uuid.uuid4())
-        workspace_id = "00000000-0000-0000-0000-000000000101"  # Demo workspace from seed
-        tenant_id = "00000000-0000-0000-0000-000000000001"  # Demo tenant from seed
+        workspace_id = "00000000-0000-0000-0000-000000000101"  # Demo workspace (local)
         
         # Store debate + participants
         with get_db_connection() as conn:
@@ -60,8 +60,8 @@ class DebateEngine:
                 debate_id,
                 workspace_id,
                 debate_title,
-                'live',
-                {'problem_statement': problem_statement, 'turns': 5},
+                'running',
+                psycopg2.extras.Json({'problem_statement': problem_statement, 'turns': 5}),
                 datetime.now(timezone.utc),
                 datetime.now(timezone.utc)
             ))
@@ -74,19 +74,18 @@ class DebateEngine:
                 
                 cursor.execute("""
                     INSERT INTO participants (
-                        participant_id, debate_id, participant_type, display_name,
-                        agent_config, turn_order, created_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        participant_id, debate_id, participant_type, role_name,
+                        agent_config, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
                 """, (
                     participant_id,
                     debate_id,
                     'agent',
                     agent['name'],
-                    {
+                    psycopg2.extras.Json({
                         'role': agent['role'],
                         'model_id': agent['model_id']
-                    },
-                    idx,
+                    }),
                     datetime.now(timezone.utc)
                 ))
             
@@ -103,7 +102,7 @@ class DebateEngine:
                 'system_message',
                 'system',
                 0,
-                {'text': f'Debate started: {debate_title}', 'problem_statement': problem_statement},
+                psycopg2.extras.Json({'text': f'Debate started: {debate_title}', 'problem_statement': problem_statement}),
                 datetime.now(timezone.utc)
             ))
         
@@ -148,7 +147,7 @@ class DebateEngine:
                 cursor = get_cursor(conn)
                 cursor.execute("""
                     INSERT INTO events (
-                        event_id, debate_id, event_type, sender_type, sender_participant_id,
+                        event_id, debate_id, event_type, sender_type, sender_id,
                         sequence_number, content, created_at
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
@@ -158,12 +157,12 @@ class DebateEngine:
                     'agent',
                     participant_id,
                     sequence_num,
-                    {
+                    psycopg2.extras.Json({
                         'agent_name': agent['name'],
                         'text': agent_message,
                         'model': response['model'],
                         'turn': turn + 1
-                    },
+                    }),
                     datetime.now(timezone.utc)
                 ))
             
@@ -184,11 +183,11 @@ class DebateEngine:
             cursor = get_cursor(conn)
             cursor.execute("""
                 UPDATE debates SET state = %s, updated_at = %s WHERE debate_id = %s
-            """, ('completed', datetime.now(timezone.utc), debate_id))
+            """, ('ended', datetime.now(timezone.utc), debate_id))
         
         return {
             'debate_id': debate_id,
-            'status': 'completed',
+            'status': 'ended',
             'outputs': outputs,
             'event_history': events
         }

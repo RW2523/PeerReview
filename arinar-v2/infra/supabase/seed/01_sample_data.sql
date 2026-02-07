@@ -80,7 +80,7 @@ VALUES (
     '00000000-0000-0000-0000-000000000101',
     'Feature Prioritization Q1 2026',
     'Discuss and prioritize features for Q1 2026 product roadmap',
-    'live',
+    'running',
     60,
     '{"internet_research_enabled": false, "tool_calling_enabled": false, "strict_citation_mode": true, "max_tokens_per_response": 1500}',
     NOW() - INTERVAL '10 minutes',
@@ -232,6 +232,22 @@ VALUES
 ON CONFLICT (knowledge_id) DO NOTHING;
 
 -- ============================================================================
+-- USER WORKSPACE MAPPINGS (for Supabase Auth)
+-- ============================================================================
+
+-- Map test user to Product Strategy workspace
+-- Test user ID: 00000000-0000-0000-0000-000000000999 (for local testing)
+INSERT INTO user_workspaces (user_id, workspace_id, role, created_at)
+VALUES
+    (
+        '00000000-0000-0000-0000-000000000999',
+        '00000000-0000-0000-0000-000000000101',
+        'owner',
+        NOW()
+    )
+ON CONFLICT (user_id, workspace_id) DO NOTHING;
+
+-- ============================================================================
 -- SUMMARY
 -- ============================================================================
 
@@ -249,5 +265,6 @@ BEGIN
     RAISE NOTICE 'Events: 5';
     RAISE NOTICE 'Memory Chunks: 2';
     RAISE NOTICE 'Knowledge Units: 2';
+    RAISE NOTICE 'User Workspaces: 1 (test user)';
     RAISE NOTICE '========================================';
 END $$;

@@ -12,12 +12,35 @@ export interface paths {
      */
     get: operations["getHealth"];
   };
+  "/agent-templates": {
+    /**
+     * List built-in agent templates
+     * @description Returns built-in templates (roles + personas) for fast meeting setup.
+     */
+    get: operations["listAgentTemplates"];
+  };
+  "/agents": {
+    /** List persistent agents in a workspace */
+    get: operations["listAgents"];
+    /**
+     * Create a persistent agent
+     * @description Creates an agent definition (name, prompt, model selection) that can be reused across meetings.
+     */
+    post: operations["createAgent"];
+  };
   "/debates": {
     /**
      * Create new debate session
-     * @description Creates a new debate session in draft state
+     * @description Creates a new debate session in pending state (M2)
      */
     post: operations["createDebate"];
+  };
+  "/debates/{debate_id}": {
+    /**
+     * Get debate details
+     * @description Retrieve details for a specific debate (M2)
+     */
+    get: operations["getDebate"];
   };
   "/debates/run": {
     /**
@@ -28,6 +51,13 @@ export interface paths {
      * **OpenRouter BYOK**: Requires user-provided OpenRouter API key per request.
      */
     post: operations["runDebate"];
+  };
+  "/debates/setup": {
+    /**
+     * Setup a debate (participants + materials)
+     * @description Creates a pending debate plus participants and materials metadata in one call.
+     */
+    post: operations["setupDebate"];
   };
   "/debates/{debate_id}/participants": {
     /**
@@ -43,6 +73,20 @@ export interface paths {
      */
     post: operations["startDebate"];
   };
+  "/debates/{debate_id}/pause": {
+    /**
+     * Pause debate (M2)
+     * @description Transitions debate from running to paused state
+     */
+    post: operations["pauseDebate"];
+  };
+  "/debates/{debate_id}/resume": {
+    /**
+     * Resume debate (M2)
+     * @description Transitions debate from paused to running state
+     */
+    post: operations["resumeDebate"];
+  };
   "/debates/{debate_id}/intervene": {
     /**
      * Intervene in debate
@@ -57,12 +101,69 @@ export interface paths {
      */
     post: operations["endDebate"];
   };
+  "/debates/{debate_id}/summarize": {
+    /**
+     * Generate debate summary (M3)
+     * @description Generate end-of-meeting outputs: summary, minutes, action items.
+     * Requires debate to be in 'ended' state.
+     *
+     * **OpenRouter BYOK**: Requires user-provided OpenRouter API key per request (never stored).
+     */
+    post: operations["generateSummary"];
+  };
+  "/debates/{debate_id}/summary": {
+    /**
+     * Get debate summary (M3)
+     * @description Retrieve existing summary/minutes/action items for a debate
+     */
+    get: operations["getSummary"];
+  };
   "/debates/{debate_id}/events": {
     /**
      * Get debate events
      * @description Retrieves paginated event stream for a debate session
      */
     get: operations["getDebateEvents"];
+  };
+  "/debates/{debate_id}/events/stream": {
+    /**
+     * Stream debate events via SSE (M2)
+     * @description Real-time Server-Sent Events stream of debate events.
+     * Stream automatically closes when debate ends.
+     */
+    get: operations["streamDebateEvents"];
+  };
+  "/openrouter/models": {
+    /**
+     * Fetch OpenRouter model catalog
+     * @description Fetches available models from OpenRouter API using user's BYOK key.
+     * Key is never stored. Results cached 60s.
+     */
+    get: operations["listOpenRouterModels"];
+  };
+  "/openrouter/account": {
+    /**
+     * Get OpenRouter account info
+     * @description Fetches account details from OpenRouter: usage, limits, credits.
+     * Key is never stored.
+     */
+    get: operations["getOpenRouterAccount"];
+  };
+  "/personas/generate-draft": {
+    /**
+     * Generate persona draft with AI
+     * @description Uses OpenRouter LLM to generate persona structure.
+     * Requires BYOK key. Key never stored.
+     */
+    post: operations["generatePersonaDraft"];
+  };
+  "/personas/validate": {
+    /**
+     * Validate persona structure
+     * @description Validates persona fields and compiled prompt.
+     * No LLM call - pure validation logic.
+     */
+    post: operations["validatePersona"];
   };
 }
 
@@ -84,39 +185,100 @@ export interface components {
       };
     };
     CreateDebateRequest: {
+      /** Format: uuid */
+      workspace_id: string;
       title: string;
-      description?: string;
-      /** @default 60 */
-      timebox_minutes?: number;
       policy_config?: {
-        /** @default false */
-        internet_research_enabled?: boolean;
-        /** @default false */
-        tool_calling_enabled?: boolean;
-        max_tokens_per_response?: number;
-        /** @default true */
-        strict_citation_mode?: boolean;
+        [key: string]: unknown;
       };
     };
     DebateResponse: {
       /** Format: uuid */
       debate_id: string;
+      /** Format: uuid */
+      workspace_id: string;
       title: string;
-      description?: string;
       state: components["schemas"]["DebateState"];
-      timebox_minutes?: number;
-      policy_config?: Record<string, never>;
       /** Format: date-time */
       created_at: string;
-      /** Format: date-time */
-      updated_at: string;
-      /** Format: date-time */
-      started_at?: string;
-      /** Format: date-time */
-      ended_at?: string;
     };
     /** @enum {string} */
-    DebateState: "draft" | "preflight" | "live" | "paused" | "synthesis" | "closed" | "archived";
+    DebateState: "pending" | "running" | "paused" | "ended";
+    AgentTemplate: {
+      template_id: string;
+      label: string;
+      role_title: string;
+      system_prompt: string;
+      /** @description OpenRouter model ID (e.g. anthropic/claude-3.5-sonnet) */
+      model_id: string;
+      model_config: {
+        [key: string]: unknown;
+      };
+    };
+    CreateAgentRequest: {
+      /** Format: uuid */
+      workspace_id: string;
+      name: string;
+      role_description?: string;
+      system_prompt: string;
+      /** @description OpenRouter model ID (e.g. anthropic/claude-3.5-sonnet) */
+      model_id: string;
+      agent_model_config?: {
+        [key: string]: unknown;
+      };
+    };
+    AgentResponse: {
+      /** Format: uuid */
+      agent_id: string;
+      /** Format: uuid */
+      workspace_id: string;
+      name: string;
+      role_description?: string;
+      system_prompt: string;
+      model_id: string;
+      model_config: {
+        [key: string]: unknown;
+      };
+      /** Format: date-time */
+      created_at: string;
+    };
+    DebateSetupRequest: {
+      /** Format: uuid */
+      workspace_id: string;
+      title: string;
+      problem_statement: string;
+      timebox_minutes?: number;
+      participants: components["schemas"]["SetupParticipant"][];
+      materials?: components["schemas"]["SetupMaterial"][];
+    };
+    SetupParticipant: {
+      /**
+       * Format: uuid
+       * @description Reference an existing persistent agent
+       */
+      agent_id?: string;
+      /** @description Inline participant name (if not using agent_id) */
+      name?: string;
+      role_description?: string;
+      system_prompt?: string;
+      model_id?: string;
+      model_config?: {
+        [key: string]: unknown;
+      };
+    };
+    SetupMaterial: {
+      /** @enum {string} */
+      kind: "text" | "link" | "file_placeholder";
+      title?: string;
+      body_text?: string;
+      url?: string;
+    };
+    DebateSetupResponse: {
+      /** Format: uuid */
+      debate_id: string;
+      participant_ids: string[];
+      material_ids: string[];
+    };
     DebateRunRequest: {
       /** @description Problem or topic to discuss */
       problem_statement: string;
@@ -212,6 +374,51 @@ export interface components {
       /** Format: date-time */
       created_at: string;
     };
+    SummarizeRequest: {
+      /** @description OpenRouter BYOK key (never stored) */
+      openrouter_api_key: string;
+      /**
+       * @description Model for summary generation
+       * @default anthropic/claude-3.5-sonnet
+       */
+      model_id?: string;
+    };
+    ActionItem: {
+      /** @description Action item description */
+      description: string;
+      /** @description Responsible party (role or name) */
+      owner: string;
+      /**
+       * @description Priority level
+       * @enum {string}
+       */
+      priority: "high" | "medium" | "low";
+    };
+    SummaryResponse: {
+      /**
+       * Format: uuid
+       * @description Unique output record ID
+       */
+      output_id: string;
+      /**
+       * Format: uuid
+       * @description Associated debate ID
+       */
+      debate_id: string;
+      /** @description Short summary (1-3 sentences) */
+      summary: string;
+      /** @description Detailed meeting minutes */
+      minutes: string;
+      /** @description Extracted action items */
+      action_items: components["schemas"]["ActionItem"][];
+      /**
+       * Format: date-time
+       * @description When summary was generated
+       */
+      generated_at: string;
+      /** @description Model ID used for generation */
+      model_used?: string;
+    };
     EndDebateRequest: {
       reason?: string;
     };
@@ -255,6 +462,59 @@ export interface components {
       /** Format: date-time */
       timestamp?: string;
     };
+    ModelListResponse: {
+      models: components["schemas"]["OpenRouterModel"][];
+      /** @default false */
+      cached?: boolean;
+    };
+    OpenRouterModel: {
+      id: string;
+      name: string;
+      context_length?: number;
+      pricing?: {
+        [key: string]: unknown;
+      };
+      description?: string;
+    };
+    GeneratePersonaDraftRequest: {
+      role_title: string;
+      style_brief: string;
+      tone: string;
+      risk_appetite: string;
+      /** @default anthropic/claude-3.5-sonnet */
+      model_id?: string;
+    };
+    GeneratePersonaDraftResponse: {
+      persona: components["schemas"]["PersonaData"];
+      compiled_prompt: string;
+    };
+    PersonaData: {
+      name?: string;
+      role_title: string;
+      description: string;
+      traits: components["schemas"]["PersonaTraits"];
+      behavior_policy: string;
+      knowledge_policy: string;
+    };
+    PersonaTraits: {
+      assertiveness: number;
+      analytical_depth: number;
+      creativity: number;
+      risk_tolerance: number;
+    };
+    ValidatePersonaRequest: {
+      persona: {
+        [key: string]: unknown;
+      };
+      compiled_prompt: string;
+    };
+    ValidatePersonaResponse: {
+      valid: boolean;
+      /** @default [] */
+      errors?: string[];
+      /** @default [] */
+      warnings?: string[];
+    };
   };
   responses: never;
   parameters: {
@@ -287,8 +547,63 @@ export interface operations {
     };
   };
   /**
+   * List built-in agent templates
+   * @description Returns built-in templates (roles + personas) for fast meeting setup.
+   */
+  listAgentTemplates: {
+    responses: {
+      /** @description List of templates */
+      200: {
+        content: {
+          "application/json": components["schemas"]["AgentTemplate"][];
+        };
+      };
+    };
+  };
+  /** List persistent agents in a workspace */
+  listAgents: {
+    parameters: {
+      query: {
+        workspace_id: string;
+      };
+    };
+    responses: {
+      /** @description List of agents */
+      200: {
+        content: {
+          "application/json": components["schemas"]["AgentResponse"][];
+        };
+      };
+    };
+  };
+  /**
+   * Create a persistent agent
+   * @description Creates an agent definition (name, prompt, model selection) that can be reused across meetings.
+   */
+  createAgent: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateAgentRequest"];
+      };
+    };
+    responses: {
+      /** @description Agent created */
+      201: {
+        content: {
+          "application/json": components["schemas"]["AgentResponse"];
+        };
+      };
+      /** @description Invalid request */
+      400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
    * Create new debate session
-   * @description Creates a new debate session in draft state
+   * @description Creates a new debate session in pending state (M2)
    */
   createDebate: {
     requestBody: {
@@ -305,6 +620,31 @@ export interface operations {
       };
       /** @description Invalid request */
       400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Get debate details
+   * @description Retrieve details for a specific debate (M2)
+   */
+  getDebate: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Debate retrieved successfully */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DebateResponse"];
+        };
+      };
+      /** @description Debate not found */
+      404: {
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
         };
@@ -345,6 +685,31 @@ export interface operations {
       };
       /** @description Internal server error */
       500: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Setup a debate (participants + materials)
+   * @description Creates a pending debate plus participants and materials metadata in one call.
+   */
+  setupDebate: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DebateSetupRequest"];
+      };
+    };
+    responses: {
+      /** @description Debate setup created */
+      201: {
+        content: {
+          "application/json": components["schemas"]["DebateSetupResponse"];
+        };
+      };
+      /** @description Invalid request */
+      400: {
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
         };
@@ -413,6 +778,68 @@ export interface operations {
     };
   };
   /**
+   * Pause debate (M2)
+   * @description Transitions debate from running to paused state
+   */
+  pauseDebate: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Debate paused successfully */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DebateResponse"];
+        };
+      };
+      /** @description Invalid state transition */
+      400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Debate not found */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Resume debate (M2)
+   * @description Transitions debate from paused to running state
+   */
+  resumeDebate: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Debate resumed successfully */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DebateResponse"];
+        };
+      };
+      /** @description Invalid state transition */
+      400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Debate not found */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
    * Intervene in debate
    * @description Manual or policy-triggered intervention in active debate
    */
@@ -473,6 +900,76 @@ export interface operations {
     };
   };
   /**
+   * Generate debate summary (M3)
+   * @description Generate end-of-meeting outputs: summary, minutes, action items.
+   * Requires debate to be in 'ended' state.
+   *
+   * **OpenRouter BYOK**: Requires user-provided OpenRouter API key per request (never stored).
+   */
+  generateSummary: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SummarizeRequest"];
+      };
+    };
+    responses: {
+      /** @description Summary generated successfully */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SummaryResponse"];
+        };
+      };
+      /** @description Invalid request (debate not ended) */
+      400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Invalid OpenRouter API key */
+      401: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Debate not found */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Get debate summary (M3)
+   * @description Retrieve existing summary/minutes/action items for a debate
+   */
+  getSummary: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Summary retrieved successfully */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SummaryResponse"];
+        };
+      };
+      /** @description Debate or summary not found */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
    * Get debate events
    * @description Retrieves paginated event stream for a debate session
    */
@@ -499,6 +996,167 @@ export interface operations {
       404: {
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Stream debate events via SSE (M2)
+   * @description Real-time Server-Sent Events stream of debate events.
+   * Stream automatically closes when debate ends.
+   */
+  streamDebateEvents: {
+    parameters: {
+      query?: {
+        /** @description Start streaming from this sequence number */
+        since?: number;
+      };
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description SSE stream established */
+      200: {
+        content: {
+          "text/event-stream": string;
+        };
+      };
+      /** @description Debate not found */
+      404: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Fetch OpenRouter model catalog
+   * @description Fetches available models from OpenRouter API using user's BYOK key.
+   * Key is never stored. Results cached 60s.
+   */
+  listOpenRouterModels: {
+    parameters: {
+      header: {
+        /** @description OpenRouter API key (BYOK) */
+        "X-OpenRouter-Key": string;
+      };
+    };
+    responses: {
+      /** @description Model list */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ModelListResponse"];
+        };
+      };
+      /** @description Missing API key */
+      400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Invalid API key */
+      401: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Get OpenRouter account info
+   * @description Fetches account details from OpenRouter: usage, limits, credits.
+   * Key is never stored.
+   */
+  getOpenRouterAccount: {
+    parameters: {
+      header: {
+        /** @description OpenRouter API key (BYOK) */
+        "X-OpenRouter-Key": string;
+      };
+    };
+    responses: {
+      /** @description Account information */
+      200: {
+        content: {
+          "application/json": {
+            /** @description Key usage and limits */
+            key?: Record<string, never>;
+            /** @description Credits info (null if not available) */
+            credits?: Record<string, unknown> | null;
+            /** @description Additional info or warnings */
+            note?: string | null;
+          };
+        };
+      };
+      /** @description Missing API key */
+      400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Invalid API key */
+      401: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Generate persona draft with AI
+   * @description Uses OpenRouter LLM to generate persona structure.
+   * Requires BYOK key. Key never stored.
+   */
+  generatePersonaDraft: {
+    parameters: {
+      header: {
+        /** @description OpenRouter API key (BYOK) */
+        "X-OpenRouter-Key": string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GeneratePersonaDraftRequest"];
+      };
+    };
+    responses: {
+      /** @description Persona draft generated */
+      200: {
+        content: {
+          "application/json": components["schemas"]["GeneratePersonaDraftResponse"];
+        };
+      };
+      /** @description Missing or invalid input */
+      400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Invalid API key */
+      401: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * Validate persona structure
+   * @description Validates persona fields and compiled prompt.
+   * No LLM call - pure validation logic.
+   */
+  validatePersona: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ValidatePersonaRequest"];
+      };
+    };
+    responses: {
+      /** @description Validation result */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ValidatePersonaResponse"];
         };
       };
     };

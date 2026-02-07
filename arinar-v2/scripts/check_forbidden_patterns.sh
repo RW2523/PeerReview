@@ -90,10 +90,13 @@ echo ""
 echo "🔧 Checking for temporary hacks..."
 
 # TODO/FIXME without issue reference
+# Valid formats: TODO(#123), TODO(TICKET-...), TODO(ABC-123), TODO #123, TODO: #TICKET-06
 todo_without_issue=$(grep -rn "TODO\|FIXME\|HACK" "$ROOT_DIR/apps" "$ROOT_DIR/packages" \
     --include="*.py" --include="*.ts" --include="*.js" \
     --exclude-dir=node_modules --exclude-dir=generated --exclude-dir=.venv --exclude-dir=.next 2>/dev/null | \
-    grep -v "TODO.*#[0-9]" | grep -v "FIXME.*#[0-9]" | grep -v "HACK.*#[0-9]" || true)
+    grep -v "TODO.*#[0-9]" | grep -v "FIXME.*#[0-9]" | grep -v "HACK.*#[0-9]" | \
+    grep -v "TODO.*TICKET-" | grep -v "FIXME.*TICKET-" | grep -v "HACK.*TICKET-" | \
+    grep -v "TODO.*[A-Z]+-[0-9]" | grep -v "FIXME.*[A-Z]+-[0-9]" | grep -v "HACK.*[A-Z]+-[0-9]" || true)
 
 if [ -n "$todo_without_issue" ]; then
     echo -e "  ${YELLOW}⚠${NC}  Found TODO/FIXME/HACK without issue reference:"
@@ -164,7 +167,7 @@ echo "🌍 Checking for undocumented environment variables..."
 env_vars=$(grep -rhE "process\.env\.[A-Z_][A-Z0-9_]*|process\.env\[[\"\']([A-Z_][A-Z0-9_]*)[\"\']|os\.getenv\([\"\']([A-Z_][A-Z0-9_]*)|os\.environ\[[\"\']([A-Z_][A-Z0-9_]*)" \
     "$ROOT_DIR/apps" "$ROOT_DIR/packages" \
     --include="*.py" --include="*.ts" --include="*.js" \
-    --exclude-dir=node_modules --exclude-dir=generated 2>/dev/null | \
+    --exclude-dir=node_modules --exclude-dir=generated --exclude-dir=.next --exclude-dir=.venv --exclude-dir=.pytest_cache --exclude-dir=__pycache__ 2>/dev/null | \
     sed -E "s/.*process\.env\.([A-Z_][A-Z0-9_]*).*/\1/; s/.*process\.env\[[\"\']([A-Z_][A-Z0-9_]*)[\"\'].*/\1/; s/.*os\.getenv\([\"\']([A-Z_][A-Z0-9_]*).*/\1/; s/.*os\.environ\[[\"\']([A-Z_][A-Z0-9_]*).*/\1/" | \
     sort | uniq || true)
 

@@ -1,19 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import AppNav from '@/components/layout/AppNav';
 import { useEventStream, DebateEvent } from '@/hooks/useEventStream';
 import * as api from '@/lib/api';
+import { SummaryDisplay } from '@/components/SummaryDisplay';
+import { SummaryGenerateForm } from '@/components/SummaryGenerateForm';
 import styles from './operator.module.css';
 
-export default function OperatorPage() {
+function OperatorContent() {
+  const searchParams = useSearchParams();
+  const urlDebateId = searchParams.get('debate_id');
+  
   const [debateId, setDebateId] = useState('');
   const [activeDebateId, setActiveDebateId] = useState<string | null>(null);
   const [interventionText, setInterventionText] = useState('');
   const [status, setStatus] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // M3 Summary state
+  const [summary, setSummary] = useState<api.SummaryResponse | null>(null);
+  const [isDebateEnded, setIsDebateEnded] = useState(false);
 
   const streamUrl = activeDebateId ? api.getStreamUrl(activeDebateId) : null;
   const stream = useEventStream(streamUrl);
+  
+  // Auto-load debate from query param
+  useEffect(() => {
+    if (urlDebateId && !debateId) {
+      setDebateId(urlDebateId);
+      setActiveDebateId(urlDebateId);
+      setStatus(`Loaded debate: ${urlDebateId}`);
+    }
+  }, [urlDebateId, debateId]);
 
   const handleCreate = async () => {
     setIsLoading(true);
@@ -83,6 +103,7 @@ export default function OperatorPage() {
     try {
       const result = await api.endDebate(debateId);
       setStatus(`Ended - State: ${result.state}`);
+      setIsDebateEnded(true);
     } catch (err: any) {
       setStatus(`Error: ${err.message}`);
     } finally {
@@ -177,12 +198,37 @@ export default function OperatorPage() {
             </button>
           </div>
 
+          {/* M3 Summary Generation */}
+          {isDebateEnded && !summary && (
+            <div className={styles.section}>
+              <SummaryGenerateForm
+                debateId={debateId}
+                isLoading={isLoading}
+                onGenerate={(result) => {
+                  setSummary(result);
+                  setIsLoading(false);
+                }}
+                onStatusChange={(newStatus) => {
+                  setStatus(newStatus);
+                  setIsLoading(true);
+                }}
+              />
+            </div>
+          )}
+
           {status && (
             <div className={styles.status}>
               <strong>Status:</strong> {status}
             </div>
           )}
         </div>
+
+        {/* M3 Summary Display */}
+        {summary && (
+          <div className={styles.panel}>
+            <SummaryDisplay summary={summary} />
+          </div>
+        )}
 
         {/* Live Feed */}
         <div className={styles.panel}>
@@ -225,5 +271,16 @@ export default function OperatorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OperatorPage() {
+  return (
+    <>
+      <AppNav />
+      <Suspense fallback={<div>Loading...</div>}>
+        <OperatorContent />
+      </Suspense>
+    </>
   );
 }

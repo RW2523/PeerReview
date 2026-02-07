@@ -69,7 +69,12 @@ Core tables:
    make db-migrate
    ```
    
-   Applies all SQL migrations in order from `infra/supabase/migrations/`
+   Applies SQL migrations in order from `infra/supabase/migrations/`.
+   
+   Notes:
+   - Migrations are tracked in the DB table `arinar_schema_migrations`.
+   - Safe to re-run: already-applied migrations are skipped.
+   - If you change a migration file that has already been applied, you must create a new migration instead.
 
 5. **Load seed data** (optional for development):
    ```bash
@@ -418,6 +423,57 @@ def db_transaction():
     transaction.rollback()
     connection.close()
 ```
+
+## Troubleshooting
+
+### Port Conflicts
+**Symptom:** `db-up` fails with "Address already in use"  
+**Solution:** Check for existing services on ports 5432, 54321, 54323-54327
+```bash
+lsof -i :5432  # Check who's using port 5432
+docker ps      # Check for existing Supabase containers
+```
+
+### Database Connection Failed from API
+**Symptom:** `password authentication failed for user "postgres"`  
+**Root Cause:** API `.env` file doesn't match actual database credentials
+
+**Solution:**
+1. Check actual password in `infra/docker/.env`:
+   ```bash
+   grep POSTGRES_PASSWORD infra/docker/.env
+   ```
+2. Update `apps/api/.env.local` to match:
+   ```env
+   DATABASE_URL=postgresql://postgres:<PASSWORD_FROM_STEP_1>@127.0.0.1:5432/postgres
+   ```
+3. Restart API server
+
+**Why 127.0.0.1 instead of localhost?**  
+macOS/Linux may resolve `localhost` to IPv6 `::1`, causing connection issues if Docker only binds to IPv4.
+
+### Migration Errors
+**Symptom:** SQL errors during `make db-migrate`  
+**Solution:** Check `infra/supabase/migrations/*.sql` for syntax errors. Run individual migration manually:
+```bash
+docker exec -i arinar-db psql -U postgres -d postgres < infra/supabase/migrations/FILENAME.sql
+```
+
+### Seed Data Errors
+**Symptom:** FK constraint violations during `make db-seed`  
+**Solution:** Verify FK relationships in `infra/supabase/seed/*.sql`. Ensure parent records (tenants, workspaces) exist before children (debates, agents).
+
+### Invalid Debate State Enum Error
+**Symptom:** API returns `'draft' is not a valid DebateState` or `'live' is not a valid DebateState`  
+**Root Cause:** Database schema constraint doesn't match application DebateState enum
+
+**Solution:**
+This indicates schema drift. Check if migration `20260206000001_align_debate_states.sql` exists and is applied:
+```bash
+docker exec arinar-db psql -U postgres -d postgres -c "\d debates" | grep state_check
+```
+
+If constraint shows `draft|live|closed` instead of `pending|running|paused|ended`, apply alignment migration (see `reports/DEMO-01-2026-02-06-v1.md` for migration SQL).
 
 ## References
 

@@ -155,11 +155,7 @@ db-migrate:
 		echo "❌ Database is not running. Run 'make db-up' first."; \
 		exit 1; \
 	fi
-	@for file in infra/supabase/migrations/*.sql; do \
-		echo "→ Applying $$(basename $$file)..."; \
-		docker exec -i arinar-db psql -U postgres -d postgres < $$file || exit 1; \
-	done
-	@echo "✅ Migrations applied successfully"
+	@bash scripts/db_apply_migrations.sh
 
 # Load seed data
 db-seed:

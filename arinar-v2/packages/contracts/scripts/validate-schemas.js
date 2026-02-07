@@ -15,6 +15,7 @@ const SCHEMAS_DIR = path.join(__dirname, '../schemas/events');
 const REQUIRED_EVENT_TYPES = [
   'agent_message',
   'intervention',
+  'debate_summary',
   'pre_turn_nudge',
   'research_request',
   'research_result',

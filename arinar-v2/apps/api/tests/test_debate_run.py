@@ -1,4 +1,4 @@
-"""Tests for POST /debates/run endpoint"""
+"""Tests for POST /debates/run endpoint (DB-backed, OpenRouter mocked)."""
 import pytest
 import os
 import sys
@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from fastapi.testclient import TestClient
 from src.main import app
 from src.openrouter_client import OpenRouterAuthError
+from src.database import get_db_connection, get_cursor
 
 
 client = TestClient(app)
@@ -77,8 +78,7 @@ def test_health_check():
 
 
 @patch('src.debate_engine.OpenRouterClient')
-@patch('src.debate_engine.get_db_connection')
-def test_debate_run_happy_path(mock_db, mock_openrouter, valid_request_payload):
+def test_debate_run_happy_path(mock_openrouter, valid_request_payload):
     """Test successful 5-turn debate execution"""
     # Mock OpenRouter client
     mock_client_instance = MagicMock()
@@ -93,14 +93,6 @@ def test_debate_run_happy_path(mock_db, mock_openrouter, valid_request_payload):
         MOCK_AGENT_RESPONSE_2,  # Turn 5: Agent 1
         MOCK_SUMMARY_RESPONSE   # Final summary
     ]
-    
-    # Mock database
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.__enter__ = MagicMock(return_value=mock_conn)
-    mock_conn.__exit__ = MagicMock(return_value=False)
-    mock_db.return_value = mock_conn
-    mock_conn.cursor.return_value = mock_cursor
     
     # Execute request
     response = client.post("/debates/run", json=valid_request_payload)
@@ -130,6 +122,15 @@ def test_debate_run_happy_path(mock_db, mock_openrouter, valid_request_payload):
         assert "agent" in event
         assert "message" in event
 
+    # Verify DB has the debate row
+    debate_id = data["debate_id"]
+    with get_db_connection() as conn:
+        cur = get_cursor(conn)
+        cur.execute("SELECT debate_id, state FROM debates WHERE debate_id=%s", (debate_id,))
+        row = cur.fetchone()
+        assert row is not None
+        assert row["state"] == "ended"
+
 
 @patch('src.debate_engine.OpenRouterClient')
 def test_debate_run_turn_order(mock_openrouter, valid_request_payload):
@@ -146,25 +147,16 @@ def test_debate_run_turn_order(mock_openrouter, valid_request_payload):
         MOCK_SUMMARY_RESPONSE
     ]
     
-    with patch('src.debate_engine.get_db_connection') as mock_db:
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_conn.__enter__ = MagicMock(return_value=mock_conn)
-        mock_conn.__exit__ = MagicMock(return_value=False)
-        mock_db.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
-        
-        response = client.post("/debates/run", json=valid_request_payload)
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        # Verify turn order: 0, 1, 2, 0, 1
-        events = data["event_history"]
-        expected_agents = ["Product Manager", "Senior Engineer", "UX Designer", "Product Manager", "Senior Engineer"]
-        
-        for i, expected_agent in enumerate(expected_agents):
-            assert events[i]["agent"] == expected_agent
+    response = client.post("/debates/run", json=valid_request_payload)
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify turn order: 0, 1, 2, 0, 1
+    events = data["event_history"]
+    expected_agents = ["Product Manager", "Senior Engineer", "UX Designer", "Product Manager", "Senior Engineer"]
+
+    for i, expected_agent in enumerate(expected_agents):
+        assert events[i]["agent"] == expected_agent
 
 
 def test_debate_run_invalid_agent_count(valid_request_payload):
@@ -200,8 +192,7 @@ def test_debate_run_missing_api_key(valid_request_payload):
 
 
 @patch('src.debate_engine.OpenRouterClient')
-@patch('src.debate_engine.get_db_connection')
-def test_debate_run_db_persistence(mock_db, mock_openrouter, valid_request_payload):
+def test_debate_run_db_persistence(mock_openrouter, valid_request_payload):
     """Test that debate and events are persisted to database"""
     mock_client_instance = MagicMock()
     mock_openrouter.return_value = mock_client_instance
@@ -215,25 +206,20 @@ def test_debate_run_db_persistence(mock_db, mock_openrouter, valid_request_paylo
         MOCK_SUMMARY_RESPONSE
     ]
     
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.__enter__ = MagicMock(return_value=mock_conn)
-    mock_conn.__exit__ = MagicMock(return_value=False)
-    mock_db.return_value = mock_conn
-    mock_conn.cursor.return_value = mock_cursor
-    
     response = client.post("/debates/run", json=valid_request_payload)
     
     assert response.status_code == 200
-    
-    # Verify database calls
-    execute_calls = mock_cursor.execute.call_count
-    
-    # Expected calls:
-    # 1 debate insert
-    # 3 participant inserts
-    # 1 system event
-    # 5 agent message events
-    # 1 debate update (mark completed)
-    # Total: 11 execute calls
-    assert execute_calls >= 10  # At least 10 inserts/updates
+
+    data = response.json()
+    debate_id = data["debate_id"]
+
+    with get_db_connection() as conn:
+        cur = get_cursor(conn)
+        cur.execute("SELECT COUNT(*)::int AS c FROM participants WHERE debate_id=%s", (debate_id,))
+        participants = cur.fetchone()["c"]
+        assert participants == 3
+
+        cur.execute("SELECT COUNT(*)::int AS c FROM events WHERE debate_id=%s", (debate_id,))
+        events = cur.fetchone()["c"]
+        # 1 system event + 5 agent messages + 1+ system messages possible
+        assert events >= 6

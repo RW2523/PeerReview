@@ -1,45 +1,52 @@
 # Ticket Report Template
 
 ## Summary
-- Ticket(s):
-- Date:
-- Author:
-- Status: `PASS` / `PARTIAL` / `FAIL` / `NOT VERIFIED`
+- **Ticket(s):** TICKET-XX
+- **Date:** YYYY-MM-DD
+- **Author:** Cursor Agent
+- **Status:** `PASS` | `FAIL` | `BLOCKED`
 
-## Changed Files
-- Created:
-- Modified:
-- Deleted:
+## What Changed
 
-## Commands Run And Output Summary
-1. `<command>`
-- Exit code:
-- Key output:
-2. `<command>`
-- Exit code:
-- Key output:
+### Files Created
+- `path/to/new/file.ext` - Brief description
+
+### Files Modified
+- `path/to/modified/file.ext` - What changed
+
+### Files Deleted
+- `path/to/deleted/file.ext` - Why deleted
+
+## Commands Run
+
+```bash
+# Command 1: Description
+command --with --flags
+# Exit code: 0
+# Output: <key lines>
+
+# Command 2: Description
+another-command
+# Exit code: 0
+# Output: <key lines>
+```
 
 ## Gate Checklist
-| Gate Item | Expected | Actual Evidence | Status |
-|---|---|---|---|
-| Example item | <expected behavior> | <command/file/proof> | PASS/FAIL/PARTIAL/NOT VERIFIED |
 
-## Negative Test Evidence
-- Test case:
-- Command:
-- Expected failure:
-- Actual result:
-- Status:
+| Gate | Status | Evidence |
+|------|--------|----------|
+| Lint passes | YES/NO | `make lint` output |
+| Tests pass | YES/NO | `make api-test` output |
+| Verify passes | YES/NO | `make verify` output |
+| Build succeeds | YES/NO | `npm run build` output |
+| Contract valid | YES/NO | OpenAPI validation output |
 
-## Known Limitations
-- Limitation:
-- Impact:
-- Mitigation:
+## Blockers
 
-## Blockers / Founder Input Needed
-- None / list items.
+None / List specific blockers requiring resolution before PASS.
 
-## Definition Of Done Verdict
-- Final verdict:
-- Ready for next ticket: Yes/No
+## Next Steps
 
+1. Next action item
+2. Follow-up ticket
+3. Handoff to user/team

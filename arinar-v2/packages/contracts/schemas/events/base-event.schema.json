@@ -50,7 +50,8 @@
         "voice_transcript_partial",
         "voice_transcript_final",
         "voice_tts_started",
-        "voice_tts_completed"
+        "voice_tts_completed",
+        "debate_summary"
       ]
     },
     "sender_type": {

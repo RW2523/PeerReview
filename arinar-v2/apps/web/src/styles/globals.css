@@ -1,18 +1,52 @@
-/* Dark Matte Design System */
+/* Dark Matte Design System - Premium Tokens */
 :root {
+  /* Backgrounds - layered depth */
   --bg-0: #070707;
   --bg-1: #0d0d0f;
   --bg-2: #141418;
+  
+  /* Surfaces - elevated panels */
   --surface-0: rgba(255, 255, 255, 0.04);
   --surface-1: rgba(255, 255, 255, 0.07);
+  --surface-2: rgba(255, 255, 255, 0.10);
+  
+  /* Borders */
   --border-soft: rgba(255, 255, 255, 0.10);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  
+  /* Typography */
   --text-0: #f4f4f5;
   --text-1: #c8c8cf;
   --text-2: #9a9aa4;
+  --text-3: #6e6e78;
+  
+  /* Accent - subtle, not loud */
   --accent: #f2f2f2;
+  --accent-hover: #ffffff;
+  
+  /* Semantic */
   --success: #4ade80;
   --warning: #fbbf24;
   --danger: #f87171;
+  
+  /* Spacing scale (8px grid) */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+  --space-6: 64px;
+  
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -27,11 +61,15 @@ body {
   overflow-x: hidden;
   background-color: var(--bg-0);
   color: var(--text-0);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   font-weight: 400;
   line-height: 1.6;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display, var(--font-sans, sans-serif));
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 a {

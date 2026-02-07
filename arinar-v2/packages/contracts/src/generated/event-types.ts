@@ -13,6 +13,7 @@ export type EventType =
   | 'agent_question'
   | 'agent_rebuttal'
   | 'intervention'
+  | 'debate_summary'
   | 'evidence_request'
   | 'evidence_response'
   | 'summary_update'
@@ -84,6 +85,17 @@ export interface InterventionContent {
 export interface InterventionEvent extends BaseEvent {
   event_type: 'intervention';
   content: InterventionContent;
+}
+
+export interface DebateSummaryContent {
+  summary: string;
+  action_item_count: number;
+}
+
+export interface DebateSummaryEvent extends BaseEvent {
+  event_type: 'debate_summary';
+  sender_type: 'system';
+  content: DebateSummaryContent;
 }
 
 export interface PreTurnNudgeContent {

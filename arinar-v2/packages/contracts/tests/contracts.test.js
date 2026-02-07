@@ -27,12 +27,26 @@ test('OpenAPI contains all required endpoints', () => {
   
   const requiredPaths = [
     '/health:',
+    '/agent-templates:',
+    '/agents:',
     '/debates:',
+    '/debates/{debate_id}:',
+    '/debates/run:',
+    '/debates/setup:',
     '/debates/{debate_id}/participants:',
     '/debates/{debate_id}/start:',
+    '/debates/{debate_id}/pause:',
+    '/debates/{debate_id}/resume:',
     '/debates/{debate_id}/intervene:',
     '/debates/{debate_id}/end:',
-    '/debates/{debate_id}/events:'
+    '/debates/{debate_id}/events:',
+    '/debates/{debate_id}/events/stream:',
+    '/debates/{debate_id}/summarize:',
+    '/debates/{debate_id}/summary:',
+    '/openrouter/models:',
+    '/openrouter/account:',
+    '/personas/generate-draft:',
+    '/personas/validate:'
   ];
   
   for (const path of requiredPaths) {
@@ -51,6 +65,7 @@ test('All required event schemas exist', () => {
   const requiredSchemas = [
     'base-event.schema.json',
     'agent-message.schema.json',
+    'debate-summary.schema.json',
     'intervention.schema.json',
     'pre-turn-nudge.schema.json',
     'research-request.schema.json',
@@ -138,6 +153,7 @@ test('Event schemas include all required event types', () => {
   const requiredEventTypes = [
     'agent_message',
     'intervention',
+    'debate_summary',
     'pre_turn_nudge',
     'research_request',
     'research_result',

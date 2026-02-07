@@ -36,12 +36,27 @@ async function validate() {
     // Validate required endpoints from ticket
     const requiredEndpoints = [
       { method: 'get', path: '/health' },
+      { method: 'get', path: '/agent-templates' },
+      { method: 'get', path: '/agents' },
+      { method: 'post', path: '/agents' },
       { method: 'post', path: '/debates' },
+      { method: 'get', path: '/debates/{debate_id}' },
+      { method: 'post', path: '/debates/run' },
+      { method: 'post', path: '/debates/setup' },
       { method: 'post', path: '/debates/{debate_id}/participants' },
       { method: 'post', path: '/debates/{debate_id}/start' },
+      { method: 'post', path: '/debates/{debate_id}/pause' },
+      { method: 'post', path: '/debates/{debate_id}/resume' },
       { method: 'post', path: '/debates/{debate_id}/intervene' },
       { method: 'post', path: '/debates/{debate_id}/end' },
-      { method: 'get', path: '/debates/{debate_id}/events' }
+      { method: 'get', path: '/debates/{debate_id}/events' },
+      { method: 'get', path: '/debates/{debate_id}/events/stream' },
+      { method: 'post', path: '/debates/{debate_id}/summarize' },
+      { method: 'get', path: '/debates/{debate_id}/summary' },
+      { method: 'get', path: '/openrouter/models' },
+      { method: 'get', path: '/openrouter/account' },
+      { method: 'post', path: '/personas/generate-draft' },
+      { method: 'post', path: '/personas/validate' }
     ];
     
     console.log('\n📋 Checking required endpoints:');

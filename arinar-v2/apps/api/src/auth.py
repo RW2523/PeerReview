@@ -29,11 +29,12 @@ def decode_jwt(token: str) -> Dict[str, Any]:
             token = token[7:]
         
         # Decode JWT with Supabase secret
+        # Disable iat verification to avoid clock skew issues
         payload = jwt.decode(
             token,
             settings.supabase_jwt_secret,
             algorithms=['HS256'],
-            options={'verify_exp': True}
+            options={'verify_exp': True, 'verify_iat': False}
         )
         
         return payload
@@ -46,6 +47,39 @@ def decode_jwt(token: str) -> Dict[str, Any]:
         raise AuthError("Invalid token format")
     except Exception as e:
         raise AuthError(f"Token validation failed: {str(e)}")
+
+
+def get_workspace_for_user(user_id: str) -> Optional[str]:
+    """
+    Resolve workspace_id for user from user_workspaces table
+    
+    Args:
+        user_id: Supabase user ID
+    
+    Returns:
+        workspace_id or None if user not mapped to any workspace
+    """
+    from .database import get_db_connection, get_cursor
+    
+    try:
+        with get_db_connection() as conn:
+            cursor = get_cursor(conn)
+            cursor.execute("""
+                SELECT workspace_id, role
+                FROM user_workspaces
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (user_id,))
+            
+            result = cursor.fetchone()
+            if result:
+                return result['workspace_id']
+            
+            return None
+    except Exception:
+        # If DB query fails, return None (will be handled by caller)
+        return None
 
 
 def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
@@ -86,6 +120,10 @@ def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
         
         if not user_id:
             raise AuthError("Token missing user ID (sub)")
+        
+        # If workspace_id not in JWT, resolve from user_workspaces table
+        if not workspace_id:
+            workspace_id = get_workspace_for_user(user_id)
         
         return {
             'user_id': user_id,
