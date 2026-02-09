@@ -4,29 +4,14 @@ import { useState, useEffect } from 'react';
 import AppNav from '@/components/layout/AppNav';
 import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import { KeyPersistence } from '@/lib/openrouterKeyStore';
+import * as api from '@/lib/api';
 import styles from './settings.module.css';
-
-interface AccountInfo {
-  key?: {
-    label?: string;
-    usage?: number;
-    limit?: number | null;
-    rate_limit?: any;
-    is_free_tier?: boolean;
-  };
-  credits?: {
-    total_credits?: number;
-    total_usage?: number;
-    balance?: number;
-  } | null;
-  note?: string | null;
-}
 
 export default function SettingsPage() {
   const { apiKey, persistence, saveKey, clearKey } = useOpenRouterKey();
   const [keyInput, setKeyInput] = useState('');
   const [selectedPersistence, setSelectedPersistence] = useState<KeyPersistence>('memory');
-  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [accountInfo, setAccountInfo] = useState<api.OpenRouterAccountResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -54,17 +39,7 @@ export default function SettingsPage() {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8000/openrouter/account', {
-        headers: {
-          'X-OpenRouter-Key': apiKey,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch account info');
-      }
-
-      const data = await response.json();
+      const data = await api.getOpenRouterAccount(apiKey);
       setAccountInfo(data);
       setLastUpdated(new Date());
     } catch (err) {
@@ -92,13 +67,13 @@ export default function SettingsPage() {
       <div className={styles.container}>
         <div className={styles.content}>
           <h1>Settings</h1>
-          <p className={styles.subtitle}>Manage your OpenRouter API key and view account info</p>
+          <p className={styles.subtitle}>Enter your OpenRouter API key to enable AI features</p>
 
           {/* API Key Card */}
           <section className={styles.card}>
             <h2>OpenRouter API Key</h2>
             <p className={styles.cardDesc}>
-              Your key enables AI features like model catalog, persona generation, and summaries.
+              Enter your OpenRouter key to use AI features. Your key is never stored on our servers.
             </p>
 
             {apiKey ? (

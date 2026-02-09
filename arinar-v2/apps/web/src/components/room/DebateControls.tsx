@@ -19,7 +19,8 @@ export default function DebateControls({ debateId, currentState, onStateChange }
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:8000/debates/${debateId}/${action}`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/debates/${debateId}/${action}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

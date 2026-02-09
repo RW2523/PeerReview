@@ -48,3 +48,21 @@ class InterventionResponse(BaseModel):
     debate_id: str
     message: str
     tagged_agents: List[str]
+
+
+class DebateListItem(BaseModel):
+    """Single debate item in list"""
+    debate_id: str
+    workspace_id: str
+    title: str
+    state: str
+    created_at: str
+    updated_at: Optional[str] = None
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+
+
+class DebateListResponse(BaseModel):
+    """Response for listing debates"""
+    items: List[DebateListItem]
+    next_cursor: Optional[str] = None

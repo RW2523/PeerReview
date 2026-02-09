@@ -3,23 +3,30 @@
 import { useState, useEffect } from 'react';
 import AppNav from '@/components/layout/AppNav';
 import DebateSelector from '@/components/room/DebateSelector';
-import KeyVault from '@/components/room/KeyVault';
 import EventFeed from '@/components/room/EventFeed';
 import DebateControls from '@/components/room/DebateControls';
 import AgendaPanel from '@/components/room/AgendaPanel';
 import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
-import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import * as api from '@/lib/api';
 import styles from './room.module.css';
 
+/**
+ * Room Page - Live Debate Control Center
+ * 
+ * Data Isolation: All components receive debateId prop and only fetch/display
+ * data for that specific debate. No cross-debate data leakage.
+ * - EventFeed: filters events by debateId via SSE stream
+ * - DebateControls: actions scoped to debateId
+ * - InterveneComposer: interventions sent to debateId
+ * - SummaryReport: summary generated for debateId
+ * - AgendaPanel: localStorage keyed by debateId
+ */
 export default function RoomPage() {
   const [debateId, setDebateId] = useState<string | null>(null);
   const [debateTitle, setDebateTitle] = useState<string>('');
   const [debateState, setDebateState] = useState<string>('pending');
-  const [isKeyVaultOpen, setIsKeyVaultOpen] = useState(false);
   const [participants, setParticipants] = useState<{ name: string; id: string }[]>([]);
-  const { apiKey, hasKey } = useOpenRouterKey();
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
@@ -61,11 +68,6 @@ export default function RoomPage() {
     <>
       <AppNav />
       <div className={styles.room}>
-      <KeyVault
-        isOpen={isKeyVaultOpen}
-        onClose={() => setIsKeyVaultOpen(false)}
-      />
-      
       {/* Left Rail: Meeting Info */}
       <aside className={styles.leftRail}>
         <div className={styles.meetingInfo}>
@@ -73,14 +75,6 @@ export default function RoomPage() {
             <h2>Arinar</h2>
             <span className={styles.subtitle}>Decision Room</span>
           </div>
-          
-          <button
-            className={styles.keyVaultBtn}
-            onClick={() => setIsKeyVaultOpen(true)}
-          >
-            <span className={styles.keyIcon}>🔑</span>
-            <span>{hasKey ? 'API Key Saved' : 'Set API Key'}</span>
-          </button>
           
           {debateId && (
             <>

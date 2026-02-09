@@ -24,7 +24,8 @@ export default function DebateSelector({ onDebateLoaded }: DebateSelectorProps) 
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:8000/debates/${debateIdInput}`);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/debates/${debateIdInput}`);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -52,6 +53,8 @@ export default function DebateSelector({ onDebateLoaded }: DebateSelectorProps) 
     setError(null);
 
     try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      
       // Use default workspace from demo (can be made configurable later)
       const payload = {
         workspace_id: '00000000-0000-0000-0000-000000000001',
@@ -61,7 +64,7 @@ export default function DebateSelector({ onDebateLoaded }: DebateSelectorProps) 
         },
       };
 
-      const response = await fetch('http://localhost:8000/debates', {
+      const response = await fetch(`${API_URL}/debates`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -285,3 +285,67 @@ class DebateService:
         
         result = cursor.fetchone()
         return result['next_seq'] if result else 1
+    
+    def list_debates(
+        self,
+        workspace_id: str,
+        limit: int = 20,
+        cursor: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        List debates in workspace with cursor pagination.
+        
+        Cursor is debate_id for simple pagination.
+        Returns items + next_cursor (if more results exist).
+        """
+        with get_db_connection() as conn:
+            db_cursor = get_cursor(conn)
+            
+            if cursor:
+                # Fetch after cursor
+                db_cursor.execute("""
+                    SELECT debate_id, workspace_id, title, state,
+                           created_at, updated_at, started_at, ended_at
+                    FROM debates
+                    WHERE workspace_id = %s AND debate_id > %s
+                    ORDER BY debate_id ASC
+                    LIMIT %s
+                """, (workspace_id, cursor, limit + 1))
+            else:
+                # First page
+                db_cursor.execute("""
+                    SELECT debate_id, workspace_id, title, state,
+                           created_at, updated_at, started_at, ended_at
+                    FROM debates
+                    WHERE workspace_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                """, (workspace_id, limit + 1))
+            
+            rows = db_cursor.fetchall()
+            items = [dict(row) for row in rows]
+            
+            # Check if there are more results
+            next_cursor = None
+            if len(items) > limit:
+                items = items[:limit]
+                next_cursor = items[-1]["debate_id"]
+            
+            return {
+                "items": items,
+                "next_cursor": next_cursor
+            }
+    
+    def get_participants(self, debate_id: str):
+        """Get all participants for a debate"""
+        with get_db_connection() as conn:
+            cursor = get_cursor(conn)
+            cursor.execute("""
+                SELECT participant_id, debate_id, agent_id, agent_config, created_at
+                FROM participants
+                WHERE debate_id = %s
+                ORDER BY created_at ASC
+            """, (debate_id,))
+            
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]

@@ -299,3 +299,74 @@ export async function setupDebate(request: DebateSetupRequest): Promise<DebateSe
   
   return response.json();
 }
+
+// OpenRouter account info
+export interface OpenRouterAccountResponse {
+  key?: {
+    label?: string;
+    usage?: number;
+    limit?: number | null;
+    rate_limit?: any;
+    is_free_tier?: boolean;
+  };
+  credits?: {
+    total_credits?: number;
+    total_usage?: number;
+    balance?: number;
+  } | null;
+  note?: string | null;
+}
+
+export async function getOpenRouterAccount(openrouterKey: string): Promise<OpenRouterAccountResponse> {
+  const response = await fetch(`${API_URL}/openrouter/account`, {
+    method: 'GET',
+    headers: {
+      'X-OpenRouter-Key': openrouterKey,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch account info: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+// Debates list
+export interface DebateListItem {
+  debate_id: string;
+  workspace_id: string;
+  title: string;
+  state: string;
+  created_at: string;
+  updated_at?: string;
+  started_at?: string;
+  ended_at?: string;
+}
+
+export interface DebateListResponse {
+  items: DebateListItem[];
+  next_cursor?: string | null;
+}
+
+export async function listDebates(
+  workspaceId: string,
+  limit?: number,
+  cursor?: string
+): Promise<DebateListResponse> {
+  const headers = await getAuthHeaders();
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  if (limit) params.append('limit', limit.toString());
+  if (cursor) params.append('cursor', cursor);
+  
+  const response = await fetch(`${API_URL}/debates?${params}`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to list debates: ${response.statusText}`);
+  }
+  
+  return response.json();
+}

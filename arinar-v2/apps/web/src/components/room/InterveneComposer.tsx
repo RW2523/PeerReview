@@ -23,12 +23,14 @@ export default function InterveneComposer({ debateId, participants }: InterveneC
     setError(null);
 
     try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      
       const payload = {
         message: message.trim(),
         actor: 'operator',
       };
 
-      const response = await fetch(`http://localhost:8000/debates/${debateId}/intervene`, {
+      const response = await fetch(`${API_URL}/debates/${debateId}/intervene`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

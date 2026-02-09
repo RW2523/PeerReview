@@ -25,7 +25,8 @@ export default function EventFeed({ debateId }: EventFeedProps) {
   useEffect(() => {
     if (!debateId) return;
 
-    const streamUrl = `http://localhost:8000/debates/${debateId}/events/stream`;
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const streamUrl = `${API_URL}/debates/${debateId}/events/stream`;
     setConnectionStatus('connecting');
     setError(null);
 

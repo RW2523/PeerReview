@@ -117,6 +117,55 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /debates:
+    get:
+      operationId: listDebates
+      summary: List debates in workspace
+      description: |
+        List debates with cursor pagination.
+        Protected by workspace access checks.
+      tags:
+        - debates
+      parameters:
+        - name: workspace_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to filter debates
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Max debates to return
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Cursor for pagination
+      responses:
+        '200':
+          description: Debates list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebateListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Workspace access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       operationId: createDebate
       summary: Create new debate session
@@ -781,6 +830,55 @@ components:
         - running
         - paused
         - ended
+    
+    DebateListItem:
+      type: object
+      required:
+        - debate_id
+        - workspace_id
+        - title
+        - state
+        - created_at
+      properties:
+        debate_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        state:
+          $ref: '#/components/schemas/DebateState'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+    
+    DebateListResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebateListItem'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for next page (null if no more results)
 
     AgentTemplate:
       type: object

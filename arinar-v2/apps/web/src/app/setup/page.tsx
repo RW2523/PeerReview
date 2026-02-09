@@ -135,10 +135,22 @@ export default function SetupPage() {
 
       <div className={styles.wizard}>
         <div className={styles.steps}>
-          <div className={step === 1 ? styles.stepActive : styles.step}>1. Basic Info</div>
-          <div className={step === 2 ? styles.stepActive : styles.step}>2. Materials</div>
-          <div className={step === 3 ? styles.stepActive : styles.step}>3. Participants</div>
-          <div className={step === 4 ? styles.stepActive : styles.step}>4. Review</div>
+          <div className={`${styles.step} ${step === 1 ? styles.stepActive : ''} ${step > 1 ? styles.stepCompleted : ''}`}>
+            <div className={styles.stepNumber}>{step > 1 ? '✓' : '1'}</div>
+            <div className={styles.stepLabel}>Basic Info</div>
+          </div>
+          <div className={`${styles.step} ${step === 2 ? styles.stepActive : ''} ${step > 2 ? styles.stepCompleted : ''}`}>
+            <div className={styles.stepNumber}>{step > 2 ? '✓' : '2'}</div>
+            <div className={styles.stepLabel}>Materials</div>
+          </div>
+          <div className={`${styles.step} ${step === 3 ? styles.stepActive : ''} ${step > 3 ? styles.stepCompleted : ''}`}>
+            <div className={styles.stepNumber}>{step > 3 ? '✓' : '3'}</div>
+            <div className={styles.stepLabel}>Participants</div>
+          </div>
+          <div className={`${styles.step} ${step === 4 ? styles.stepActive : ''}`}>
+            <div className={styles.stepNumber}>4</div>
+            <div className={styles.stepLabel}>Review</div>
+          </div>
         </div>
 
         <div className={styles.content}>
@@ -187,32 +199,34 @@ export default function SetupPage() {
           )}
         </div>
 
-        <div className={styles.navigation}>
-          {step > 1 && (
-            <button onClick={() => setStep(step - 1)} disabled={isLoading}>
-              Previous
-            </button>
-          )}
+        <div className={styles.actions}>
+          <div>
+            {step > 1 && (
+              <button onClick={() => setStep(step - 1)} disabled={isLoading}>
+                ← Previous
+              </button>
+            )}
+          </div>
           
-          {step < 4 && (
-            <button
-              onClick={() => setStep(step + 1)}
-              disabled={!canGoNext() || isLoading}
-              className={styles.btnPrimary}
-            >
-              Next
-            </button>
-          )}
-          
-          {step === 4 && (
-            <button
-              onClick={handleLaunch}
-              disabled={isLoading}
-              className={styles.btnLaunch}
-            >
-              {isLoading ? 'Creating...' : 'Launch Meeting'}
-            </button>
-          )}
+          <div>
+            {step < 4 && (
+              <button
+                onClick={() => setStep(step + 1)}
+                disabled={!canGoNext() || isLoading}
+              >
+                {isLoading ? 'Loading...' : 'Next'}
+              </button>
+            )}
+            
+            {step === 4 && (
+              <button
+                onClick={handleLaunch}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Creating...' : 'Create Meeting'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
       </div>

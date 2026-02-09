@@ -1,6 +1,6 @@
 """Debate-related endpoints"""
-from fastapi import APIRouter, HTTPException, status, Depends
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, status, Depends, Query
+from typing import Dict, Any, Optional, List
 from ..auth import get_current_user, check_workspace_access
 from ..debate_engine import DebateEngine
 from ..debate_service import DebateService
@@ -15,6 +15,8 @@ from ..schemas.debates import (
     DebateResponse,
     InterveneRequest,
     InterventionResponse,
+    DebateListResponse,
+    DebateListItem,
 )
 from ..schemas.summary import (
     SummarizeRequest,
@@ -27,6 +29,52 @@ from ..schemas.setup import (
 )
 
 router = APIRouter()
+
+
+@router.get("/debates", response_model=DebateListResponse)
+async def list_debates(
+    workspace_id: str = Query(..., description="Workspace ID to filter debates"),
+    limit: int = Query(20, ge=1, le=100, description="Max debates to return"),
+    cursor: Optional[str] = Query(None, description="Cursor for pagination"),
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
+):
+    """
+    List debates in a workspace with cursor pagination.
+    Protected by workspace access checks.
+    """
+    # Check workspace access
+    if current_user:
+        check_workspace_access(workspace_id, current_user)
+    
+    service = DebateService()
+    
+    try:
+        # Get debates from DB
+        debates_data = service.list_debates(workspace_id, limit=limit, cursor=cursor)
+        
+        items = [
+            DebateListItem(
+                debate_id=d["debate_id"],
+                workspace_id=d["workspace_id"],
+                title=d["title"],
+                state=d["state"],
+                created_at=d["created_at"],
+                updated_at=d.get("updated_at"),
+                started_at=d.get("started_at"),
+                ended_at=d.get("ended_at"),
+            )
+            for d in debates_data["items"]
+        ]
+        
+        return DebateListResponse(
+            items=items,
+            next_cursor=debates_data.get("next_cursor")
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list debates: {str(e)}"
+        )
 
 
 @router.post("/debates/run", response_model=DebateRunResponse, status_code=status.HTTP_200_OK)

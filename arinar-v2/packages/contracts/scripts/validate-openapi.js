@@ -39,6 +39,7 @@ async function validate() {
       { method: 'get', path: '/agent-templates' },
       { method: 'get', path: '/agents' },
       { method: 'post', path: '/agents' },
+      { method: 'get', path: '/debates' },
       { method: 'post', path: '/debates' },
       { method: 'get', path: '/debates/{debate_id}' },
       { method: 'post', path: '/debates/run' },
