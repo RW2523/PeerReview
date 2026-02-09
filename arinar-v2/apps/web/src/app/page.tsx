@@ -35,21 +35,21 @@ export default function HomePage() {
               <div className={styles.stepNumber}>1</div>
               <div className={styles.stepContent}>
                 <h3>Frame your challenge</h3>
-                <p>Share the problem, decision, or topic you need help with</p>
+                <p>Describe the decision, problem, or topic you're working through</p>
               </div>
             </div>
             <div className={styles.step}>
               <div className={styles.stepNumber}>2</div>
               <div className={styles.stepContent}>
-                <h3>Assemble your panel</h3>
-                <p>Choose AI experts with diverse perspectives and expertise</p>
+                <h3>Assemble your expert panel</h3>
+                <p>Select 2-8 AI agents with diverse roles and perspectives</p>
               </div>
             </div>
             <div className={styles.step}>
               <div className={styles.stepNumber}>3</div>
               <div className={styles.stepContent}>
-                <h3>Watch them deliberate</h3>
-                <p>Follow the live discussion and get actionable insights</p>
+                <h3>Run the deliberation</h3>
+                <p>Watch live as they debate, then get summary + action items</p>
               </div>
             </div>
           </div>

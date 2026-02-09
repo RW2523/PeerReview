@@ -19,6 +19,21 @@ export default function SetupPage() {
   const [title, setTitle] = useState('');
   const [problemStatement, setProblemStatement] = useState('');
   const [timeboxMinutes, setTimeboxMinutes] = useState<number | undefined>(30);
+
+  // Pre-fill from draft if coming from home page
+  useEffect(() => {
+    const draft = sessionStorage.getItem('debate_draft');
+    if (draft) {
+      try {
+        const data = JSON.parse(draft);
+        setTitle(data.title || '');
+        setProblemStatement(data.problemStatement || '');
+        sessionStorage.removeItem('debate_draft');
+      } catch (e) {
+        console.error('Failed to parse debate draft:', e);
+      }
+    }
+  }, []);
   
   // Step 2: Materials
   const [materials, setMaterials] = useState<api.SetupMaterial[]>([]);
@@ -199,34 +214,38 @@ export default function SetupPage() {
           )}
         </div>
 
-        <div className={styles.actions}>
-          <div>
-            {step > 1 && (
-              <button onClick={() => setStep(step - 1)} disabled={isLoading}>
-                ← Previous
-              </button>
-            )}
-          </div>
+        <div className={styles.navigation}>
+          {step > 1 && (
+            <button 
+              onClick={() => setStep(step - 1)} 
+              disabled={isLoading}
+              className={styles.btnSecondary}
+            >
+              ← Previous
+            </button>
+          )}
           
-          <div>
-            {step < 4 && (
-              <button
-                onClick={() => setStep(step + 1)}
-                disabled={!canGoNext() || isLoading}
-              >
-                {isLoading ? 'Loading...' : 'Next'}
-              </button>
-            )}
-            
-            {step === 4 && (
-              <button
-                onClick={handleLaunch}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Creating...' : 'Create Meeting'}
-              </button>
-            )}
-          </div>
+          <div style={{ flex: 1 }} />
+          
+          {step < 4 && (
+            <button
+              onClick={() => setStep(step + 1)}
+              disabled={!canGoNext() || isLoading}
+              className={styles.btnPrimary}
+            >
+              {isLoading ? 'Loading...' : 'Next →'}
+            </button>
+          )}
+          
+          {step === 4 && (
+            <button
+              onClick={handleLaunch}
+              disabled={isLoading}
+              className={styles.btnLaunch}
+            >
+              {isLoading ? 'Creating...' : 'Launch Debate'}
+            </button>
+          )}
         </div>
       </div>
       </div>

@@ -209,6 +209,8 @@ export interface AgentTemplate {
   template_id: string;
   label: string;
   role_title: string;
+  category: string;  // e.g. "Product", "Engineering", "Design", "Business", "Wildcards"
+  character?: string;  // e.g. "Visionary - Jobs-inspired", "Pragmatic - Data-driven"
   system_prompt: string;
   model_id: string;
   model_config: Record<string, any>;

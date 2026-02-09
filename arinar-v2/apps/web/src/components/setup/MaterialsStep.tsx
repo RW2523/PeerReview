@@ -15,10 +15,15 @@ export function MaterialsStep({ materials, onAdd, onUpdate, onRemove }: Material
       <p className={styles.hint}>Add context, documents, or links for participants</p>
 
       <div className={styles.buttonGroup}>
-        <button onClick={() => onAdd('text')}>+ Add Text</button>
-        <button onClick={() => onAdd('link')}>+ Add Link</button>
-        <button onClick={() => onAdd('file_placeholder')} disabled>
-          + Upload File (coming in 08B.3)
+        <button onClick={() => onAdd('text')} className={styles.btnAdd}>
+          <span>📝</span> Add Text
+        </button>
+        <button onClick={() => onAdd('link')} className={styles.btnAdd}>
+          <span>🔗</span> Add Link
+        </button>
+        <button onClick={() => onAdd('file_placeholder')} disabled className={styles.btnAdd}>
+          <span>📎</span> Upload File
+          <span className={styles.comingSoon}>Soon</span>
         </button>
       </div>
 

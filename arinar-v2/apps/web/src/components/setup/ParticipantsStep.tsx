@@ -22,16 +22,41 @@ export function ParticipantsStep({
   onRemove,
 }: ParticipantsStepProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+
+  // Get unique categories
+  const categories = ['All', ...Array.from(new Set(templates.map(t => t.category)))];
+  
+  // Filter templates by category
+  const filteredTemplates = selectedCategory === 'All' 
+    ? templates 
+    : templates.filter(t => t.category === selectedCategory);
 
   return (
     <div className={styles.section}>
-      <h2>Participants ({participants.length}/8)</h2>
-      <p className={styles.hint}>Choose agents to participate in the discussion</p>
+      <h2>Assemble Your Panel ({participants.length}/8)</h2>
+      <p className={styles.hint}>
+        Select AI experts with diverse perspectives. Mix roles, seniority, and thinking styles for richer debates.
+        <strong> Min 2, Max 8 participants.</strong>
+      </p>
 
       <div className={styles.templates}>
-        <h3>From Template</h3>
+        <div className={styles.templateHeader}>
+          <h3>Agent Templates</h3>
+          <div className={styles.categoryFilter}>
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`${styles.categoryBtn} ${selectedCategory === category ? styles.categoryBtnActive : ''}`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className={styles.templateGrid}>
-          {templates.map((template) => (
+          {filteredTemplates.map((template) => (
             <button
               key={template.template_id}
               onClick={() => onAddFromTemplate(template)}
@@ -40,6 +65,9 @@ export function ParticipantsStep({
             >
               <div className={styles.templateLabel}>{template.label}</div>
               <div className={styles.templateRole}>{template.role_title}</div>
+              {template.character && (
+                <div className={styles.templateCharacter}>{template.character}</div>
+              )}
             </button>
           ))}
         </div>

@@ -17,29 +17,21 @@ export default function CreateDebateCard({ workspaceId, onDebateCreated }: Creat
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
     if (!title.trim()) {
       setError('Title is required');
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    // Store in sessionStorage to pre-fill setup wizard
+    sessionStorage.setItem('debate_draft', JSON.stringify({
+      title: title.trim(),
+      problemStatement: problemStatement.trim(),
+      timestamp: Date.now()
+    }));
 
-    try {
-      const debate = await api.createDebate(workspaceId, title);
-      
-      // Navigate to room
-      router.push(`/room?debate_id=${debate.debate_id}`);
-      
-      if (onDebateCreated) {
-        onDebateCreated();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create debate');
-    } finally {
-      setLoading(false);
-    }
+    // Navigate to setup wizard to assemble panel
+    router.push('/setup');
   };
 
   return (
@@ -79,10 +71,10 @@ export default function CreateDebateCard({ workspaceId, onDebateCreated }: Creat
 
         <button
           onClick={handleCreate}
-          disabled={loading || !title.trim()}
+          disabled={!title.trim()}
           className={styles.btnPrimary}
         >
-          {loading ? 'Creating...' : 'Create & Assemble Panel'}
+          Next: Assemble Panel →
         </button>
       </div>
     </div>

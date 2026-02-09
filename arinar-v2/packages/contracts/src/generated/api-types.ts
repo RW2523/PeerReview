@@ -30,6 +30,12 @@ export interface paths {
   };
   "/debates": {
     /**
+     * List debates in workspace
+     * @description List debates with cursor pagination.
+     * Protected by workspace access checks.
+     */
+    get: operations["listDebates"];
+    /**
      * Create new debate session
      * @description Creates a new debate session in pending state (M2)
      */
@@ -204,6 +210,27 @@ export interface components {
     };
     /** @enum {string} */
     DebateState: "pending" | "running" | "paused" | "ended";
+    DebateListItem: {
+      /** Format: uuid */
+      debate_id: string;
+      /** Format: uuid */
+      workspace_id: string;
+      title: string;
+      state: components["schemas"]["DebateState"];
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at?: string | null;
+      /** Format: date-time */
+      started_at?: string | null;
+      /** Format: date-time */
+      ended_at?: string | null;
+    };
+    DebateListResponse: {
+      items: components["schemas"]["DebateListItem"][];
+      /** @description Cursor for next page (null if no more results) */
+      next_cursor?: string | null;
+    };
     AgentTemplate: {
       template_id: string;
       label: string;
@@ -595,6 +622,43 @@ export interface operations {
       };
       /** @description Invalid request */
       400: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  /**
+   * List debates in workspace
+   * @description List debates with cursor pagination.
+   * Protected by workspace access checks.
+   */
+  listDebates: {
+    parameters: {
+      query: {
+        /** @description Workspace ID to filter debates */
+        workspace_id: string;
+        /** @description Max debates to return */
+        limit?: number;
+        /** @description Cursor for pagination */
+        cursor?: string;
+      };
+    };
+    responses: {
+      /** @description Debates list */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DebateListResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Workspace access denied */
+      403: {
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
         };

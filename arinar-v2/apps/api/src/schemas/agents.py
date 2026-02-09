@@ -13,12 +13,14 @@ class AgentInput(BaseModel):
 
 
 class AgentTemplateResponse(BaseModel):
-    """Agent template"""
+    """Agent template with category and character"""
     model_config = ConfigDict(protected_namespaces=(), populate_by_name=True)
     
     template_id: str
     label: str
     role_title: str
+    category: str
+    character: Optional[str] = None
     system_prompt: str
     model_id: str
     llm_config: Dict[str, Any] = Field(..., alias="model_config")
