@@ -38,6 +38,12 @@ tags:
     description: Memory import and retrieval (user-controlled context sharing)
   - name: preflight
     description: Agent preparation orchestration (pre-debate briefing)
+  - name: artifacts
+    description: Live collaborative artifacts (Figma-like documents)
+  - name: embeddings
+    description: Embeddings generation and OCR for materials (OpenRouter BYOK)
+  - name: workspace-settings
+    description: Workspace-wide settings and preferences (model defaults)
 
 paths:
   /health:
@@ -660,27 +666,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  key:
-                    type: object
-                    description: Key usage and limits
-                  credits:
-                    type: object
-                    nullable: true
-                    description: Credits info (null if not available)
-                  note:
-                    type: string
-                    nullable: true
-                    description: Additional info or warnings
+                $ref: '#/components/schemas/OpenRouterAccountResponse'
         '400':
-          description: Missing API key
+          description: Missing or empty API key
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: OpenRouter API error
           content:
             application/json:
               schema:
@@ -1017,6 +1017,360 @@ paths:
           description: Access denied
         '404':
           description: Participant run not found
+
+  # ============================================================================
+  # Artifacts Endpoints
+  # ============================================================================
+
+  /debates/{debate_id}/artifact/init:
+    post:
+      operationId: initArtifact
+      summary: Initialize artifact
+      description: |
+        Creates a new artifact for a debate with section assignments.
+        Sections are stored in agent_knowledge_units with type=artifact_section.
+      tags:
+        - artifacts
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtifactInitRequest'
+      responses:
+        '200':
+          description: Artifact initialized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactInitResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: Debate or template not found
+
+  /debates/{debate_id}/artifact:
+    get:
+      operationId: getArtifact
+      summary: Get artifact
+      description: |
+        Returns current artifact state (latest or specific version).
+        Sections reconstructed from agent_knowledge_units.
+      tags:
+        - artifacts
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Specific version to retrieve (defaults to latest)
+      responses:
+        '200':
+          description: Artifact data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactGetResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: Artifact not found
+
+  /debates/{debate_id}/artifact/sections/{section_id}/events:
+    post:
+      operationId: createSectionEvent
+      summary: Create section event
+      description: |
+        Appends/replaces section content or sends typing indicator.
+        Only section owner can write (enforced via X-Participant-Id header).
+      tags:
+        - artifacts
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: section_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Section ID from template
+        - name: X-Participant-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Actor participant ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SectionEventRequest'
+      responses:
+        '200':
+          description: Section event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SectionEventResponse'
+        '403':
+          description: Not section owner or access denied
+        '404':
+          description: Section not found
+
+  /debates/{debate_id}/artifact/events:
+    get:
+      operationId: getArtifactEvents
+      summary: Get artifact events
+      description: |
+        Returns artifact event history with cursor pagination.
+        Optionally filter by section_id.
+      tags:
+        - artifacts
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: section_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter events by section
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+          description: Max events per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Pagination cursor (event_id)
+      responses:
+        '200':
+          description: Artifact events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactEventsResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: Artifact not found
+
+  # ============================================================================
+  # Embeddings + OCR Endpoints
+  # ============================================================================
+
+  /debates/{debate_id}/materials/{material_id}/embed:
+    post:
+      operationId: generateEmbeddings
+      summary: Generate embeddings
+      description: |
+        Generate embeddings for material chunks using OpenRouter (BYOK).
+        Requires X-OpenRouter-Key header (client-driven, not stored).
+        Material must be processed (status=complete) before embeddings.
+      tags:
+        - embeddings
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-OpenRouter-Key
+          in: header
+          required: true
+          schema:
+            type: string
+          description: OpenRouter API key (BYOK, not stored)
+      responses:
+        '200':
+          description: Embeddings generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingsResponse'
+        '400':
+          description: Missing key or material not ready
+        '403':
+          description: Access denied
+        '404':
+          description: Material not found
+
+  /debates/{debate_id}/materials/{material_id}/embed/status:
+    get:
+      operationId: getEmbeddingStatus
+      summary: Get embedding status
+      description: |
+        Returns embedding generation status for a material's chunks.
+        Shows counts by status (not_started, running, complete, failed).
+      tags:
+        - embeddings
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Embedding status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingStatusResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: Material not found
+
+  /debates/{debate_id}/materials/{material_id}/ocr:
+    post:
+      operationId: runOcr
+      summary: Run OCR
+      description: |
+        Run OCR on a scanned PDF material (Phase 1 baseline).
+        Only allowed if processed_status = 'needs_ocr'.
+        Uses Tesseract if available, otherwise returns 501.
+      tags:
+        - embeddings
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OCR queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OcrResponse'
+        '400':
+          description: Material does not need OCR
+        '403':
+          description: Access denied
+        '404':
+          description: Material not found
+        '501':
+          description: OCR not available on server
+
+  /debates/{debate_id}/materials/{material_id}/ocr/status:
+    get:
+      operationId: getOcrStatus
+      summary: Get OCR status
+      description: |
+        Returns OCR processing status for a material.
+      tags:
+        - embeddings
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OCR status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OcrStatusResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: Material not found
+
+  # ============================================================================
+  # Workspace Settings Endpoints
+  # ============================================================================
+
+  /workspaces/{workspace_id}/settings/models:
+    get:
+      operationId: getWorkspaceModels
+      summary: Get workspace model defaults
+      description: |
+        Returns workspace-wide default models for RAG/embeddings and OCR post-processing.
+        These settings sync across devices (stored in database).
+        Returns system defaults if workspace hasn't configured custom values.
+      tags:
+        - workspace-settings
+      parameters:
+        - name: workspace_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Workspace UUID
+      responses:
+        '200':
+          description: Workspace model defaults
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceModelsResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: Workspace not found
+
+    put:
+      operationId: updateWorkspaceModels
+      summary: Update workspace model defaults
+      description: |
+        Updates workspace-wide default models for RAG/embeddings and OCR.
+        These settings:
+        - Are stored server-side (sync across devices)
+        - Apply automatically when requests don't specify a model
+        - Do NOT require OpenRouter key (can be set before key is added)
+        
+        Note: OpenRouter key remains client-only (browser storage).
+      tags:
+        - workspace-settings
+      parameters:
+        - name: workspace_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Workspace UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceModelsRequest'
+      responses:
+        '200':
+          description: Workspace model defaults updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceModelsResponse'
+        '400':
+          description: Invalid request (missing or empty model IDs)
+        '403':
+          description: Access denied
+        '404':
+          description: Workspace not found
 
 components:
   parameters:
@@ -1772,6 +2126,57 @@ components:
         description:
           type: string
 
+    OpenRouterAccountResponse:
+      type: object
+      properties:
+        key:
+          type: object
+          description: "Key usage and limits from /api/v1/auth/key"
+          properties:
+            usage:
+              type: number
+              description: "Current usage in USD"
+            limit:
+              type: number
+              nullable: true
+              description: "Usage limit in USD (null for unlimited)"
+            label:
+              type: string
+              nullable: true
+              description: "Key label"
+            rate_limit:
+              type: object
+              nullable: true
+              properties:
+                requests:
+                  type: integer
+                  description: "Max requests per interval"
+                interval:
+                  type: string
+                  description: "Time interval (e.g., '1m', '1h')"
+            is_free_tier:
+              type: boolean
+              nullable: true
+              description: "Whether key is on free tier"
+        credits:
+          type: object
+          nullable: true
+          description: "Credits info from /api/v1/credits (null if not available)"
+          properties:
+            total_credits:
+              type: number
+              description: "Total credits purchased"
+            total_usage:
+              type: number
+              description: "Total credits used"
+            balance:
+              type: number
+              description: "Remaining credits"
+        note:
+          type: string
+          nullable: true
+          description: "Informational message (e.g., why credits unavailable)"
+
     GeneratePersonaDraftRequest:
       type: object
       required:
@@ -2275,3 +2680,388 @@ components:
           type: string
         message:
           type: string
+
+    # ============================================================================
+    # Artifacts Schemas
+    # ============================================================================
+    
+    SectionAssignment:
+      type: object
+      required:
+        - section_id
+        - participant_id
+      properties:
+        section_id:
+          type: string
+          description: Section key from template (e.g., "goals", "risks")
+        participant_id:
+          type: string
+          format: uuid
+          description: Owner participant ID for this section
+
+    ArtifactInitRequest:
+      type: object
+      required:
+        - template_id
+        - section_assignments
+      properties:
+        template_id:
+          type: string
+          description: Template ID (e.g., "prd", "brief", "memo")
+        title:
+          type: string
+          nullable: true
+          description: Custom artifact title (defaults to template title)
+        section_assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionAssignment'
+          description: Section ownership assignments
+
+    SectionInfo:
+      type: object
+      required:
+        - section_id
+        - title
+        - status
+        - content
+        - word_count
+        - citations
+        - block_type
+      properties:
+        section_id:
+          type: string
+        title:
+          type: string
+        owner_participant_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [drafting, committed, locked]
+        content:
+          type: string
+        word_count:
+          type: integer
+        citations:
+          type: array
+          items:
+            type: object
+        block_type:
+          type: string
+          enum: [rich_text, chart, table, diagram_mermaid]
+
+    ArtifactInitResponse:
+      type: object
+      required:
+        - artifact_id
+        - debate_id
+        - template_id
+        - title
+        - version
+        - status
+        - sections
+        - created_at
+      properties:
+        artifact_id:
+          type: string
+          format: uuid
+        debate_id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+        title:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionInfo'
+        created_at:
+          type: string
+          format: date-time
+
+    ArtifactGetResponse:
+      type: object
+      required:
+        - artifact_id
+        - debate_id
+        - template_id
+        - title
+        - version
+        - status
+        - sections
+        - created_at
+        - updated_at
+      properties:
+        artifact_id:
+          type: string
+          format: uuid
+        debate_id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+        title:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionInfo'
+        quality_report:
+          type: object
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        finalized_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SectionEventRequest:
+      type: object
+      required:
+        - event_type
+        - content
+      properties:
+        event_type:
+          type: string
+          enum: [append, replace, typing]
+          description: Type of content update
+        content:
+          type: string
+          description: Markdown content or JSON payload for charts/tables
+        citations:
+          type: array
+          items:
+            type: object
+          nullable: true
+          description: Citations for this content
+
+    SectionEventResponse:
+      type: object
+      required:
+        - event_id
+        - section_id
+        - artifact_id
+        - event_type
+        - actor_participant_id
+        - content_preview
+        - created_at
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        section_id:
+          type: string
+        artifact_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        actor_participant_id:
+          type: string
+          format: uuid
+        content_preview:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ArtifactEvent:
+      type: object
+      required:
+        - event_id
+        - artifact_id
+        - event_type
+        - payload
+        - created_at
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        artifact_id:
+          type: string
+          format: uuid
+        section_id:
+          type: string
+          nullable: true
+        event_type:
+          type: string
+        actor_participant_id:
+          type: string
+          format: uuid
+          nullable: true
+        payload:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    ArtifactEventsResponse:
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtifactEvent'
+        next_cursor:
+          type: string
+          nullable: true
+
+    # ============================================================================
+    # Embeddings + OCR Schemas
+    # ============================================================================
+
+    EmbeddingsResponse:
+      type: object
+      required:
+        - material_id
+        - embedding_model_id
+        - chunks_processed
+        - status
+      properties:
+        material_id:
+          type: string
+          format: uuid
+        embedding_model_id:
+          type: string
+          description: OpenRouter model ID used for embeddings
+        chunks_processed:
+          type: integer
+          description: Number of chunks processed
+        status:
+          type: string
+
+    EmbeddingStatusResponse:
+      type: object
+      required:
+        - material_id
+        - total_chunks
+        - overall_status
+        - status_breakdown
+      properties:
+        material_id:
+          type: string
+          format: uuid
+        total_chunks:
+          type: integer
+        overall_status:
+          type: string
+          enum: [no_chunks, not_started, in_progress, complete, partial_failure]
+        status_breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+
+    OcrResponse:
+      type: object
+      required:
+        - material_id
+        - job_id
+        - message
+        - status
+      properties:
+        material_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        message:
+          type: string
+        status:
+          type: string
+
+    OcrStatusResponse:
+      type: object
+      required:
+        - material_id
+        - processed_status
+      properties:
+        material_id:
+          type: string
+          format: uuid
+        processed_status:
+          type: string
+        ocr_job_id:
+          type: string
+          format: uuid
+          nullable: true
+        ocr_job_status:
+          type: string
+          nullable: true
+        ocr_completed:
+          type: boolean
+        ocr_page_count:
+          type: integer
+          nullable: true
+        ocr_confidence_avg:
+          type: number
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ============================================================================
+    # Workspace Settings Schemas
+    # ============================================================================
+
+    WorkspaceModelsRequest:
+      type: object
+      required:
+        - embeddings_model_id
+        - ocr_model_id
+      properties:
+        embeddings_model_id:
+          type: string
+          minLength: 1
+          description: "OpenRouter model ID for embeddings/RAG (e.g., moonshot/kimi-embeddings-v1)"
+          example: "moonshot/kimi-embeddings-v1"
+        ocr_model_id:
+          type: string
+          minLength: 1
+          description: "OpenRouter model ID for OCR post-processing (e.g., qwen/qwen-2.5-72b-instruct)"
+          example: "qwen/qwen-2.5-72b-instruct"
+
+    WorkspaceModelsResponse:
+      type: object
+      required:
+        - workspace_id
+        - embeddings_model_id
+        - ocr_model_id
+        - updated_at
+      properties:
+        workspace_id:
+          type: string
+          format: uuid
+          description: "Workspace UUID"
+        embeddings_model_id:
+          type: string
+          description: "OpenRouter model ID for embeddings/RAG"
+        ocr_model_id:
+          type: string
+          description: "OpenRouter model ID for OCR post-processing"
+        updated_at:
+          type: string
+          format: date-time
+          description: "When settings were last updated"

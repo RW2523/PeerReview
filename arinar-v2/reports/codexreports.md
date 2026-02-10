@@ -57,7 +57,7 @@ This file is written by Codex (not Cursor) as an independent verification trail.
 
 **What I verified locally (this Codex environment)**
 - Ran the canonical gate: `cd arinar-v2 && make verify`
-- Result: **FAIL**
+- Result: **FAIL** (initial check)
 
 **Why it failed**
 - File-size gate failure:
@@ -72,3 +72,16 @@ This file is written by Codex (not Cursor) as an independent verification trail.
 **Implication**
 - Any ticket report claiming `make verify PASS` while `apps/web/src/app/setup/page.tsx` exceeds 300 lines is **not accurate**.
 - Next work must be a UI refactor + correctness hardening that brings the file under the limit and ensures “Enter Room” is gated by preflight readiness (no misleading controls).
+
+### TICKET-13B.1 (Preflight UI Hardening) - Independent Re-Check
+
+**Inputs reviewed**
+- `/Users/pv/Downloads/arinar-6-IPSS-V5/arinar-v2/reports/tickets/TICKET-13B.1-2026-02-10-v1.md`
+
+**What I verified locally (this Codex environment)**
+- `wc -l apps/web/src/app/setup/page.tsx` => **282** (<= 300)
+- `rg "onCanContinueChange" apps/web/src/components/setup/PreflightStep.tsx apps/web/src/app/setup/page.tsx` confirms the callback wiring exists.
+- Re-ran the canonical gate: `cd arinar-v2 && make verify` => **PASS**
+
+**Notes**
+- Forbidden-pattern gate still reports warnings for TODO comments without an issue reference in `apps/api/src/routes/memory.py`. This is currently a warning, not a failure.

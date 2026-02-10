@@ -10,6 +10,7 @@ import { ParticipantsStep } from '@/components/setup/ParticipantsStep';
 import { MemoryImportStep } from '@/components/setup/MemoryImportStep';
 import { PreflightStep } from '@/components/setup/PreflightStep';
 import { ReviewStep } from '@/components/setup/ReviewStep';
+import { SetupStepper } from '@/components/setup/SetupStepper';
 import { useMemoryImport } from '@/hooks/useMemoryImport';
 import { useSetupValidation } from '@/hooks/useSetupValidation';
 import { useParticipants } from '@/hooks/useParticipants';
@@ -164,32 +165,7 @@ export default function SetupPage() {
       </header>
 
       <div className={styles.wizard}>
-        <div className={styles.steps}>
-          <div className={`${styles.step} ${step === 1 ? styles.stepActive : ''} ${step > 1 ? styles.stepCompleted : ''}`}>
-            <div className={styles.stepNumber}>{step > 1 ? '✓' : '1'}</div>
-            <div className={styles.stepLabel}>Basic Info</div>
-          </div>
-          <div className={`${styles.step} ${step === 2 ? styles.stepActive : ''} ${step > 2 ? styles.stepCompleted : ''}`}>
-            <div className={styles.stepNumber}>{step > 2 ? '✓' : '2'}</div>
-            <div className={styles.stepLabel}>Materials</div>
-          </div>
-          <div className={`${styles.step} ${step === 3 ? styles.stepActive : ''} ${step > 3 ? styles.stepCompleted : ''}`}>
-            <div className={styles.stepNumber}>{step > 3 ? '✓' : '3'}</div>
-            <div className={styles.stepLabel}>Participants</div>
-          </div>
-          <div className={`${styles.step} ${step === 4 ? styles.stepActive : ''} ${step > 4 ? styles.stepCompleted : ''}`}>
-            <div className={styles.stepNumber}>{step > 4 ? '✓' : '4'}</div>
-            <div className={styles.stepLabel}>Memory</div>
-          </div>
-          <div className={`${styles.step} ${step === 5 ? styles.stepActive : ''} ${step > 5 ? styles.stepCompleted : ''}`}>
-            <div className={styles.stepNumber}>{step > 5 ? '✓' : '5'}</div>
-            <div className={styles.stepLabel}>Prepare</div>
-          </div>
-          <div className={`${styles.step} ${step === 6 ? styles.stepActive : ''}`}>
-            <div className={styles.stepNumber}>6</div>
-            <div className={styles.stepLabel}>Review</div>
-          </div>
-        </div>
+        <SetupStepper steps={steps} currentStep={step} />
 
         <div className={styles.content}>
           {step === 1 && (
@@ -239,6 +215,7 @@ export default function SetupPage() {
               debateId={createdDebateId}
               participants={participants}
               participantIds={createdParticipantIds}
+              onCanContinueChange={setCanEnterRoom}
             />
           )}
 
@@ -287,21 +264,12 @@ export default function SetupPage() {
             </button>
           )}
           
-          {step === 5 && (
+          {(step === 5 || step === 6) && (
             <button
               onClick={handleLaunchAfterPreflight}
-              disabled={isLoading}
+              disabled={isLoading || !canEnterRoom}
               className={styles.btnLaunch}
-            >
-              {isLoading ? 'Loading...' : 'Enter Room'}
-            </button>
-          )}
-          
-          {step === 6 && (
-            <button
-              onClick={handleLaunchAfterPreflight}
-              disabled={isLoading}
-              className={styles.btnLaunch}
+              title={!canEnterRoom ? 'Complete agent preparation first' : ''}
             >
               {isLoading ? 'Loading...' : 'Enter Room'}
             </button>

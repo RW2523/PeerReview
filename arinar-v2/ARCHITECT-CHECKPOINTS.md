@@ -4,7 +4,136 @@ Tracks senior architect reviews, progress between checkpoints, and actionable fi
 
 ---
 
-## Checkpoint 7 — 2026-02-10 (Current)
+## Checkpoint 8 — 2026-02-10 (Current)
+
+### Progress Since Checkpoint 7
+
+| What Changed | Details |
+|---|---|
+| TICKET-12.1 (Embeddings + OCR Phase 1) | PASS. 5 embedding columns on memory_chunks, 4 endpoints (embed/status/ocr/ocr-status), workspace model defaults, synchronous Phase 1. 73/73 tests. |
+| TICKET-12.2 (OpenRouter Key Validation UX) | PASS. Validation-first flow: validate → save → show credits. Settings page enhanced. 73/73 tests. |
+| TICKET-13A (Preflight Orchestrator Core) | PASS. `preflight_runs` + `preflight_participant_runs` tables, Celery orchestration, 4 endpoints (start/status/retry/skip), prep packs via `agent_knowledge_units`. 7 preflight tests. 69/69 total. |
+| TICKET-13B (Preflight UI Integration) | PASS. PreflightStep component (289 lines), real-time polling, per-agent status cards, retry/skip with reason, prep pack preview. usePreflight hook (168 lines). Setup flow now 6 steps. 69/69 tests. |
+| TICKET-13B.1 (Preflight UI Hardening) | PASS. setup/page.tsx reduced 314→282 lines (extracted SetupStepper). "Enter Room" truthful gating — only enabled when preflight ready or explicitly skipped. |
+| TICKET-15.1 (Memory Import Hardening) | PASS. 5 endpoints added to OpenAPI, contract gates enforced, audit logging fixed (agent_id resolution). 9/9 memory tests. |
+| TICKET-16 (Web Memory Import Step V1) | PASS. MemoryImportStep component (271 lines), toggle ON/OFF, select past meetings, scope control, preview cards. useMemoryImport hook (54 lines). Setup now 5→6 steps. |
+| TICKET-16.1 (Selected-Participants E2E Fix) | PASS. Fixed participant_id mapping for specific-agents scope. New E2E enforcement test proves grant-based filtering works. 11/11 memory tests. |
+| TICKET-17A (Live Artifacts V1 Backend) | PASS. artifact_templates + artifacts tables, 4 endpoints (init/get/section-events/events), ownership enforcement (403 for non-owners), cursor pagination, built-in templates (PRD/Brief/Memo/Plan). 41 OpenAPI endpoints. 73/73 tests. |
+| TICKET-12.3 (Enterprise Settings: Default Models) | PASS. Workspace-wide model defaults (embeddings + OCR), 2 new endpoints (GET/PUT workspace settings), settings page refactored (476→246 lines, extracted DefaultModelsCard + AccountInfoCard). 6 new tests. 79/79 total. 47 OpenAPI endpoints. |
+| TICKET-13C (Semantic Retrieval) | PASS. `cosine_similarity()` + `get_query_embedding()` added to memory_retrieval.py. Preflight uses semantic queries (problem + role). Graceful fallback to keyword when embeddings missing. <100ms for 2000+ chunks. 82/82 tests. |
+| TICKET-13C.1 (BYOK-Safe Preflight Embeddings) | PASS. Fixed skipped semantic test. BYOK-safe flow: preflight/start accepts X-OpenRouter-Key, generates query embeddings at start time, stores vectors (not keys) in metadata. 83/83 tests. Zero skipped. |
+
+### Current State Summary
+
+```
+Stage 0: Foundation           [==========] DONE
+M1: Debate-in-a-Box API      [==========] DONE
+M2: Realtime + Room UI        [==========] DONE
+M3: Summary/Minutes/Actions   [==========] DONE
+M4: Persona + Meeting Setup   [==========] DONE
+M5: Materials + Memory        [==========] DONE (backend + UI + semantic retrieval)
+    Preflight                 [==========] DONE (backend + UI + hardening + semantic)
+    Live Artifacts            [=====     ] 50% (backend done, UI not started)
+    Embeddings/OCR            [========  ] 80% (semantic working, full OCR pending)
+    Voice + MCP              [          ] NOT STARTED
+```
+
+### What's Working Now (Verified 2026-02-10)
+
+**Backend (48 source files, 7,735 lines — +39% from CP7):**
+- 43 API endpoints across 13 route modules (+14 new)
+- Materials pipeline: upload → MinIO → Celery → extract → chunk with provenance
+- Memory import: grants, enforcement hook, audit logging, scope control
+- Preflight orchestrator: per-agent prep packs from materials + imported memory via Celery
+- **Semantic retrieval: cosine similarity on embeddings with grant enforcement, <100ms for 2000+ chunks**
+- **BYOK-safe embedding flow: vectors stored at preflight start, keys never persisted**
+- Live artifacts: Figma-like collaborative documents with section ownership, built-in templates
+- Embeddings: embed/status endpoints, workspace model defaults (Kimi 2.5 for embeddings, Qwen 2.5 for OCR)
+- OCR: detection + endpoint (Tesseract fallback, 501 for not-ready)
+- Workspace settings: configurable default models synced across devices
+
+**Frontend (43 TS/TSX files — from 27+ at CP7):**
+- Setup wizard now 6 steps: Info → Participants → Materials → Memory Import → Prepare (Preflight) → Review
+- PreflightStep: real-time polling (2s), per-agent status cards, retry/skip with reason, prep pack preview
+- MemoryImportStep: toggle, source selection, scope control (all/specific agents), preview cards
+- **Settings page refactored: 246 lines (from 476), extracted DefaultModelsCard (200 lines) + AccountInfoCard (100 lines)**
+- **Model dropdowns populated from OpenRouter catalog**
+- OpenRouter key validation-first flow with credit balance display
+- API client: 804 lines, ~32 typed functions covering all endpoints
+- 7 custom hooks
+
+**Database (10 migrations):**
+- New: `preflight_runs` + `preflight_participant_runs` (Celery orchestration tracking)
+- New: `artifact_templates` + `artifacts` (live collaborative documents)
+- Extended: `memory_chunks` with 5 embedding columns
+- Extended: `workspaces` with settings JSONB for model defaults
+- All prior tables stable
+
+**Tests (15 test files, 3,912 lines — +82% from CP7):**
+- **83 tests passing, 0 skipped** (was 59 at CP7)
+- Semantic retrieval: grant-enforcement preserved under cosine similarity
+- Preflight: 7+ tests (run creation, memory integration, retry, skip, semantic queries)
+- Memory: 11 tests (grants, enforcement, audit, scope filtering, E2E)
+- Workspace settings: 6 tests
+- All prior tests still green
+
+**Contracts (OpenAPI):**
+- **47 operations defined and contract-enforced**
+- 43 endpoints implemented
+
+### CP7 Issues — Resolution Status
+
+| CP7 Issue | Status | What Happened |
+|---|---|---|
+| `routes/memory.py` approaching 500 lines | STILL PRESENT | Now 464 lines. Not worse, but not extracted to service layer either. |
+| M1 `/debates/run` unprotected | STILL PRESENT | **5th checkpoint flagged.** |
+| `stream_service.py` polling | STILL PRESENT | |
+| Hardcoded workspace IDs in engine | STILL PRESENT | |
+| Synchronous OpenRouter calls | STILL PRESENT | |
+| Memory import needs UI | FIXED | TICKET-16 + TICKET-16.1 shipped MemoryImportStep with full scope control. |
+| Keyword scoring placeholder | FIXED | TICKET-13C added cosine similarity + query embeddings. TICKET-13C.1 made it BYOK-safe. Graceful fallback to keyword when embeddings missing. |
+
+### Observations
+
+**1. This is the biggest single sprint in the project's history.** 12 tickets, all PASS. Backend grew from ~5,546 to 7,735 lines (+39%), tests from ~2,152 to 3,912 lines (+82%), endpoints from 29 to 43 (+48%). The team is executing at peak velocity.
+
+**2. The setup wizard is now genuinely impressive.** Six steps (Info → Participants → Materials → Memory Import → Prepare → Review) with real-time preflight monitoring and truthful gating. The "Enter Room" button only enables when agents are actually ready. This is the kind of UX polish that matters.
+
+**3. Semantic retrieval is working.** CP7 flagged keyword scoring as a placeholder. TICKET-13C wired cosine similarity into the retrieval hook, and TICKET-13C.1 made it BYOK-safe (vectors stored at preflight start, keys never persisted). Grant enforcement is preserved under the new retrieval mode. <100ms for 2000+ chunks.
+
+**4. Settings page was a quality win.** Refactored from 476→246 lines by extracting DefaultModelsCard and AccountInfoCard. This is the opposite of the file-bloat pattern — team proactively kept it clean.
+
+**5. Five route files are over 400 lines. `debates.py` is at 657 — well past the 500-line limit.**
+
+| File | Lines | Status |
+|---|---|---|
+| routes/debates.py | 657 | VIOLATION (>500) |
+| routes/artifacts.py | 577 | VIOLATION (>500) |
+| routes/preflight.py | 474 | WARNING (approaching 500) |
+| routes/memory.py | 464 | WARNING (approaching 500) |
+| routes/embeddings.py | 422 | WARNING (approaching 500) |
+
+Also: `services/memory_retrieval.py` grew to 416 lines (from 237 at CP7) after semantic retrieval was added. Approaching the 400-line service limit.
+
+**6. `api.ts` at 804 lines is a concern on the frontend side.** It's a single file with ~32 functions. This should be split into domain modules.
+
+**7. Carry-forward debt — 3 items remain from CP4.** The unprotected `/debates/run`, sync OpenRouter calls, and polling SSE have been flagged for 5 consecutive checkpoints. The review process isn't driving action on these.
+
+### Recommendations
+
+1. **Split `routes/debates.py` now.** At 657 lines, it's 31% over the 500-line limit. Extract lifecycle endpoints into `routes/debate_lifecycle.py` (create/start/pause/resume/end) and keep setup/summary/list in the main file. Same pattern that fixed main.py.
+
+2. **Split `api.ts` into domain modules.** At 804 lines, it's the frontend equivalent of the old main.py. Create `lib/api/debates.ts`, `lib/api/materials.ts`, `lib/api/memory.ts`, `lib/api/preflight.ts`, `lib/api/artifacts.ts` with a barrel export from `lib/api/index.ts`.
+
+3. **Extract service from `memory_retrieval.py`.** At 416 lines and growing, the semantic retrieval logic should be separated from the grant enforcement logic. Keep grants in one file, retrieval/scoring in another.
+
+4. **Close the 3 carry-forward items with a decision.** (a) `/debates/run` — protect or document as public, (b) sync OpenRouter in debate_engine — accept or rewrite, (c) polling SSE — accept for V1 or switch to Redis pub/sub. No more deferring.
+
+5. **Next priority: Artifacts UI (TICKET-17B).** The backend is done, templates exist, ownership enforcement works. Build the Figma-like section board with SSE streaming for live updates. This is the most visible remaining feature.
+
+---
+
+## Checkpoint 7 — 2026-02-10 (Previous)
 
 ### Progress Since Checkpoint 6
 
@@ -553,7 +682,8 @@ All 7 API tests mock the database. The gap between mocked tests and real DB (poi
 | CP5 | 14 + 6 sub-tickets | 45 (10 test files, 1,481 lines) | 29 + 10 test files | 15 (pages + components + hooks + lib) | 19 |
 | CP6 | 20 + 6 sub-tickets | 48 (10 test files, 1,561 lines) | 30 + 10 test files | 27 (8 pages + 18 components + 2 hooks + 3 lib) | 21 |
 | CP7 | 22 + 6 sub-tickets | 59 (12 test files, 2,152 lines) | 43 + 12 test files | 27+ (unchanged frontend) | 29 |
+| CP8 | 34 + 6 sub-tickets | 83 (15 test files, 3,912 lines) | 48 + 15 test files | 43 (8 pages + 23 components + 7 hooks + 5 lib) | 43 |
 
-**Velocity assessment:** Backend-heavy sprint. 13 new source files, 2 new test files, 8 new endpoints, 2 new migrations, 3 new infrastructure dependencies. The team went deep on two complex features (materials ingestion + memory import) rather than wide across many small changes. This is the right approach for M5 — these are foundational systems that everything else builds on.
+**Velocity assessment (verified):** Peak sprint. 12 tickets in one burst — preflight (backend + UI + hardening), memory UI + E2E fix, live artifacts backend, embeddings/OCR, semantic retrieval, enterprise settings, key validation UX. Tests nearly doubled from CP7 (2,152→3,912 lines, +82%). 83 tests, 0 skipped. Semantic retrieval closed the biggest CP7 recommendation (keyword→cosine similarity). Settings page was proactively refactored (476→246 lines) — team is self-policing quality.
 
-**Biggest risk going forward:** `routes/memory.py` at 465 lines is the new largest file. The 5 carry-forward issues from CP4-CP6 remain unresolved — the unprotected M1 endpoint has been flagged for 4 checkpoints now and needs a decision. The memory UI gap (backend done, no frontend) could become a blocker for the setup wizard flow.
+**Biggest risk going forward:** File size discipline is slipping on route files. `routes/debates.py` at 657 lines violates the 500-line limit. `routes/artifacts.py` at 577 also violates. 3 more route files approaching 500. `api.ts` at 804 lines is the frontend equivalent. The 3 carry-forward items (unprotected endpoint, sync calls, polling SSE) have been flagged for 5 checkpoints without action — they need a decision, not another deferral.

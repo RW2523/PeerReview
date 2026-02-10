@@ -319,6 +319,30 @@ export interface OpenRouterAccountResponse {
   note?: string | null;
 }
 
+export interface OpenRouterModelListResponse {
+  models: Array<{
+    id: string;
+    name: string;
+    context_length?: number;
+    pricing?: any;
+  }>;
+}
+
+export async function listOpenRouterModels(openrouterKey: string): Promise<OpenRouterModelListResponse> {
+  const response = await fetch(`${API_URL}/openrouter/models`, {
+    method: 'GET',
+    headers: {
+      'X-OpenRouter-Key': openrouterKey,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
 export async function getOpenRouterAccount(openrouterKey: string): Promise<OpenRouterAccountResponse> {
   const response = await fetch(`${API_URL}/openrouter/account`, {
     method: 'GET',
@@ -724,6 +748,56 @@ export async function skipPreflightParticipant(
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to skip preflight: ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+// ============================================================================
+// Workspace Settings
+// ============================================================================
+
+export interface WorkspaceModelsRequest {
+  embeddings_model_id: string;
+  ocr_model_id: string;
+}
+
+export interface WorkspaceModelsResponse {
+  workspace_id: string;
+  embeddings_model_id: string;
+  ocr_model_id: string;
+  updated_at: string;
+}
+
+export async function getWorkspaceModels(workspaceId: string): Promise<WorkspaceModelsResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/workspaces/${workspaceId}/settings/models`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to get workspace models: ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+export async function updateWorkspaceModels(
+  workspaceId: string,
+  models: WorkspaceModelsRequest
+): Promise<WorkspaceModelsResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/workspaces/${workspaceId}/settings/models`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(models),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update workspace models: ${response.statusText} - ${errorText}`);
   }
   
   return response.json();

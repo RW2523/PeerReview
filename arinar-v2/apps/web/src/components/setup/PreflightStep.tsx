@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as api from '@/lib/api';
 import { usePreflight } from '@/hooks/usePreflight';
 import { SkipDialog, PrepPackDialog } from './PreflightDialogs';
@@ -15,14 +15,14 @@ interface PreflightStepProps {
   debateId: string | null;
   participants: api.SetupParticipant[];
   participantIds: string[];
-  onPreflightComplete?: () => void;
+  onCanContinueChange?: (canContinue: boolean) => void;
 }
 
 export function PreflightStep({
   debateId,
   participants,
   participantIds,
-  onPreflightComplete,
+  onCanContinueChange,
 }: PreflightStepProps) {
   const {
     status,
@@ -44,6 +44,13 @@ export function PreflightStep({
   const [skipReason, setSkipReason] = useState('');
   const [prepPackDialogOpen, setPrepPackDialogOpen] = useState(false);
   const [prepPackContent, setPrepPackContent] = useState<string | null>(null);
+
+  // Notify parent when readiness changes
+  useEffect(() => {
+    if (onCanContinueChange) {
+      onCanContinueChange(canContinue);
+    }
+  }, [canContinue, onCanContinueChange]);
 
   const handleStartPreflight = async () => {
     if (!debateId) {

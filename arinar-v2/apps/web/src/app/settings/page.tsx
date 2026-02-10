@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import AppNav from '@/components/layout/AppNav';
 import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import { KeyPersistence } from '@/lib/openrouterKeyStore';
+import { DefaultModelsCard } from '@/components/settings/DefaultModelsCard';
+import { AccountInfoCard } from '@/components/settings/AccountInfoCard';
 import * as api from '@/lib/api';
 import styles from './settings.module.css';
 
@@ -14,7 +16,13 @@ export default function SettingsPage() {
   const [accountInfo, setAccountInfo] = useState<api.OpenRouterAccountResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationSuccess, setValidationSuccess] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Demo workspace ID (replace with actual user's workspace in production)
+  const workspaceId = '00000000-0000-0000-0000-000000000101';
 
   useEffect(() => {
     if (apiKey) {
@@ -49,10 +57,40 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveKey = () => {
-    if (!keyInput.trim()) return;
-    saveKey(keyInput, selectedPersistence);
-    setKeyInput('');
+  const handleSaveKey = async () => {
+    const trimmedKey = keyInput.trim();
+    if (!trimmedKey) return;
+
+    // Reset states
+    setValidating(true);
+    setValidationError(null);
+    setValidationSuccess(false);
+
+    try {
+      // Validate key by calling /openrouter/account
+      const data = await api.getOpenRouterAccount(trimmedKey);
+      
+      // If we got here, key is valid
+      setValidationSuccess(true);
+      setAccountInfo(data);
+      setLastUpdated(new Date());
+      
+      // Save key to browser storage
+      saveKey(trimmedKey, selectedPersistence);
+      setKeyInput('');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setValidationSuccess(false), 3000);
+    } catch (err) {
+      // Key is invalid or network error
+      const errorMessage = err instanceof Error ? err.message : 'Failed to validate key';
+      setValidationError(errorMessage);
+      
+      // Don't save invalid key
+      // Keep input so user can correct it
+    } finally {
+      setValidating(false);
+    }
   };
 
   const handleClearKey = () => {
@@ -79,9 +117,9 @@ export default function SettingsPage() {
             {apiKey ? (
               <div className={styles.keyStatus}>
                 <div className={styles.keyStatusHeader}>
-                  <span className={styles.keyIcon}>🔑</span>
+                  <span className={styles.keyIcon}>✅</span>
                   <div>
-                    <strong>Key Saved</strong>
+                    <strong>Key Verified & Saved</strong>
                     <p>
                       Stored: <span className={styles.persistenceBadge}>{persistence}</span>
                     </p>
@@ -150,12 +188,33 @@ export default function SettingsPage() {
 
                   <button
                     onClick={handleSaveKey}
-                    disabled={!keyInput.trim()}
+                    disabled={!keyInput.trim() || validating}
                     className={styles.btnPrimary}
                   >
-                    Save Key
+                    {validating ? 'Validating...' : 'Validate & Save Key'}
                   </button>
                 </div>
+
+                {validationError && (
+                  <div className={styles.error}>
+                    <span>❌</span>
+                    <div>
+                      <strong>Validation Failed</strong>
+                      <p>{validationError}</p>
+                      <p className={styles.hint}>Please check your key and try again.</p>
+                    </div>
+                  </div>
+                )}
+
+                {validationSuccess && (
+                  <div className={styles.success}>
+                    <span>✅</span>
+                    <div>
+                      <strong>Key Verified!</strong>
+                      <p>Your OpenRouter key is valid and has been saved.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className={styles.securityNote}>
                   <span>🔒</span>
@@ -169,74 +228,17 @@ export default function SettingsPage() {
           </section>
 
           {/* Account Info Card */}
-          {apiKey && (
-            <section className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h2>Account Info</h2>
-                <button
-                  onClick={fetchAccountInfo}
-                  disabled={loading}
-                  className={styles.btnSecondary}
-                >
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </button>
-              </div>
+          <AccountInfoCard
+            apiKey={apiKey}
+            accountInfo={accountInfo}
+            loading={loading}
+            error={error}
+            lastUpdated={lastUpdated}
+            onRefresh={fetchAccountInfo}
+          />
 
-              {error && (
-                <div className={styles.error}>
-                  <span>⚠</span>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {loading && !accountInfo ? (
-                <div className={styles.loading}>Loading account info...</div>
-              ) : accountInfo ? (
-                <>
-                  {accountInfo.credits ? (
-                    <div className={styles.metric}>
-                      <h3>Credits Balance</h3>
-                      <div className={styles.metricValue}>
-                        ${accountInfo.credits.balance?.toFixed(2) || '0.00'}
-                      </div>
-                      <div className={styles.metricDetails}>
-                        <span>Total: ${accountInfo.credits.total_credits?.toFixed(2)}</span>
-                        <span>Used: ${accountInfo.credits.total_usage?.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ) : accountInfo.key ? (
-                    <div className={styles.metric}>
-                      <h3>Usage & Limits</h3>
-                      <div className={styles.metricValue}>
-                        ${accountInfo.key.usage?.toFixed(2) || '0.00'}
-                        {accountInfo.key.limit ? ` / $${accountInfo.key.limit.toFixed(2)}` : ' (Unlimited)'}
-                      </div>
-                      {accountInfo.key.rate_limit && (
-                        <div className={styles.metricDetails}>
-                          <span>
-                            Rate: {accountInfo.key.rate_limit.requests} req / {accountInfo.key.rate_limit.interval}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-
-                  {accountInfo.note && (
-                    <div className={styles.note}>
-                      <span>ℹ️</span>
-                      <span>{accountInfo.note}</span>
-                    </div>
-                  )}
-
-                  {lastUpdated && (
-                    <div className={styles.timestamp}>
-                      Last updated: {lastUpdated.toLocaleTimeString()}
-                    </div>
-                  )}
-                </>
-              ) : null}
-            </section>
-          )}
+          {/* Default Models Card */}
+          <DefaultModelsCard apiKey={apiKey} workspaceId={workspaceId} />
         </div>
       </div>
     </>

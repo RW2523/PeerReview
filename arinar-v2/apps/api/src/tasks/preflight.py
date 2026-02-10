@@ -155,40 +155,51 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         """, (agent_id, participant_run_id))
         conn.commit()
         
-        # 2. Gather context
+        # 2. Gather context using semantic retrieval (TICKET-13C, TICKET-13C.1)
         problem_statement = policy_config.get('problem_statement', '') if policy_config else ''
         
-        # Get current debate materials chunks
+        # Get pre-computed query embedding from participant_run metadata (BYOK-safe)
         cursor.execute("""
-            SELECT chunk_id, chunk_text, chunk_metadata
-            FROM memory_chunks
-            WHERE source_debate_id = %s 
-              AND agent_id IS NULL
-            ORDER BY created_at DESC
-            LIMIT 20
-        """, (debate_id,))
+            SELECT metadata FROM preflight_participant_runs WHERE participant_run_id = %s
+        """, (participant_run_id,))
         
-        material_chunks = cursor.fetchall()
-        materials_context = "\n\n".join([
-            f"[Material Chunk {i+1}]: {chunk_text[:500]}"
-            for i, (_, chunk_text, _) in enumerate(material_chunks)
-        ])
+        run_metadata = cursor.fetchone()
+        stored_query_embedding = None
+        if run_metadata and run_metadata[0]:
+            stored_query_embedding = run_metadata[0].get('query_embedding')
         
-        # Get imported memory chunks (if grants exist)
+        # Build semantic query for logging/audit (even if embedding pre-computed)
+        semantic_query = f"{problem_statement[:300] if problem_statement else 'context summary'}\n\nRole: {system_prompt[:200]}"
+        
+        # Retrieve chunks using pre-computed embedding (BYOK-safe: no key needed)
         try:
             memory_retrieval_result = retrieve_allowed_chunks(
                 debate_id=debate_id,
                 participant_id=participant_id,
-                query=problem_statement[:200] if problem_statement else "context summary",
-                top_k=10
+                query=semantic_query,
+                top_k=15,
+                openrouter_key=None,  # Not needed with pre-computed embedding
+                use_semantic=True,
+                query_embedding=stored_query_embedding  # Use stored embedding
             )
             
-            imported_chunks = memory_retrieval_result.chunks
+            all_chunks = memory_retrieval_result.chunks
             grant_ids_used = memory_retrieval_result.grant_ids_used
+            retrieval_method = memory_retrieval_result.retrieval_method
         except Exception as e:
             print(f"Memory retrieval failed for {participant_id}: {e}")
-            imported_chunks = []
+            all_chunks = []
             grant_ids_used = []
+            retrieval_method = 'error'
+        
+        # Separate material chunks from imported chunks for better context presentation
+        material_chunks = [c for c in all_chunks if c.source_debate_id == debate_id]
+        imported_chunks = [c for c in all_chunks if c.source_debate_id != debate_id]
+        
+        materials_context = "\n\n".join([
+            f"[Material Chunk {i+1}]: {chunk.chunk_text[:500]}"
+            for i, chunk in enumerate(material_chunks)
+        ])
         
         imported_context = "\n\n".join([
             f"[Imported Context {i+1}]: {chunk.chunk_text[:500]}"
@@ -262,7 +273,11 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
             except Exception as e:
                 prep_pack_content = f"Error calling OpenRouter: {str(e)}\n\nFallback prep pack with {len(material_chunks)} materials and {len(imported_chunks)} imported chunks."
         
-        # 5. Persist prep pack as agent_knowledge_units
+        # 5. Persist prep pack as agent_knowledge_units (TICKET-13C: include retrieval metadata)
+        # Extract chunk IDs for provenance
+        material_chunk_ids = [str(chunk.chunk_id) for chunk in material_chunks]
+        imported_chunk_ids = [str(chunk.chunk_id) for chunk in imported_chunks]
+        
         cursor.execute("""
             INSERT INTO agent_knowledge_units (
                 knowledge_id, agent_id, source_debate_id, knowledge_type, content, metadata, created_at
@@ -281,13 +296,17 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                 'imported_chunks_count': len(imported_chunks),
                 'grant_ids_used': grant_ids_used,
                 'model_used': model_id,
+                'retrieval_method': retrieval_method,
+                'material_chunk_ids': material_chunk_ids,
+                'imported_chunk_ids': imported_chunk_ids,
+                'semantic_query_used': semantic_query[:200],
                 'generated_at': datetime.utcnow().isoformat()
             })
         ))
         
         prep_pack_knowledge_id = cursor.fetchone()[0]
         
-        # 6. Update participant run to success
+        # 6. Update participant run to success (TICKET-13C: include retrieval metadata)
         cursor.execute("""
             UPDATE preflight_participant_runs
             SET status = 'success', 
@@ -299,7 +318,11 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
             prep_pack_knowledge_id,
             Json({
                 'chunks_processed': len(material_chunks) + len(imported_chunks),
-                'grants_used': len(grant_ids_used)
+                'grants_used': len(grant_ids_used),
+                'retrieval_mode': retrieval_method,
+                'embeddings_used': retrieval_method == 'semantic',
+                'material_chunk_ids': material_chunk_ids,
+                'imported_chunk_ids': imported_chunk_ids
             }),
             participant_run_id
         ))

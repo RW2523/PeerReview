@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import List
 import psycopg2
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header
 from psycopg2.extras import Json
 
 from src.config import settings

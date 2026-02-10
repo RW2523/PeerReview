@@ -4,7 +4,7 @@ Endpoints for agent preparation orchestration
 """
 
 import psycopg2
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Header
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -12,6 +12,7 @@ from datetime import datetime
 from src.config import settings
 from src.auth import require_auth
 from src.tasks.preflight import orchestrate_preflight
+from src.services.memory_retrieval import get_query_embedding
 
 router = APIRouter()
 
@@ -100,12 +101,19 @@ def get_debate_workspace(debate_id: str) -> str:
 @router.post("/debates/{debate_id}/preflight/start", response_model=PreflightStartResponse)
 def start_preflight(
     debate_id: str,
-    workspace_id: str = Depends(require_auth)
+    workspace_id: str = Depends(require_auth),
+    x_openrouter_key: Optional[str] = Header(None)
 ):
     """
     Start preflight preparation for all participants in a debate
     
     Creates a preflight run and enqueues tasks to generate prep packs for each participant.
+    
+    BYOK Enhancement (TICKET-13C.1):
+    - Optional X-OpenRouter-Key header enables semantic retrieval
+    - If provided, generates query embeddings for each participant at start time
+    - Stores embeddings (not key) in participant_runs.metadata
+    - This enables semantic retrieval without storing OpenRouter keys server-side
     
     Protected: Requires valid JWT and workspace access
     """
@@ -144,11 +152,14 @@ def start_preflight(
         
         run_id = cursor.fetchone()[0]
         
-        # Get all participants for this debate
+        # Get participants, policy config, and workspace settings for query embedding
         cursor.execute("""
-            SELECT participant_id, agent_config
-            FROM participants
-            WHERE debate_id = %s
+            SELECT p.participant_id, p.agent_config, d.policy_config,
+                   w.settings->>'embeddings_model_id' AS embeddings_model
+            FROM participants p
+            JOIN debates d ON p.debate_id = d.debate_id
+            JOIN workspaces w ON d.workspace_id = w.workspace_id
+            WHERE d.debate_id = %s
         """, (debate_id,))
         
         participants = cursor.fetchall()
@@ -159,26 +170,49 @@ def start_preflight(
                 detail="No participants found for this debate"
             )
         
-        # Create participant run entries
+        # Get common data for query embedding generation (TICKET-13C.1)
+        policy_config = participants[0][2] if participants else {}
+        embeddings_model_id = participants[0][3] if participants and participants[0][3] else 'moonshot/kimi-embeddings-v1'
+        problem_statement = policy_config.get('problem_statement', '') if policy_config else ''
+        
+        # Create participant run entries with query embeddings (BYOK-safe)
         participant_runs = []
-        for participant_id, agent_config in participants:
+        for participant in participants:
+            participant_id, agent_config = participant[0], participant[1]
             agent_id = agent_config.get('agent_id') if agent_config else None
+            
+            # Generate query embedding if OpenRouter key provided (BYOK: not stored)
+            query_embedding = None
+            if x_openrouter_key and problem_statement:
+                system_prompt = agent_config.get('system_prompt', '') if agent_config else ''
+                semantic_query = f"{problem_statement[:300]}\n\nRole: {system_prompt[:200]}"
+                query_embedding = get_query_embedding(semantic_query, x_openrouter_key, embeddings_model_id)
+            
+            # Store embedding vector (not key) in metadata
+            initial_metadata = {}
+            if query_embedding:
+                initial_metadata = {
+                    'query_embedding': query_embedding,
+                    'query_embedding_model_id': embeddings_model_id,
+                    'semantic_query_generated_at': datetime.utcnow().isoformat()
+                }
             
             cursor.execute("""
                 INSERT INTO preflight_participant_runs (
                     participant_run_id, run_id, participant_id, agent_id, status, metadata
                 ) VALUES (
-                    gen_random_uuid(), %s, %s, %s, 'queued', '{}'::jsonb
+                    gen_random_uuid(), %s, %s, %s, 'queued', %s
                 )
                 RETURNING participant_run_id, participant_id, agent_id, status
-            """, (run_id, participant_id, agent_id))
+            """, (run_id, participant_id, agent_id, Json(initial_metadata)))
             
             participant_run = cursor.fetchone()
             participant_runs.append({
                 'participant_run_id': participant_run[0],
                 'participant_id': participant_run[1],
                 'agent_id': participant_run[2],
-                'status': participant_run[3]
+                'status': participant_run[3],
+                'has_query_embedding': query_embedding is not None
             })
         
         conn.commit()

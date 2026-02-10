@@ -31,6 +31,7 @@ Non-negotiables:
 0. **Immediate blocker: Setup Page Gate + Truthfulness**
    - Goal: bring `/apps/web/src/app/setup/page.tsx` back under the 300-line limit and ensure “Enter Room” is only enabled when preflight is actually ready (or explicitly skipped) for every participant.
    - Required: `make verify` must pass. No misleading UI controls.
+   - Status: Completed via `TICKET-13B.1-2026-02-10-v1.md` (independently re-verified by Codex; `setup/page.tsx` is 282 lines; `make verify` PASS).
 
 1. **TICKET-12 hard verification**
    - Goal: Materials pipeline verified end-to-end with real local services and a no-mock E2E test.

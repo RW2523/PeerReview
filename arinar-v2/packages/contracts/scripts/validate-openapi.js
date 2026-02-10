@@ -66,7 +66,17 @@ async function validate() {
       { method: 'post', path: '/debates/{debate_id}/preflight/start' },
       { method: 'get', path: '/debates/{debate_id}/preflight/status' },
       { method: 'post', path: '/debates/{debate_id}/preflight/retry' },
-      { method: 'post', path: '/debates/{debate_id}/preflight/skip' }
+      { method: 'post', path: '/debates/{debate_id}/preflight/skip' },
+      { method: 'post', path: '/debates/{debate_id}/artifact/init' },
+      { method: 'get', path: '/debates/{debate_id}/artifact' },
+      { method: 'post', path: '/debates/{debate_id}/artifact/sections/{section_id}/events' },
+      { method: 'get', path: '/debates/{debate_id}/artifact/events' },
+      { method: 'post', path: '/debates/{debate_id}/materials/{material_id}/embed' },
+      { method: 'get', path: '/debates/{debate_id}/materials/{material_id}/embed/status' },
+      { method: 'post', path: '/debates/{debate_id}/materials/{material_id}/ocr' },
+      { method: 'get', path: '/debates/{debate_id}/materials/{material_id}/ocr/status' },
+      { method: 'get', path: '/workspaces/{workspace_id}/settings/models' },
+      { method: 'put', path: '/workspaces/{workspace_id}/settings/models' }
     ];
     
     console.log('\n📋 Checking required endpoints:');

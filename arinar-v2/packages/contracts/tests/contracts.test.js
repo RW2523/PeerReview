@@ -55,7 +55,16 @@ test('OpenAPI contains all required endpoints', () => {
     '/debates/{debate_id}/preflight/start:',
     '/debates/{debate_id}/preflight/status:',
     '/debates/{debate_id}/preflight/retry:',
-    '/debates/{debate_id}/preflight/skip:'
+    '/debates/{debate_id}/preflight/skip:',
+    '/debates/{debate_id}/artifact/init:',
+    '/debates/{debate_id}/artifact:',
+    '/debates/{debate_id}/artifact/sections/{section_id}/events:',
+    '/debates/{debate_id}/artifact/events:',
+    '/debates/{debate_id}/materials/{material_id}/embed:',
+    '/debates/{debate_id}/materials/{material_id}/embed/status:',
+    '/debates/{debate_id}/materials/{material_id}/ocr:',
+    '/debates/{debate_id}/materials/{material_id}/ocr/status:',
+    '/workspaces/{workspace_id}/settings/models:'
   ];
   
   for (const path of requiredPaths) {

@@ -79,6 +79,31 @@
   font-weight: 500;
 }
 
+.form input,
+.select {
+  padding: 12px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  color: var(--text-0);
+  font-size: 14px;
+  transition: all 150ms;
+}
+
+.form input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface-1);
+}
+
+.fieldHint {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+  font-weight: 400;
+}
+
 .persistenceOptions {
   display: flex;
   flex-direction: column;
@@ -243,6 +268,50 @@
   font-size: 13px;
   color: var(--danger);
   margin-bottom: var(--space-2);
+  animation: fadeIn 300ms ease-out;
+}
+
+.error strong {
+  display: block;
+  color: var(--danger);
+  margin-bottom: 4px;
+}
+
+.error p {
+  color: rgba(248, 113, 113, 0.9);
+  margin: 0 0 4px 0;
+  line-height: 1.5;
+}
+
+.hint {
+  font-size: 12px;
+  color: rgba(248, 113, 113, 0.7) !important;
+  font-style: italic;
+}
+
+.success {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--success);
+  margin-bottom: var(--space-2);
+  animation: fadeIn 300ms ease-out;
+}
+
+.success strong {
+  display: block;
+  color: var(--success);
+  margin-bottom: 4px;
+}
+
+.success p {
+  color: rgba(74, 222, 128, 0.9);
+  margin: 0;
+  line-height: 1.5;
 }
 
 .loading {

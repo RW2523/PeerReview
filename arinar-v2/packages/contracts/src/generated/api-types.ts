@@ -245,6 +245,91 @@ export interface paths {
      */
     post: operations["skipParticipantPreflight"];
   };
+  "/debates/{debate_id}/artifact/init": {
+    /**
+     * Initialize artifact
+     * @description Creates a new artifact for a debate with section assignments.
+     * Sections are stored in agent_knowledge_units with type=artifact_section.
+     */
+    post: operations["initArtifact"];
+  };
+  "/debates/{debate_id}/artifact": {
+    /**
+     * Get artifact
+     * @description Returns current artifact state (latest or specific version).
+     * Sections reconstructed from agent_knowledge_units.
+     */
+    get: operations["getArtifact"];
+  };
+  "/debates/{debate_id}/artifact/sections/{section_id}/events": {
+    /**
+     * Create section event
+     * @description Appends/replaces section content or sends typing indicator.
+     * Only section owner can write (enforced via X-Participant-Id header).
+     */
+    post: operations["createSectionEvent"];
+  };
+  "/debates/{debate_id}/artifact/events": {
+    /**
+     * Get artifact events
+     * @description Returns artifact event history with cursor pagination.
+     * Optionally filter by section_id.
+     */
+    get: operations["getArtifactEvents"];
+  };
+  "/debates/{debate_id}/materials/{material_id}/embed": {
+    /**
+     * Generate embeddings
+     * @description Generate embeddings for material chunks using OpenRouter (BYOK).
+     * Requires X-OpenRouter-Key header (client-driven, not stored).
+     * Material must be processed (status=complete) before embeddings.
+     */
+    post: operations["generateEmbeddings"];
+  };
+  "/debates/{debate_id}/materials/{material_id}/embed/status": {
+    /**
+     * Get embedding status
+     * @description Returns embedding generation status for a material's chunks.
+     * Shows counts by status (not_started, running, complete, failed).
+     */
+    get: operations["getEmbeddingStatus"];
+  };
+  "/debates/{debate_id}/materials/{material_id}/ocr": {
+    /**
+     * Run OCR
+     * @description Run OCR on a scanned PDF material (Phase 1 baseline).
+     * Only allowed if processed_status = 'needs_ocr'.
+     * Uses Tesseract if available, otherwise returns 501.
+     */
+    post: operations["runOcr"];
+  };
+  "/debates/{debate_id}/materials/{material_id}/ocr/status": {
+    /**
+     * Get OCR status
+     * @description Returns OCR processing status for a material.
+     */
+    get: operations["getOcrStatus"];
+  };
+  "/workspaces/{workspace_id}/settings/models": {
+    /**
+     * Get workspace model defaults
+     * @description Returns workspace-wide default models for RAG/embeddings and OCR post-processing.
+     * These settings sync across devices (stored in database).
+     * Returns system defaults if workspace hasn't configured custom values.
+     */
+    get: operations["getWorkspaceModels"];
+    /**
+     * Update workspace model defaults
+     * @description Updates workspace-wide default models for RAG/embeddings and OCR.
+     * These settings:
+     * - Are stored server-side (sync across devices)
+     * - Apply automatically when requests don't specify a model
+     * - Do NOT require OpenRouter key (can be set before key is added)
+     *
+     * Note: OpenRouter key remains client-only (browser storage).
+     */
+    put: operations["updateWorkspaceModels"];
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -577,6 +662,36 @@ export interface components {
       };
       description?: string;
     };
+    OpenRouterAccountResponse: {
+      /** @description Key usage and limits from /api/v1/auth/key */
+      key?: {
+        /** @description Current usage in USD */
+        usage?: number;
+        /** @description Usage limit in USD (null for unlimited) */
+        limit?: number | null;
+        /** @description Key label */
+        label?: string | null;
+        rate_limit?: {
+          /** @description Max requests per interval */
+          requests?: number;
+          /** @description Time interval (e.g., '1m', '1h') */
+          interval?: string;
+        } | null;
+        /** @description Whether key is on free tier */
+        is_free_tier?: boolean | null;
+      };
+      /** @description Credits info from /api/v1/credits (null if not available) */
+      credits?: {
+        /** @description Total credits purchased */
+        total_credits?: number;
+        /** @description Total credits used */
+        total_usage?: number;
+        /** @description Remaining credits */
+        balance?: number;
+      } | null;
+      /** @description Informational message (e.g., why credits unavailable) */
+      note?: string | null;
+    };
     GeneratePersonaDraftRequest: {
       role_title: string;
       style_brief: string;
@@ -787,6 +902,177 @@ export interface components {
       participant_id: string;
       status: string;
       message: string;
+    };
+    SectionAssignment: {
+      /** @description Section key from template (e.g., "goals", "risks") */
+      section_id: string;
+      /**
+       * Format: uuid
+       * @description Owner participant ID for this section
+       */
+      participant_id: string;
+    };
+    ArtifactInitRequest: {
+      /** @description Template ID (e.g., "prd", "brief", "memo") */
+      template_id: string;
+      /** @description Custom artifact title (defaults to template title) */
+      title?: string | null;
+      /** @description Section ownership assignments */
+      section_assignments: components["schemas"]["SectionAssignment"][];
+    };
+    SectionInfo: {
+      section_id: string;
+      title: string;
+      /** Format: uuid */
+      owner_participant_id?: string | null;
+      /** @enum {string} */
+      status: "drafting" | "committed" | "locked";
+      content: string;
+      word_count: number;
+      citations: Record<string, never>[];
+      /** @enum {string} */
+      block_type: "rich_text" | "chart" | "table" | "diagram_mermaid";
+    };
+    ArtifactInitResponse: {
+      /** Format: uuid */
+      artifact_id: string;
+      /** Format: uuid */
+      debate_id: string;
+      template_id: string;
+      title: string;
+      version: number;
+      status: string;
+      sections: components["schemas"]["SectionInfo"][];
+      /** Format: date-time */
+      created_at: string;
+    };
+    ArtifactGetResponse: {
+      /** Format: uuid */
+      artifact_id: string;
+      /** Format: uuid */
+      debate_id: string;
+      template_id: string;
+      title: string;
+      version: number;
+      status: string;
+      sections: components["schemas"]["SectionInfo"][];
+      quality_report?: Record<string, unknown> | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      /** Format: date-time */
+      finalized_at?: string | null;
+    };
+    SectionEventRequest: {
+      /**
+       * @description Type of content update
+       * @enum {string}
+       */
+      event_type: "append" | "replace" | "typing";
+      /** @description Markdown content or JSON payload for charts/tables */
+      content: string;
+      /** @description Citations for this content */
+      citations?: Record<string, never>[] | null;
+    };
+    SectionEventResponse: {
+      /** Format: uuid */
+      event_id: string;
+      section_id: string;
+      /** Format: uuid */
+      artifact_id: string;
+      event_type: string;
+      /** Format: uuid */
+      actor_participant_id: string;
+      content_preview: string;
+      /** Format: date-time */
+      created_at: string;
+    };
+    ArtifactEvent: {
+      /** Format: uuid */
+      event_id: string;
+      /** Format: uuid */
+      artifact_id: string;
+      section_id?: string | null;
+      event_type: string;
+      /** Format: uuid */
+      actor_participant_id?: string | null;
+      payload: Record<string, never>;
+      /** Format: date-time */
+      created_at: string;
+    };
+    ArtifactEventsResponse: {
+      events: components["schemas"]["ArtifactEvent"][];
+      next_cursor?: string | null;
+    };
+    EmbeddingsResponse: {
+      /** Format: uuid */
+      material_id: string;
+      /** @description OpenRouter model ID used for embeddings */
+      embedding_model_id: string;
+      /** @description Number of chunks processed */
+      chunks_processed: number;
+      status: string;
+    };
+    EmbeddingStatusResponse: {
+      /** Format: uuid */
+      material_id: string;
+      total_chunks: number;
+      /** @enum {string} */
+      overall_status: "no_chunks" | "not_started" | "in_progress" | "complete" | "partial_failure";
+      status_breakdown: {
+        [key: string]: number;
+      };
+    };
+    OcrResponse: {
+      /** Format: uuid */
+      material_id: string;
+      /** Format: uuid */
+      job_id: string;
+      message: string;
+      status: string;
+    };
+    OcrStatusResponse: {
+      /** Format: uuid */
+      material_id: string;
+      processed_status: string;
+      /** Format: uuid */
+      ocr_job_id?: string | null;
+      ocr_job_status?: string | null;
+      ocr_completed?: boolean;
+      ocr_page_count?: number | null;
+      ocr_confidence_avg?: number | null;
+      error_message?: string | null;
+      /** Format: date-time */
+      completed_at?: string | null;
+    };
+    WorkspaceModelsRequest: {
+      /**
+       * @description OpenRouter model ID for embeddings/RAG (e.g., moonshot/kimi-embeddings-v1)
+       * @example moonshot/kimi-embeddings-v1
+       */
+      embeddings_model_id: string;
+      /**
+       * @description OpenRouter model ID for OCR post-processing (e.g., qwen/qwen-2.5-72b-instruct)
+       * @example qwen/qwen-2.5-72b-instruct
+       */
+      ocr_model_id: string;
+    };
+    WorkspaceModelsResponse: {
+      /**
+       * Format: uuid
+       * @description Workspace UUID
+       */
+      workspace_id: string;
+      /** @description OpenRouter model ID for embeddings/RAG */
+      embeddings_model_id: string;
+      /** @description OpenRouter model ID for OCR post-processing */
+      ocr_model_id: string;
+      /**
+       * Format: date-time
+       * @description When settings were last updated
+       */
+      updated_at: string;
     };
   };
   responses: never;
@@ -1389,17 +1675,10 @@ export interface operations {
       /** @description Account information */
       200: {
         content: {
-          "application/json": {
-            /** @description Key usage and limits */
-            key?: Record<string, never>;
-            /** @description Credits info (null if not available) */
-            credits?: Record<string, unknown> | null;
-            /** @description Additional info or warnings */
-            note?: string | null;
-          };
+          "application/json": components["schemas"]["OpenRouterAccountResponse"];
         };
       };
-      /** @description Missing API key */
+      /** @description Missing or empty API key */
       400: {
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
@@ -1407,6 +1686,12 @@ export interface operations {
       };
       /** @description Invalid API key */
       401: {
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description OpenRouter API error */
+      500: {
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
         };
@@ -1763,6 +2048,352 @@ export interface operations {
         content: never;
       };
       /** @description Participant run not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Initialize artifact
+   * @description Creates a new artifact for a debate with section assignments.
+   * Sections are stored in agent_knowledge_units with type=artifact_section.
+   */
+  initArtifact: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ArtifactInitRequest"];
+      };
+    };
+    responses: {
+      /** @description Artifact initialized */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ArtifactInitResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Debate or template not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Get artifact
+   * @description Returns current artifact state (latest or specific version).
+   * Sections reconstructed from agent_knowledge_units.
+   */
+  getArtifact: {
+    parameters: {
+      query?: {
+        /** @description Specific version to retrieve (defaults to latest) */
+        version?: number;
+      };
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Artifact data */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ArtifactGetResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Artifact not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Create section event
+   * @description Appends/replaces section content or sends typing indicator.
+   * Only section owner can write (enforced via X-Participant-Id header).
+   */
+  createSectionEvent: {
+    parameters: {
+      header: {
+        /** @description Actor participant ID */
+        "X-Participant-Id": string;
+      };
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+        /** @description Section ID from template */
+        section_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SectionEventRequest"];
+      };
+    };
+    responses: {
+      /** @description Section event created */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SectionEventResponse"];
+        };
+      };
+      /** @description Not section owner or access denied */
+      403: {
+        content: never;
+      };
+      /** @description Section not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Get artifact events
+   * @description Returns artifact event history with cursor pagination.
+   * Optionally filter by section_id.
+   */
+  getArtifactEvents: {
+    parameters: {
+      query?: {
+        /** @description Filter events by section */
+        section_id?: string;
+        /** @description Max events per page */
+        limit?: number;
+        /** @description Pagination cursor (event_id) */
+        cursor?: string;
+      };
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Artifact events */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ArtifactEventsResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Artifact not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Generate embeddings
+   * @description Generate embeddings for material chunks using OpenRouter (BYOK).
+   * Requires X-OpenRouter-Key header (client-driven, not stored).
+   * Material must be processed (status=complete) before embeddings.
+   */
+  generateEmbeddings: {
+    parameters: {
+      header: {
+        /** @description OpenRouter API key (BYOK, not stored) */
+        "X-OpenRouter-Key": string;
+      };
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+        material_id: string;
+      };
+    };
+    responses: {
+      /** @description Embeddings generated */
+      200: {
+        content: {
+          "application/json": components["schemas"]["EmbeddingsResponse"];
+        };
+      };
+      /** @description Missing key or material not ready */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Material not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Get embedding status
+   * @description Returns embedding generation status for a material's chunks.
+   * Shows counts by status (not_started, running, complete, failed).
+   */
+  getEmbeddingStatus: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+        material_id: string;
+      };
+    };
+    responses: {
+      /** @description Embedding status */
+      200: {
+        content: {
+          "application/json": components["schemas"]["EmbeddingStatusResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Material not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Run OCR
+   * @description Run OCR on a scanned PDF material (Phase 1 baseline).
+   * Only allowed if processed_status = 'needs_ocr'.
+   * Uses Tesseract if available, otherwise returns 501.
+   */
+  runOcr: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+        material_id: string;
+      };
+    };
+    responses: {
+      /** @description OCR queued */
+      200: {
+        content: {
+          "application/json": components["schemas"]["OcrResponse"];
+        };
+      };
+      /** @description Material does not need OCR */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Material not found */
+      404: {
+        content: never;
+      };
+      /** @description OCR not available on server */
+      501: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Get OCR status
+   * @description Returns OCR processing status for a material.
+   */
+  getOcrStatus: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+        material_id: string;
+      };
+    };
+    responses: {
+      /** @description OCR status */
+      200: {
+        content: {
+          "application/json": components["schemas"]["OcrStatusResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Material not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Get workspace model defaults
+   * @description Returns workspace-wide default models for RAG/embeddings and OCR post-processing.
+   * These settings sync across devices (stored in database).
+   * Returns system defaults if workspace hasn't configured custom values.
+   */
+  getWorkspaceModels: {
+    parameters: {
+      path: {
+        /** @description Workspace UUID */
+        workspace_id: string;
+      };
+    };
+    responses: {
+      /** @description Workspace model defaults */
+      200: {
+        content: {
+          "application/json": components["schemas"]["WorkspaceModelsResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Workspace not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Update workspace model defaults
+   * @description Updates workspace-wide default models for RAG/embeddings and OCR.
+   * These settings:
+   * - Are stored server-side (sync across devices)
+   * - Apply automatically when requests don't specify a model
+   * - Do NOT require OpenRouter key (can be set before key is added)
+   *
+   * Note: OpenRouter key remains client-only (browser storage).
+   */
+  updateWorkspaceModels: {
+    parameters: {
+      path: {
+        /** @description Workspace UUID */
+        workspace_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["WorkspaceModelsRequest"];
+      };
+    };
+    responses: {
+      /** @description Workspace model defaults updated */
+      200: {
+        content: {
+          "application/json": components["schemas"]["WorkspaceModelsResponse"];
+        };
+      };
+      /** @description Invalid request (missing or empty model IDs) */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Workspace not found */
       404: {
         content: never;
       };
