@@ -5,6 +5,8 @@
 **Author:** Strategic Planning Session  
 **Context:** Post-TICKET-09B UI Simplification
 
+**Update (2026-02-10):** Materials ingestion + memory import + preflight core are now implemented (see ticket reports). This doc remains the guiding design, but some “current state gaps” are partially closed.
+
 ---
 
 ## Executive Summary
@@ -84,6 +86,18 @@ User Journey:
    - Audit trail of all preparation steps
    - Cost tracking per debate
    - Configurable timeouts and budgets
+
+## RLM-Style Preparation (Long-Context Quality)
+
+Agent preparation must remain high-quality even when meetings include large numbers of documents and imported memory.
+We will use an **RLM-style multi-pass approach** (plan -> retrieve slices -> draft notes -> synthesize -> verify), rather than passing all materials into a single prompt.
+
+This approach is:
+- compatible with OpenRouter BYOK (works with any model selection)
+- enterprise-auditable (every retrieval is explicit and can be logged)
+- naturally timeboxable (budgets per pass and per agent)
+
+Reference: `arinar-v2/docs/design/RLM-APPLICATION-TO-ARINAR.md`.
 
 ---
 

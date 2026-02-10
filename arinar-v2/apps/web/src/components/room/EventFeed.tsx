@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import styles from './EventFeed.module.css';
+import * as api from '@/lib/api';
 
 interface Event {
   event_id: string;
@@ -25,8 +26,7 @@ export default function EventFeed({ debateId }: EventFeedProps) {
   useEffect(() => {
     if (!debateId) return;
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const streamUrl = `${API_URL}/debates/${debateId}/events/stream`;
+    const streamUrl = api.getStreamUrl(debateId);
     setConnectionStatus('connecting');
     setError(null);
 

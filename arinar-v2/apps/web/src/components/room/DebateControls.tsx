@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import styles from './DebateControls.module.css';
+import * as api from '@/lib/api';
 
 interface DebateControlsProps {
   debateId: string;
@@ -14,40 +15,57 @@ export default function DebateControls({ debateId, currentState, onStateChange }
   const [error, setError] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
 
-  const callEndpoint = async (action: string) => {
+  const handleStart = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/debates/${debateId}/${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Failed to ${action} debate`);
-      }
-
-      const result = await response.json();
-      onStateChange(result.state || action + 'ed');
+      const result = await api.startDebate(debateId);
+      onStateChange(result.state);
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${action}`);
+      setError(err instanceof Error ? err.message : 'Failed to start debate');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStart = () => callEndpoint('start');
-  const handlePause = () => callEndpoint('pause');
-  const handleResume = () => callEndpoint('resume');
-  
-  const handleEnd = () => {
+  const handlePause = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.pauseDebate(debateId);
+      onStateChange(result.state);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to pause debate');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResume = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.resumeDebate(debateId);
+      onStateChange(result.state);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resume debate');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEnd = async () => {
     setShowEndConfirm(false);
-    callEndpoint('end');
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.endDebate(debateId);
+      onStateChange(result.state);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to end debate');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const canStart = currentState === 'pending';

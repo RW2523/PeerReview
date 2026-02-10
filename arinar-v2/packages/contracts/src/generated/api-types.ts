@@ -171,6 +171,80 @@ export interface paths {
      */
     post: operations["validatePersona"];
   };
+  "/workspaces/{workspace_id}/memory/importable": {
+    /**
+     * List importable memory sources
+     * @description Returns recent ended debates in workspace that can be imported as memory sources.
+     * Shows chunk counts, material counts, and metadata.
+     */
+    get: operations["listImportableSources"];
+  };
+  "/debates/{debate_id}/memory/preview": {
+    /**
+     * Preview memory import
+     * @description Shows what would be imported from a source debate.
+     * Returns topics, chunk counts, and date range.
+     */
+    get: operations["previewMemoryImport"];
+  };
+  "/debates/{debate_id}/memory/import": {
+    /**
+     * Import memory from prior debates
+     * @description Creates grants to allow participants to access chunks from specified source debates.
+     * Grants are immutable once debate starts (audit integrity).
+     */
+    post: operations["importMemory"];
+  };
+  "/debates/{debate_id}/memory/grants": {
+    /**
+     * List memory grants
+     * @description Lists all active memory grants for a debate.
+     * Shows which source debates/artifacts participants can access.
+     */
+    get: operations["listMemoryGrants"];
+  };
+  "/debates/{debate_id}/memory/grants/{grant_id}": {
+    /**
+     * Revoke memory grant
+     * @description Revokes a grant. Only allowed if debate is in pending state.
+     * Grants are immutable once debate starts (audit integrity).
+     */
+    delete: operations["revokeMemoryGrant"];
+  };
+  "/debates/{debate_id}/preflight/start": {
+    /**
+     * Start agent preflight preparation
+     * @description Initiates preflight preparation for all participants in a debate.
+     * Creates prep packs by reviewing materials and imported memory.
+     * Returns immediately with run_id; use status endpoint to monitor progress.
+     */
+    post: operations["startPreflight"];
+  };
+  "/debates/{debate_id}/preflight/status": {
+    /**
+     * Get preflight preparation status
+     * @description Returns overall run status and per-participant progress.
+     * Shows which participants have completed prep packs.
+     */
+    get: operations["getPreflightStatus"];
+  };
+  "/debates/{debate_id}/preflight/retry": {
+    /**
+     * Retry failed preflight preparation
+     * @description Retries preflight for a specific participant that failed.
+     * Only allowed if participant status is 'failed'.
+     */
+    post: operations["retryParticipantPreflight"];
+  };
+  "/debates/{debate_id}/preflight/skip": {
+    /**
+     * Skip preflight preparation
+     * @description Skips preflight for a specific participant.
+     * Records skip reason for audit trail.
+     * Allowed if status is queued, running, or failed.
+     */
+    post: operations["skipParticipantPreflight"];
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -541,6 +615,178 @@ export interface components {
       errors?: string[];
       /** @default [] */
       warnings?: string[];
+    };
+    ImportableDebate: {
+      /** Format: uuid */
+      debate_id: string;
+      title: string;
+      state: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      ended_at?: string | null;
+      /** @description Total chunks available (materials + agent knowledge) */
+      chunk_count: number;
+      /** @description Number of materials attached */
+      material_count: number;
+      /** @description Number of artifacts created */
+      artifact_count: number;
+      /** @description Number of participants */
+      participant_count: number;
+    };
+    ImportableSourcesResponse: {
+      /** Format: uuid */
+      workspace_id: string;
+      debates: components["schemas"]["ImportableDebate"][];
+      total_count: number;
+    };
+    MemoryPreviewChunk: {
+      /** @description Type of chunks (material, agent_knowledge, artifact) */
+      source_type: string;
+      title: string;
+      chunk_count: number;
+      /** Format: date-time */
+      last_updated: string;
+    };
+    MemoryPreviewResponse: {
+      /** Format: uuid */
+      source_debate_id: string;
+      source_title: string;
+      total_chunks: number;
+      breakdown: components["schemas"]["MemoryPreviewChunk"][];
+      date_range: {
+        /** Format: date-time */
+        start?: string | null;
+        /** Format: date-time */
+        end?: string | null;
+      };
+    };
+    MemoryImportRequest: {
+      /** @description Debate IDs to import from */
+      source_debate_ids: string[];
+      /**
+       * @description What to import
+       * @default debate_full
+       * @enum {string}
+       */
+      source_type?: "debate_full" | "materials_only";
+      /**
+       * @description Who can access
+       * @default all_agents
+       * @enum {string}
+       */
+      scope?: "all_agents" | "specific_agents";
+      /** @description Required if scope='specific_agents' */
+      participant_ids?: string[] | null;
+      /** @description Import context */
+      metadata?: {
+        [key: string]: unknown;
+      };
+    };
+    MemoryImportResponse: {
+      /** Format: uuid */
+      debate_id: string;
+      grants_created: number;
+      grant_ids: string[];
+    };
+    MemoryGrant: {
+      /** Format: uuid */
+      grant_id: string;
+      /** Format: uuid */
+      source_debate_id?: string | null;
+      source_debate_title?: string | null;
+      /** Format: uuid */
+      source_artifact_id?: string | null;
+      source_artifact_title?: string | null;
+      source_type: string;
+      scope: string;
+      allowed_participant_ids?: string[] | null;
+      granted_by: string;
+      /** Format: date-time */
+      granted_at: string;
+      /** Format: date-time */
+      expires_at?: string | null;
+      metadata: {
+        [key: string]: unknown;
+      };
+    };
+    MemoryGrantsResponse: {
+      /** Format: uuid */
+      debate_id: string;
+      grants: components["schemas"]["MemoryGrant"][];
+      total_count: number;
+    };
+    PreflightStartResponse: {
+      /** Format: uuid */
+      run_id: string;
+      /** Format: uuid */
+      debate_id: string;
+      /** @enum {string} */
+      status: "queued" | "running" | "completed" | "failed";
+      participant_count: number;
+      participant_runs: ({
+          /** Format: uuid */
+          participant_run_id?: string;
+          /** Format: uuid */
+          participant_id?: string;
+          /** Format: uuid */
+          agent_id?: string | null;
+          status?: string;
+        })[];
+    };
+    ParticipantRunStatus: {
+      /** Format: uuid */
+      participant_run_id: string;
+      /** Format: uuid */
+      participant_id: string;
+      /** Format: uuid */
+      agent_id?: string | null;
+      /** @enum {string} */
+      status: "queued" | "running" | "success" | "failed" | "skipped";
+      /** Format: date-time */
+      started_at?: string | null;
+      /** Format: date-time */
+      completed_at?: string | null;
+      error?: string | null;
+      skip_reason?: string | null;
+      /** Format: uuid */
+      prep_pack_knowledge_id?: string | null;
+      metadata: {
+        [key: string]: unknown;
+      };
+    };
+    PreflightStatusResponse: {
+      /** Format: uuid */
+      run_id: string;
+      /** Format: uuid */
+      debate_id: string;
+      /** @enum {string} */
+      status: "queued" | "running" | "completed" | "failed";
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      started_at?: string | null;
+      /** Format: date-time */
+      completed_at?: string | null;
+      error?: string | null;
+      participant_runs: components["schemas"]["ParticipantRunStatus"][];
+    };
+    PreflightRetryRequest: {
+      /** Format: uuid */
+      participant_id: string;
+    };
+    PreflightSkipRequest: {
+      /** Format: uuid */
+      participant_id: string;
+      reason: string;
+    };
+    PreflightActionResponse: {
+      /** Format: uuid */
+      participant_run_id: string;
+      /** Format: uuid */
+      participant_id: string;
+      status: string;
+      message: string;
     };
   };
   responses: never;
@@ -1222,6 +1468,303 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["ValidatePersonaResponse"];
         };
+      };
+    };
+  };
+  /**
+   * List importable memory sources
+   * @description Returns recent ended debates in workspace that can be imported as memory sources.
+   * Shows chunk counts, material counts, and metadata.
+   */
+  listImportableSources: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      path: {
+        workspace_id: string;
+      };
+    };
+    responses: {
+      /** @description List of importable debates */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ImportableSourcesResponse"];
+        };
+      };
+      /** @description Access denied to workspace */
+      403: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Preview memory import
+   * @description Shows what would be imported from a source debate.
+   * Returns topics, chunk counts, and date range.
+   */
+  previewMemoryImport: {
+    parameters: {
+      query: {
+        source_debate_id: string;
+      };
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Memory preview */
+      200: {
+        content: {
+          "application/json": components["schemas"]["MemoryPreviewResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Debate not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Import memory from prior debates
+   * @description Creates grants to allow participants to access chunks from specified source debates.
+   * Grants are immutable once debate starts (audit integrity).
+   */
+  importMemory: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemoryImportRequest"];
+      };
+    };
+    responses: {
+      /** @description Grants created successfully */
+      200: {
+        content: {
+          "application/json": components["schemas"]["MemoryImportResponse"];
+        };
+      };
+      /** @description Invalid request or debate already started */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Debate not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * List memory grants
+   * @description Lists all active memory grants for a debate.
+   * Shows which source debates/artifacts participants can access.
+   */
+  listMemoryGrants: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description List of grants */
+      200: {
+        content: {
+          "application/json": components["schemas"]["MemoryGrantsResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Debate not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Revoke memory grant
+   * @description Revokes a grant. Only allowed if debate is in pending state.
+   * Grants are immutable once debate starts (audit integrity).
+   */
+  revokeMemoryGrant: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+        grant_id: string;
+      };
+    };
+    responses: {
+      /** @description Grant revoked */
+      200: {
+        content: {
+          "application/json": {
+            /** @example revoked */
+            status?: string;
+            /** Format: uuid */
+            grant_id?: string;
+          };
+        };
+      };
+      /** @description Cannot revoke after debate started */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Grant not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Start agent preflight preparation
+   * @description Initiates preflight preparation for all participants in a debate.
+   * Creates prep packs by reviewing materials and imported memory.
+   * Returns immediately with run_id; use status endpoint to monitor progress.
+   */
+  startPreflight: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Preflight started */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PreflightStartResponse"];
+        };
+      };
+      /** @description Preflight already running or invalid state */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Debate not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Get preflight preparation status
+   * @description Returns overall run status and per-participant progress.
+   * Shows which participants have completed prep packs.
+   */
+  getPreflightStatus: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    responses: {
+      /** @description Preflight status */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PreflightStatusResponse"];
+        };
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description No preflight run found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Retry failed preflight preparation
+   * @description Retries preflight for a specific participant that failed.
+   * Only allowed if participant status is 'failed'.
+   */
+  retryParticipantPreflight: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PreflightRetryRequest"];
+      };
+    };
+    responses: {
+      /** @description Retry queued */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PreflightActionResponse"];
+        };
+      };
+      /** @description Cannot retry (not failed status) */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Participant run not found */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Skip preflight preparation
+   * @description Skips preflight for a specific participant.
+   * Records skip reason for audit trail.
+   * Allowed if status is queued, running, or failed.
+   */
+  skipParticipantPreflight: {
+    parameters: {
+      path: {
+        debate_id: components["parameters"]["DebateIdParam"];
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PreflightSkipRequest"];
+      };
+    };
+    responses: {
+      /** @description Participant skipped */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PreflightActionResponse"];
+        };
+      };
+      /** @description Cannot skip (already completed) */
+      400: {
+        content: never;
+      };
+      /** @description Access denied */
+      403: {
+        content: never;
+      };
+      /** @description Participant run not found */
+      404: {
+        content: never;
       };
     };
   };

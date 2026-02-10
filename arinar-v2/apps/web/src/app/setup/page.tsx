@@ -7,13 +7,24 @@ import * as api from '@/lib/api';
 import { BasicInfoStep } from '@/components/setup/BasicInfoStep';
 import { MaterialsStep } from '@/components/setup/MaterialsStep';
 import { ParticipantsStep } from '@/components/setup/ParticipantsStep';
+import { MemoryImportStep } from '@/components/setup/MemoryImportStep';
+import { PreflightStep } from '@/components/setup/PreflightStep';
 import { ReviewStep } from '@/components/setup/ReviewStep';
+import { useMemoryImport } from '@/hooks/useMemoryImport';
+import { useSetupValidation } from '@/hooks/useSetupValidation';
+import { useParticipants } from '@/hooks/useParticipants';
+import { useMaterials } from '@/hooks/useMaterials';
 import styles from './setup.module.css';
 
 export default function SetupPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Debate creation tracking
+  const [createdDebateId, setCreatedDebateId] = useState<string | null>(null);
+  const [createdParticipantIds, setCreatedParticipantIds] = useState<string[]>([]);
+  const [canEnterRoom, setCanEnterRoom] = useState(false);
   
   // Step 1: Basic Info
   const [title, setTitle] = useState('');
@@ -36,87 +47,78 @@ export default function SetupPage() {
   }, []);
   
   // Step 2: Materials
-  const [materials, setMaterials] = useState<api.SetupMaterial[]>([]);
+  const {
+    materials,
+    handleAdd: handleAddMaterial,
+    handleUpdate: handleUpdateMaterial,
+    handleRemove: handleRemoveMaterial,
+  } = useMaterials();
   
   // Step 3: Participants
-  const [participants, setParticipants] = useState<api.SetupParticipant[]>([]);
+  const {
+    participants,
+    setParticipants,
+    handleAddFromTemplate: handleAddParticipantFromTemplate,
+    handleAddExisting: handleAddExistingAgent,
+    handleUpdate: handleUpdateParticipant,
+    handleRemove: handleRemoveParticipant,
+  } = useParticipants();
   const [templates, setTemplates] = useState<api.AgentTemplate[]>([]);
   const [agents, setAgents] = useState<api.Agent[]>([]);
   
+  // Step 4: Memory Import
+  const { memoryImport, setMemoryImport, validateMemoryImport, createMemoryGrants } = useMemoryImport();
+  
+  // Validation
+  const { canGoNext: validateStep } = useSetupValidation();
+  
   const workspaceId = '00000000-0000-0000-0000-000000000101';
+  const steps = [
+    { id: 1, label: 'Basic Info' },
+    { id: 2, label: 'Materials' },
+    { id: 3, label: 'Participants' },
+    { id: 4, label: 'Memory' },
+    { id: 5, label: 'Prepare' },
+    { id: 6, label: 'Review' },
+  ];
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('Loading templates and agents...');
         const [templatesData, agentsData] = await Promise.all([
           api.listAgentTemplates(),
           api.listAgents(workspaceId),
         ]);
+        console.log('Templates loaded:', templatesData.length);
+        console.log('Agents loaded:', agentsData.length);
         setTemplates(templatesData);
         setAgents(agentsData);
       } catch (err: any) {
         console.error('Failed to load templates/agents:', err);
+        alert(`Failed to load templates/agents: ${err.message}`);
       }
     };
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAddMaterial = (kind: 'text' | 'link' | 'file_placeholder') => {
-    setMaterials([...materials, { kind, title: '', body_text: '', url: '' }]);
-  };
-
-  const handleUpdateMaterial = (idx: number, updates: Partial<api.SetupMaterial>) => {
-    const updated = [...materials];
-    updated[idx] = { ...updated[idx], ...updates };
-    setMaterials(updated);
-  };
-
-  const handleRemoveMaterial = (idx: number) => {
-    setMaterials(materials.filter((_, i) => i !== idx));
-  };
-
-  const handleAddParticipantFromTemplate = (template: api.AgentTemplate) => {
-    if (participants.length >= 8) {
-      alert('Maximum 8 participants allowed');
-      return;
-    }
-    
-    setParticipants([...participants, {
-      name: template.label,
-      role_description: template.role_title,
-      system_prompt: template.system_prompt,
-      model_id: template.model_id,
-      model_config: template.model_config,
-    }]);
-  };
-
-  const handleAddExistingAgent = (agent: api.Agent) => {
-    if (participants.length >= 8) {
-      alert('Maximum 8 participants allowed');
-      return;
-    }
-    
-    setParticipants([...participants, { agent_id: agent.agent_id }]);
-  };
-
-  const handleUpdateParticipant = (idx: number, updates: Partial<api.SetupParticipant>) => {
-    const updated = [...participants];
-    updated[idx] = { ...updated[idx], ...updates };
-    setParticipants(updated);
-  };
-
-  const handleRemoveParticipant = (idx: number) => {
-    setParticipants(participants.filter((_, i) => i !== idx));
-  };
-
-  const handleLaunch = async () => {
+  const handleCreateDebate = async () => {
     if (participants.length === 0) {
       alert('At least 1 participant required');
       return;
     }
     
+    // Validate memory import
+    const memoryError = validateMemoryImport(participants);
+    if (memoryError) {
+      alert(memoryError);
+      return;
+    }
+    
     setIsLoading(true);
     try {
+      // 1. Create debate (returns participant_ids)
       const result = await api.setupDebate({
         workspace_id: workspaceId,
         title,
@@ -126,18 +128,31 @@ export default function SetupPage() {
         materials,
       });
       
-      router.push(`/operator?debate_id=${result.debate_id}`);
+      // 2. Create memory grants if enabled (pass participant_ids for mapping)
+      const shouldContinue = await createMemoryGrants(result.debate_id, result.participant_ids);
+      if (!shouldContinue) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // 3. Store debate_id and participant_ids, move to preflight step
+      setCreatedDebateId(result.debate_id);
+      setCreatedParticipantIds(result.participant_ids);
+      setStep(5); // Move to preflight
+      setIsLoading(false);
     } catch (err: any) {
       alert(`Failed to create debate: ${err.message}`);
       setIsLoading(false);
     }
   };
 
-  const canGoNext = () => {
-    if (step === 1) return title.trim() && problemStatement.trim();
-    if (step === 3) return participants.length > 0;
-    return true;
+  const handleLaunchAfterPreflight = () => {
+    if (createdDebateId) {
+      router.push(`/room?debate_id=${createdDebateId}`);
+    }
   };
+
+  const canGoNext = () => validateStep(step, title, problemStatement, participants);
 
   return (
     <>
@@ -162,8 +177,16 @@ export default function SetupPage() {
             <div className={styles.stepNumber}>{step > 3 ? '✓' : '3'}</div>
             <div className={styles.stepLabel}>Participants</div>
           </div>
-          <div className={`${styles.step} ${step === 4 ? styles.stepActive : ''}`}>
-            <div className={styles.stepNumber}>4</div>
+          <div className={`${styles.step} ${step === 4 ? styles.stepActive : ''} ${step > 4 ? styles.stepCompleted : ''}`}>
+            <div className={styles.stepNumber}>{step > 4 ? '✓' : '4'}</div>
+            <div className={styles.stepLabel}>Memory</div>
+          </div>
+          <div className={`${styles.step} ${step === 5 ? styles.stepActive : ''} ${step > 5 ? styles.stepCompleted : ''}`}>
+            <div className={styles.stepNumber}>{step > 5 ? '✓' : '5'}</div>
+            <div className={styles.stepLabel}>Prepare</div>
+          </div>
+          <div className={`${styles.step} ${step === 6 ? styles.stepActive : ''}`}>
+            <div className={styles.stepNumber}>6</div>
             <div className={styles.stepLabel}>Review</div>
           </div>
         </div>
@@ -203,6 +226,23 @@ export default function SetupPage() {
           )}
 
           {step === 4 && (
+            <MemoryImportStep
+              workspaceId={workspaceId}
+              participants={participants}
+              memoryImport={memoryImport}
+              onUpdate={setMemoryImport}
+            />
+          )}
+
+          {step === 5 && (
+            <PreflightStep
+              debateId={createdDebateId}
+              participants={participants}
+              participantIds={createdParticipantIds}
+            />
+          )}
+
+          {step === 6 && (
             <ReviewStep
               title={title}
               problemStatement={problemStatement}
@@ -215,7 +255,7 @@ export default function SetupPage() {
         </div>
 
         <div className={styles.navigation}>
-          {step > 1 && (
+          {step > 1 && step !== 5 && (
             <button 
               onClick={() => setStep(step - 1)} 
               disabled={isLoading}
@@ -239,11 +279,31 @@ export default function SetupPage() {
           
           {step === 4 && (
             <button
-              onClick={handleLaunch}
+              onClick={handleCreateDebate}
+              disabled={!canGoNext() || isLoading}
+              className={styles.btnPrimary}
+            >
+              {isLoading ? 'Creating...' : 'Create & Prepare →'}
+            </button>
+          )}
+          
+          {step === 5 && (
+            <button
+              onClick={handleLaunchAfterPreflight}
               disabled={isLoading}
               className={styles.btnLaunch}
             >
-              {isLoading ? 'Creating...' : 'Launch Debate'}
+              {isLoading ? 'Loading...' : 'Enter Room'}
+            </button>
+          )}
+          
+          {step === 6 && (
+            <button
+              onClick={handleLaunchAfterPreflight}
+              disabled={isLoading}
+              className={styles.btnLaunch}
+            >
+              {isLoading ? 'Loading...' : 'Enter Room'}
             </button>
           )}
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import styles from './InterveneComposer.module.css';
+import * as api from '@/lib/api';
 
 interface InterveneComposerProps {
   debateId: string;
@@ -23,25 +24,9 @@ export default function InterveneComposer({ debateId, participants }: InterveneC
     setError(null);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      
-      const payload = {
+      await api.intervene(debateId, {
         message: message.trim(),
-        actor: 'operator',
-      };
-
-      const response = await fetch(`${API_URL}/debates/${debateId}/intervene`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to send intervention');
-      }
 
       setMessage('');
       setShowMentions(false);

@@ -34,6 +34,10 @@ tags:
     description: OpenRouter integration (model catalog, BYOK)
   - name: personas
     description: Persona generation and validation
+  - name: memory
+    description: Memory import and retrieval (user-controlled context sharing)
+  - name: preflight
+    description: Agent preparation orchestration (pre-debate briefing)
 
 paths:
   /health:
@@ -746,6 +750,273 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidatePersonaResponse'
+
+  /workspaces/{workspace_id}/memory/importable:
+    get:
+      operationId: listImportableSources
+      summary: List importable memory sources
+      description: |
+        Returns recent ended debates in workspace that can be imported as memory sources.
+        Shows chunk counts, material counts, and metadata.
+      tags:
+        - memory
+      parameters:
+        - name: workspace_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of importable debates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportableSourcesResponse'
+        '403':
+          description: Access denied to workspace
+
+  /debates/{debate_id}/memory/preview:
+    get:
+      operationId: previewMemoryImport
+      summary: Preview memory import
+      description: |
+        Shows what would be imported from a source debate.
+        Returns topics, chunk counts, and date range.
+      tags:
+        - memory
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: source_debate_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Memory preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryPreviewResponse'
+        '404':
+          description: Debate not found
+        '403':
+          description: Access denied
+
+  /debates/{debate_id}/memory/import:
+    post:
+      operationId: importMemory
+      summary: Import memory from prior debates
+      description: |
+        Creates grants to allow participants to access chunks from specified source debates.
+        Grants are immutable once debate starts (audit integrity).
+      tags:
+        - memory
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryImportRequest'
+      responses:
+        '200':
+          description: Grants created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryImportResponse'
+        '400':
+          description: Invalid request or debate already started
+        '403':
+          description: Access denied
+        '404':
+          description: Debate not found
+
+  /debates/{debate_id}/memory/grants:
+    get:
+      operationId: listMemoryGrants
+      summary: List memory grants
+      description: |
+        Lists all active memory grants for a debate.
+        Shows which source debates/artifacts participants can access.
+      tags:
+        - memory
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      responses:
+        '200':
+          description: List of grants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryGrantsResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: Debate not found
+
+  /debates/{debate_id}/memory/grants/{grant_id}:
+    delete:
+      operationId: revokeMemoryGrant
+      summary: Revoke memory grant
+      description: |
+        Revokes a grant. Only allowed if debate is in pending state.
+        Grants are immutable once debate starts (audit integrity).
+      tags:
+        - memory
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+        - name: grant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Grant revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: revoked
+                  grant_id:
+                    type: string
+                    format: uuid
+        '400':
+          description: Cannot revoke after debate started
+        '403':
+          description: Access denied
+        '404':
+          description: Grant not found
+
+  /debates/{debate_id}/preflight/start:
+    post:
+      operationId: startPreflight
+      summary: Start agent preflight preparation
+      description: |
+        Initiates preflight preparation for all participants in a debate.
+        Creates prep packs by reviewing materials and imported memory.
+        Returns immediately with run_id; use status endpoint to monitor progress.
+      tags:
+        - preflight
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      responses:
+        '200':
+          description: Preflight started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreflightStartResponse'
+        '400':
+          description: Preflight already running or invalid state
+        '403':
+          description: Access denied
+        '404':
+          description: Debate not found
+
+  /debates/{debate_id}/preflight/status:
+    get:
+      operationId: getPreflightStatus
+      summary: Get preflight preparation status
+      description: |
+        Returns overall run status and per-participant progress.
+        Shows which participants have completed prep packs.
+      tags:
+        - preflight
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      responses:
+        '200':
+          description: Preflight status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreflightStatusResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: No preflight run found
+
+  /debates/{debate_id}/preflight/retry:
+    post:
+      operationId: retryParticipantPreflight
+      summary: Retry failed preflight preparation
+      description: |
+        Retries preflight for a specific participant that failed.
+        Only allowed if participant status is 'failed'.
+      tags:
+        - preflight
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreflightRetryRequest'
+      responses:
+        '200':
+          description: Retry queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreflightActionResponse'
+        '400':
+          description: Cannot retry (not failed status)
+        '403':
+          description: Access denied
+        '404':
+          description: Participant run not found
+
+  /debates/{debate_id}/preflight/skip:
+    post:
+      operationId: skipParticipantPreflight
+      summary: Skip preflight preparation
+      description: |
+        Skips preflight for a specific participant.
+        Records skip reason for audit trail.
+        Allowed if status is queued, running, or failed.
+      tags:
+        - preflight
+      parameters:
+        - $ref: '#/components/parameters/DebateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreflightSkipRequest'
+      responses:
+        '200':
+          description: Participant skipped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreflightActionResponse'
+        '400':
+          description: Cannot skip (already completed)
+        '403':
+          description: Access denied
+        '404':
+          description: Participant run not found
 
 components:
   parameters:
@@ -1616,3 +1887,391 @@ components:
           items:
             type: string
           default: []
+
+    # Memory Import Schemas
+    ImportableDebate:
+      type: object
+      required:
+        - debate_id
+        - title
+        - state
+        - created_at
+        - chunk_count
+        - material_count
+        - artifact_count
+        - participant_count
+      properties:
+        debate_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        state:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+        chunk_count:
+          type: integer
+          description: Total chunks available (materials + agent knowledge)
+        material_count:
+          type: integer
+          description: Number of materials attached
+        artifact_count:
+          type: integer
+          description: Number of artifacts created
+        participant_count:
+          type: integer
+          description: Number of participants
+
+    ImportableSourcesResponse:
+      type: object
+      required:
+        - workspace_id
+        - debates
+        - total_count
+      properties:
+        workspace_id:
+          type: string
+          format: uuid
+        debates:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportableDebate'
+        total_count:
+          type: integer
+
+    MemoryPreviewChunk:
+      type: object
+      required:
+        - source_type
+        - title
+        - chunk_count
+        - last_updated
+      properties:
+        source_type:
+          type: string
+          description: Type of chunks (material, agent_knowledge, artifact)
+        title:
+          type: string
+        chunk_count:
+          type: integer
+        last_updated:
+          type: string
+          format: date-time
+
+    MemoryPreviewResponse:
+      type: object
+      required:
+        - source_debate_id
+        - source_title
+        - total_chunks
+        - breakdown
+        - date_range
+      properties:
+        source_debate_id:
+          type: string
+          format: uuid
+        source_title:
+          type: string
+        total_chunks:
+          type: integer
+        breakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryPreviewChunk'
+        date_range:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date-time
+              nullable: true
+            end:
+              type: string
+              format: date-time
+              nullable: true
+
+    MemoryImportRequest:
+      type: object
+      required:
+        - source_debate_ids
+      properties:
+        source_debate_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          description: Debate IDs to import from
+        source_type:
+          type: string
+          enum: [debate_full, materials_only]
+          default: debate_full
+          description: What to import
+        scope:
+          type: string
+          enum: [all_agents, specific_agents]
+          default: all_agents
+          description: Who can access
+        participant_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          nullable: true
+          description: Required if scope='specific_agents'
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Import context
+
+    MemoryImportResponse:
+      type: object
+      required:
+        - debate_id
+        - grants_created
+        - grant_ids
+      properties:
+        debate_id:
+          type: string
+          format: uuid
+        grants_created:
+          type: integer
+        grant_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    MemoryGrant:
+      type: object
+      required:
+        - grant_id
+        - source_type
+        - scope
+        - granted_by
+        - granted_at
+        - metadata
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+        source_debate_id:
+          type: string
+          format: uuid
+          nullable: true
+        source_debate_title:
+          type: string
+          nullable: true
+        source_artifact_id:
+          type: string
+          format: uuid
+          nullable: true
+        source_artifact_title:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+        scope:
+          type: string
+        allowed_participant_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          nullable: true
+        granted_by:
+          type: string
+        granted_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    MemoryGrantsResponse:
+      type: object
+      required:
+        - debate_id
+        - grants
+        - total_count
+      properties:
+        debate_id:
+          type: string
+          format: uuid
+        grants:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryGrant'
+        total_count:
+          type: integer
+
+    # Preflight Schemas
+    PreflightStartResponse:
+      type: object
+      required:
+        - run_id
+        - debate_id
+        - status
+        - participant_count
+        - participant_runs
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        debate_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        participant_count:
+          type: integer
+        participant_runs:
+          type: array
+          items:
+            type: object
+            properties:
+              participant_run_id:
+                type: string
+                format: uuid
+              participant_id:
+                type: string
+                format: uuid
+              agent_id:
+                type: string
+                format: uuid
+                nullable: true
+              status:
+                type: string
+
+    ParticipantRunStatus:
+      type: object
+      required:
+        - participant_run_id
+        - participant_id
+        - status
+        - metadata
+      properties:
+        participant_run_id:
+          type: string
+          format: uuid
+        participant_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [queued, running, success, failed, skipped]
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        skip_reason:
+          type: string
+          nullable: true
+        prep_pack_knowledge_id:
+          type: string
+          format: uuid
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    PreflightStatusResponse:
+      type: object
+      required:
+        - run_id
+        - debate_id
+        - status
+        - created_at
+        - participant_runs
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        debate_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        participant_runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantRunStatus'
+
+    PreflightRetryRequest:
+      type: object
+      required:
+        - participant_id
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+
+    PreflightSkipRequest:
+      type: object
+      required:
+        - participant_id
+        - reason
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    PreflightActionResponse:
+      type: object
+      required:
+        - participant_run_id
+        - participant_id
+        - status
+        - message
+      properties:
+        participant_run_id:
+          type: string
+          format: uuid
+        participant_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        message:
+          type: string

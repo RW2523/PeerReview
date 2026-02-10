@@ -4,7 +4,214 @@ Tracks senior architect reviews, progress between checkpoints, and actionable fi
 
 ---
 
-## Checkpoint 5 — 2026-02-07 (Current)
+## Checkpoint 7 — 2026-02-10 (Current)
+
+### Progress Since Checkpoint 6
+
+| What Changed | Details |
+|---|---|
+| TICKET-12 (Materials Ingestion Phase 1) | PASS. Full pipeline: upload → MinIO storage → Celery processing → text extraction (PDF/DOCX/TXT/MD) → paragraph-aware chunking with provenance → memory_chunks. Upload/status/retry endpoints. E2E test. 51 API tests at time of ship. |
+| TICKET-15 (Memory Import V1 Backend) | PASS. `debate_memory_grants` table, 5 endpoints (importable/preview/import/list/revoke), enforcement hook with keyword scoring + audit logging, scope control (all_agents vs specific_agents), immutable after start. 8 tests. 59/59 at time of ship. |
+| New infrastructure | Celery + Redis (task queue) + MinIO (object storage) added to stack. |
+| 2 new migrations | `materials_ingestion_phase1` + `memory_import_v1`. 2 new tables, 3 tables extended, 1 audit view. |
+| API client extended | `lib/api.ts` now has uploadMaterials, getMaterialsStatus, retryMaterial functions. |
+| CODEX-LEAD-PLAN.md | New execution plan maintained by Codex. Locked order: TICKET-12 ✓ → TICKET-15 ✓ → TICKET-13 (Preflight) → Live Artifacts. |
+
+### Current State Summary
+
+```
+Stage 0: Foundation           [==========] DONE
+M1: Debate-in-a-Box API      [==========] DONE
+M2: Realtime + Room UI        [==========] DONE
+M3: Summary/Minutes/Actions   [==========] DONE
+M4: Persona + Meeting Setup   [==========] DONE
+M5: Materials + Memory        [======    ] 60% (backend done, UI partial, no vector search yet)
+    Preflight + Artifacts     [          ] NOT STARTED
+    Voice + MCP              [          ] NOT STARTED
+```
+
+### What's Working Now
+
+**Backend (43 source files, ~5,546 lines — +58% from CP6):**
+- 29 API endpoints across 9 route modules (+8 new endpoints)
+- Materials pipeline: upload → MinIO → Celery → extract → chunk → memory_chunks
+- Memory import: grants, enforcement hook, audit logging
+- Text extraction: PDF (PyPDF2), DOCX (python-docx), TXT, MD with magic byte validation
+- Paragraph-aware chunking with provenance (material_id, chunk_index, char offsets, page_num, SHA256)
+- Keyword-based retrieval with grant enforcement (V1 — vector search ready)
+- All prior M1-M4 features still working
+
+**New infrastructure:**
+- Celery 5.3 with Redis broker for async task processing
+- MinIO for S3-compatible object storage
+- 7 new Python dependencies (celery, redis, minio, pypdf2, python-docx, filetype, python-multipart)
+
+**Frontend (27+ TSX files):**
+- MaterialsStep now has real file upload (PDF/DOCX/TXT/MD)
+- API client extended with materials functions
+- Memory import UI not yet built (backend-only for TICKET-15)
+
+**Database (7 migrations):**
+- New: `material_processing_jobs` table (Celery job tracking)
+- New: `debate_memory_grants` table (memory import with scope control)
+- Extended: `meeting_materials` (file support + processing status)
+- Extended: `memory_chunks` (nullable agent_id for material chunks)
+- Extended: `memory_access_log` (chunk_ids + metadata for audit)
+- New: `memory_access_audit` view (compliance-ready)
+
+**Tests (12 test files, ~2,152 lines):**
+- 59 passing, 1 skipped (was 48 passing at CP6)
+- Materials E2E: upload → process → verify chunks with provenance
+- Memory: grants + enforcement + audit + scope filtering
+- All prior tests still green
+
+### CP6 Issues — Resolution Status
+
+| CP6 Issue | Status | What Happened |
+|---|---|---|
+| M1 `/debates/run` unprotected | STILL PRESENT | 4th checkpoint flagged. Needs decision. |
+| `stream_service.py` polling | STILL PRESENT | Unchanged. |
+| No end-to-end test (full user journey) | PARTIALLY ADDRESSED | Materials has an E2E test. Memory has enforcement tests. But no single test covers setup → run → summary. |
+| Hardcoded workspace IDs in engine | STILL PRESENT | `debate_engine.py` still uses demo UUID. |
+| Synchronous OpenRouter calls | STILL PRESENT | `debate_engine.py` still sync. |
+| Specs outrunning code | ADDRESSED | TICKET-12 and TICKET-15 shipped real code. The CP6 concern about over-specification was heard — this sprint was code-first. |
+
+### Observations
+
+**1. The team listened.** CP6 said "ship code, not more specs." They shipped 2,046 lines of production code and 591 lines of tests. TICKET-12 and TICKET-15 are both real features with real tests. Good.
+
+**2. Materials ingestion is architecturally solid.** Celery + MinIO + provenance-first chunking is the right pattern. Every chunk traces back to its source material with char offsets and page numbers. This is exactly what enterprise customers need for "where did that insight come from?" questions.
+
+**3. Memory enforcement is the standout feature.** The grant-based system (no agent can access prior context unless explicitly granted, grants locked after debate starts, every retrieval logged with chunk_ids) is enterprise-grade access control. The `memory_access_audit` view makes compliance auditing trivial.
+
+**4. `routes/memory.py` is at 465 lines — approaching the 500-line limit.** It has 5 endpoints with substantial inline logic (grant validation, scope checking, debate state verification). Not a violation yet, but one more endpoint and it'll need a service extraction.
+
+**5. Keyword scoring is a placeholder.** `memory_retrieval.py` uses simple keyword matching for chunk retrieval. This is explicitly marked as V1 and ready for pgvector upgrade. Acceptable as a placeholder, but vector search should be next for this module.
+
+**6. The CODEX-LEAD-PLAN.md shows good execution discipline.** Locked execution order, non-negotiables, reality checks. The team is self-governing well. TICKET-12 ✓, TICKET-15 ✓, TICKET-13 (Preflight) is next.
+
+### Recommendations
+
+1. **`routes/memory.py` needs a service layer soon.** At 465 lines, it's doing grant validation, DB queries, scope enforcement, and audit logging inline in route handlers. Extract a `memory_grants_service.py` before adding anything else. This prevents hitting the 500-line limit and keeps route handlers thin.
+
+2. **The carry-forward items need a decision, not more deferral.** The unprotected `/debates/run` endpoint has been flagged for 4 checkpoints. Either: (a) add `require_auth` to it, (b) document it as an intentional public endpoint, or (c) remove it entirely since `/debates/setup` + `/debates/{id}/start` is the proper flow now. Pick one and close it.
+
+3. **TICKET-13 (Preflight Orchestrator) is the right next step.** The CODEX-LEAD-PLAN has it queued. Celery infrastructure from TICKET-12 is already in place. Per-agent prep packs with citations from ingested materials and imported memory will tie together the last two tickets nicely.
+
+4. **Vector search should follow immediately after preflight.** Keyword scoring works for demos but won't scale. pgvector is already in the Supabase stack. Embedding generation + cosine similarity retrieval is the obvious upgrade path.
+
+5. **Memory import needs a UI component for the setup wizard.** The backend is done but there's no way for users to configure memory grants through the frontend. Add a "Memory Import" step to the setup wizard (between Materials and Review) that shows importable debates and lets users create grants with scope selection.
+
+---
+
+## Checkpoint 6 — 2026-02-09 (Previous)
+
+### Progress Since Checkpoint 5
+
+| What Changed | Details |
+|---|---|
+| TICKET-08C.2B (Premium Room UI) | PASS. 3-column Slack-like decision room. 7 new components: DebateSelector, DebateControls, EventFeed, InterveneComposer, AgendaPanel, KeyVault, SummaryReport. 14 new files. |
+| TICKET-08C.2B.0 (Premium Shell + Landing) | PASS. AppNav global navigation, hero landing page, smooth transitions. 2 new layout components. |
+| TICKET-09A (OpenRouter Settings) | PASS. `X-OpenRouter-Key` header, `/openrouter/account` endpoint, Settings page with credit balance + account info, centralized key storage (memory/session/localStorage). |
+| TICKET-09B (App Simplification) | PASS. Navigation simplified from 5 tabs to 3 sections. Dashboard with create + history. Removed confusing elements (Demo badge, gradients). |
+| TICKET-10 (Stability + Alignment) | PASS. Fixed broken template tests (structure assertions, not IDs). Unified workspace IDs. Centralized API client (eliminated 6 hardcoded localhost URLs). 48 API tests pass. |
+| TICKET-11 (Specs: Live Artifacts + Memory Import) | PASS. 2 comprehensive specs written (1,426 + 876 lines). Ready for implementation. |
+| Centralized API client | `lib/api.ts` — 375 lines, 17 typed functions, single source of truth for all API calls. |
+| Agent templates enhanced | Categories (Product/Engineering/Design/Business/Strategy/Wildcards) + character variations (Visionary vs Pragmatic). |
+| 200KB+ design docs | 7 design docs + 1 product doc covering next implementation streams. |
+
+### Current State Summary
+
+```
+Stage 0: Foundation           [==========] DONE
+M1: Debate-in-a-Box API      [==========] DONE
+M2: Realtime + Room UI        [==========] DONE
+M3: Summary/Minutes/Actions   [==========] DONE
+M4: Persona + Meeting Setup   [==========] DONE
+M5: Voice + MCP + Enterprise  [          ] NOT STARTED
+```
+
+### What's Working Now
+
+**Backend (30 source files, ~3,500 lines):**
+- 21 API endpoints across 6 route modules
+- State machine: pending -> running -> paused -> ended
+- SSE streaming for realtime event delivery
+- Summary generation via OpenRouter
+- JWT auth with Supabase, workspace-scoped access control
+- Agent templates with categories + character variations
+- Persistent agent CRUD + meeting setup endpoint
+- Dynamic OpenRouter model catalog + account info (BYOK)
+- AI-powered persona draft generation + validation
+
+**Frontend (27 TSX files — nearly doubled from 15):**
+- 8 pages: home, login, logout, operator, setup, settings, room, history
+- 18 components across 4 groups:
+  - Room (7): DebateSelector, DebateControls, EventFeed, InterveneComposer, AgendaPanel, KeyVault, SummaryReport
+  - Dashboard (3): CreateDebateCard, DebateHistory, QuickActions
+  - Setup (4): BasicInfoStep, ParticipantsStep, MaterialsStep, ReviewStep
+  - Layout (2): AppNav, UserMenu
+  - Legacy (2): SummaryDisplay, SummaryGenerateForm
+- Centralized API client (17 typed functions, no hardcoded URLs)
+- BYOK key storage with 3 persistence options
+- 3-column Slack-like decision room with live SSE feed
+
+**Database (5 migrations):**
+- No new migrations — schema stable since CP5.
+
+**Tests (10 test files, ~1,561 lines):**
+- 48 API tests passing, 1 skipped
+- Template tests now assert on structure/categories, not specific IDs
+- Tests run against real Postgres
+
+**Contracts (OpenAPI):**
+- 21 operations defined in arinar-v1.yaml (was 19 at CP5)
+- New: `GET /openrouter/account`, `GET /debates` (list with cursor pagination)
+
+**Documentation (200KB+ new):**
+- LIVE-ARTIFACTS-TECHNICAL-SPEC.md (1,426 lines)
+- MEMORY-IMPORT-UX-SPEC.md (876 lines)
+- DECISIONS-SOURCE-OF-TRUTH-2026-02-09.md
+- QUESTIONS-FOR-TEAM.md + TEAM-RESPONSE-ANALYSIS.md
+- 4 new ticket specs (TICKET-10 through TICKET-13)
+
+### CP5 Issues — Resolution Status
+
+| CP5 Issue | Status | What Happened |
+|---|---|---|
+| M1 `/debates/run` unprotected | STILL PRESENT | Auth still disabled for demo. Now a carry-forward across 3 checkpoints. |
+| `stream_service.py` polling | STILL PRESENT | Polling-based. Decision room works but won't scale to multi-user. |
+| No end-to-end test | STILL PRESENT | 48 tests cover individual endpoints well, but no single test covers full user journey. |
+| Hardcoded workspace IDs | PARTIALLY FIXED | Frontend unified to `...0101`. `debate_engine.py` still uses demo UUID. |
+| Synchronous OpenRouter calls | STILL PRESENT | `debate_engine.py` still sync. |
+
+### Observations
+
+**1. The frontend is now the product.** Going from 15 to 27 TSX files and 6 to 18 components is a massive leap. The 3-column decision room, BYOK settings, and simplified navigation make this look like a real SaaS product — not a prototype.
+
+**2. Centralized API client is a great pattern.** `lib/api.ts` with 17 typed functions means zero hardcoded URLs and consistent error handling across every component. This was exactly the right investment.
+
+**3. Agent template categories + characters add real product value.** "Senior PM (Visionary)" vs "Senior PM (Pragmatic)" creates meaningfully different debate dynamics. This is a competitive differentiator.
+
+**4. Five carry-forward issues are piling up.** The unprotected M1 endpoint has been flagged for 3 checkpoints now. The sync OpenRouter calls and polling SSE are acceptable for demos but will be blockers for real multi-user scenarios. Decision needed: fix these before M5, or accept them as M5 scope.
+
+**5. Specs are ahead of code.** TICKET-11 produced 2,300+ lines of specs for live artifacts and memory import. This is good planning, but watch for the CP1 pattern of over-specification. Make sure the next sprint ships code, not more docs.
+
+### Recommendations
+
+1. **Ship code, not more specs.** You have 200KB+ of new design docs. That's plenty. The next tickets should produce working features, not more planning artifacts. The CP1 lesson applies: don't over-specify before having working features.
+
+2. **Fix the three carry-forward issues as a single "hardening" ticket.** (a) Protect `/debates/run` with auth or explicit rate limiting, (b) make OpenRouter calls async in `debate_engine.py`, (c) write the E2E integration test. These have been flagged since CP4. Clean them up before M5 adds complexity.
+
+3. **The decision room needs a live demo.** The room UI is built, but does it actually orchestrate a full debate with streaming AI responses end-to-end? Boot the stack, create a debate via the wizard, start it, watch agents respond in the SSE feed, intervene, end it, get the summary. If that flow works, you have a product. If it doesn't, that's the #1 priority.
+
+4. **For M5, start with materials ingestion (TICKET-12) over voice.** The specs are ready. Ingesting PDFs/links into debate context is higher value than voice for enterprise users. Voice is flashy but ingestion is useful.
+
+5. **Consider deploying.** With DEMO-02 proving local stack works and the UI now polished, a staging environment (Vercel + Supabase cloud + Railway for API) would let you demo to real users. Real feedback > another sprint.
+
+---
+
+## Checkpoint 5 — 2026-02-07 (Previous)
 
 ### Progress Since Checkpoint 4
 
@@ -344,7 +551,9 @@ All 7 API tests mock the database. The gap between mocked tests and real DB (poi
 | CP3 | 4 + 2 sub-tickets | 16 | 5 + 1 test | 0 | 2 |
 | CP4 | 9 + 3 sub-tickets | ~50+ (9 test files) | 14 + 9 test files | 12 (pages + components + hooks) | 16 |
 | CP5 | 14 + 6 sub-tickets | 45 (10 test files, 1,481 lines) | 29 + 10 test files | 15 (pages + components + hooks + lib) | 19 |
+| CP6 | 20 + 6 sub-tickets | 48 (10 test files, 1,561 lines) | 30 + 10 test files | 27 (8 pages + 18 components + 2 hooks + 3 lib) | 21 |
+| CP7 | 22 + 6 sub-tickets | 59 (12 test files, 2,152 lines) | 43 + 12 test files | 27+ (unchanged frontend) | 29 |
 
-**Velocity assessment:** Consistently strong. Since CP4, completed 5 tickets + 1 demo verification. Addressed the biggest CP4 concern (main.py bloat) and shipped the remaining M4 features (persona APIs, model catalog). The codebase doubled in source files (14 -> 29) while maintaining quality — no file exceeds standards limits, test count grew from ~50 to 45 verified passing tests with 0 skips.
+**Velocity assessment:** Backend-heavy sprint. 13 new source files, 2 new test files, 8 new endpoints, 2 new migrations, 3 new infrastructure dependencies. The team went deep on two complex features (materials ingestion + memory import) rather than wide across many small changes. This is the right approach for M5 — these are foundational systems that everything else builds on.
 
-**Biggest risk going forward:** The E2E integration test gap. Every individual endpoint is tested, but the full user journey (setup -> run -> summary) has never been verified as a single flow. This should be addressed before M5 adds more complexity. The three "works for one user" patterns (polling SSE, sync OpenRouter, unprotected M1 endpoint) will also need attention before multi-user scenarios.
+**Biggest risk going forward:** `routes/memory.py` at 465 lines is the new largest file. The 5 carry-forward issues from CP4-CP6 remain unresolved — the unprotected M1 endpoint has been flagged for 4 checkpoints now and needs a decision. The memory UI gap (backend done, no frontend) could become a blocker for the setup wizard flow.

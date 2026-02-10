@@ -7,3 +7,11 @@ psycopg2-binary==2.9.9
 python-dotenv==1.0.0
 tenacity==8.2.3
 pyjwt==2.8.0
+python-multipart==0.0.6
+celery==5.3.4
+redis==5.0.1
+minio==7.2.3
+pypdf2==3.0.1
+python-docx==1.1.0
+python-magic==0.4.27
+filetype==1.2.0

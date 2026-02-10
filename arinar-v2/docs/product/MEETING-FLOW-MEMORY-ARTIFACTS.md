@@ -17,6 +17,7 @@ Non-negotiables:
 - OpenRouter-only (BYOK). Never store raw OpenRouter keys server-side.
 - Enterprise policy controls (internet access, citation mode, tool calling).
 - Provenance-first: anything the system "knows" must be traceable to a source (material, prior artifact, meeting event, or approved web citation).
+- Long-context quality: we will not “stuff everything into one prompt”. We use an RLM-style multi-pass approach (plan -> retrieve slices -> draft -> verify/merge) for prep packs, artifacts, and summaries. See: `arinar-v2/docs/design/RLM-APPLICATION-TO-ARINAR.md`.
 
 ## Core Concepts
 ### A. Agents (Reusable Profiles)
@@ -40,6 +41,14 @@ Materials are the "evidence pack" for a meeting:
 
 Materials are not passed raw to agents during live debate.
 Instead, we ingest -> extract -> chunk -> index -> retrieve "context packs" with citations.
+
+### C. Long-Context Strategy (RLM-Style)
+Arinar meetings can have arbitrarily large context (many documents + prior meetings). To keep output quality high and enterprise-auditable:
+- Agents and the host operate on the materials/memory as an external environment.
+- They recursively pull only the relevant slices needed for each step.
+- They synthesize in structured stages with explicit provenance.
+
+Design note: this is an inference-time orchestration pattern, not a “special model”. Details: `arinar-v2/docs/design/RLM-APPLICATION-TO-ARINAR.md`.
 
 ### C. Memory Sharing (User-Enabled, Scoped)
 Memory is not global. It is an explicit allowlist of knowledge sources that an agent can reference.

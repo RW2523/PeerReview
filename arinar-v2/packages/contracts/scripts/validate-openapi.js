@@ -57,7 +57,16 @@ async function validate() {
       { method: 'get', path: '/openrouter/models' },
       { method: 'get', path: '/openrouter/account' },
       { method: 'post', path: '/personas/generate-draft' },
-      { method: 'post', path: '/personas/validate' }
+      { method: 'post', path: '/personas/validate' },
+      { method: 'get', path: '/workspaces/{workspace_id}/memory/importable' },
+      { method: 'get', path: '/debates/{debate_id}/memory/preview' },
+      { method: 'post', path: '/debates/{debate_id}/memory/import' },
+      { method: 'get', path: '/debates/{debate_id}/memory/grants' },
+      { method: 'delete', path: '/debates/{debate_id}/memory/grants/{grant_id}' },
+      { method: 'post', path: '/debates/{debate_id}/preflight/start' },
+      { method: 'get', path: '/debates/{debate_id}/preflight/status' },
+      { method: 'post', path: '/debates/{debate_id}/preflight/retry' },
+      { method: 'post', path: '/debates/{debate_id}/preflight/skip' }
     ];
     
     console.log('\n📋 Checking required endpoints:');

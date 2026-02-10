@@ -4,7 +4,7 @@ import AppNav from '@/components/layout/AppNav';
 import CreateDebateCard from '@/components/dashboard/CreateDebateCard';
 import styles from './home.module.css';
 
-const DEFAULT_WORKSPACE_ID = 'ws_demo_001';
+const DEFAULT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000101';
 
 export default function HomePage() {
   const handleDebateCreated = () => {

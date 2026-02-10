@@ -102,6 +102,15 @@ Explicit V2 features (not required for V1):
 - Decision: quality-first. Target HNSW, but hide behind an internal interface.
 - Allow early development fallback to IVFFlat if needed without product-level changes.
 
+### Long-Context Strategy (RLM-Style)
+- Decision: Use an **RLM-style** inference-time approach for long context across:
+  - agent preflight prep packs
+  - live artifacts (section drafting + coherence merge)
+  - end-of-meeting synthesis (summary/minutes/action items)
+- Meaning: plan -> retrieve slices -> draft -> verify/merge (bounded passes, no “stuff everything into one prompt”).
+- Rationale: improves quality and auditability for many-material + memory-import meetings.
+- Reference: `arinar-v2/docs/design/RLM-APPLICATION-TO-ARINAR.md`.
+
 ### Research Provider
 - Decision: Perplexity first, behind a provider abstraction.
 - Policy: internet research is OFF by default; explicitly enable per meeting/per agent.
@@ -149,4 +158,3 @@ Avoid:
 1. Live artifacts technical spec (events, API contracts, SSE deltas, coherence workflow).
 2. Memory import UX spec (import preview, allowlist editing, “what is shared” clarity).
 3. Cost analysis update including artifact generation (documentation only; not a blocker for early pipeline work).
-

@@ -1,14 +1,68 @@
+import { useRef, useState } from 'react';
 import * as api from '@/lib/api';
 import styles from './SetupSteps.module.css';
 
 interface MaterialsStepProps {
+  debateId?: string;
   materials: api.SetupMaterial[];
   onAdd: (kind: 'text' | 'link' | 'file_placeholder') => void;
   onUpdate: (idx: number, updates: Partial<api.SetupMaterial>) => void;
   onRemove: (idx: number) => void;
+  uploadedFiles?: api.MaterialStatus[];
+  onFilesUploaded?: (files: api.MaterialStatus[]) => void;
 }
 
-export function MaterialsStep({ materials, onAdd, onUpdate, onRemove }: MaterialsStepProps) {
+export function MaterialsStep({ 
+  debateId, 
+  materials, 
+  onAdd, 
+  onUpdate, 
+  onRemove,
+  uploadedFiles = [],
+  onFilesUploaded
+}: MaterialsStepProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !debateId) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const fileArray = Array.from(files);
+      await api.uploadMaterials(debateId, fileArray);
+      
+      // Fetch updated status
+      const status = await api.getMaterialsStatus(debateId);
+      if (onFilesUploaded) {
+        onFilesUploaded(status.materials);
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, string> = {
+      'pending': '⏳ Pending',
+      'processing': '⚙️ Processing',
+      'complete': '✅ Ready',
+      'failed': '❌ Failed',
+      'needs_ocr': '👁️ Needs OCR'
+    };
+    return badges[status] || status;
+  };
+
   return (
     <div className={styles.section}>
       <h2>Materials</h2>
@@ -21,13 +75,66 @@ export function MaterialsStep({ materials, onAdd, onUpdate, onRemove }: Material
         <button onClick={() => onAdd('link')} className={styles.btnAdd}>
           <span>🔗</span> Add Link
         </button>
-        <button onClick={() => onAdd('file_placeholder')} disabled className={styles.btnAdd}>
-          <span>📎</span> Upload File
-          <span className={styles.comingSoon}>Soon</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.docx,.txt,.md"
+          style={{ display: 'none' }}
+          onChange={handleFileUpload}
+          disabled={!debateId || uploading}
+        />
+        <button 
+          onClick={() => fileInputRef.current?.click()} 
+          className={styles.btnAdd}
+          disabled={!debateId || uploading}
+          title={!debateId ? 'File uploads available after creating debate (complete all steps first)' : ''}
+        >
+          <span>📎</span> {uploading ? 'Uploading...' : !debateId ? 'Upload Files (after setup)' : 'Upload Files'}
         </button>
       </div>
 
+      {uploadError && (
+        <div className={styles.error}>{uploadError}</div>
+      )}
+
       <div className={styles.list}>
+        {/* Show uploaded files with status */}
+        {uploadedFiles.map((file) => (
+          <div key={file.material_id} className={styles.materialCard}>
+            <div className={styles.cardHeader}>
+              <span className={styles.badge}>{file.kind}</span>
+              <span className={styles.statusBadge}>{getStatusBadge(file.processed_status)}</span>
+            </div>
+            
+            <div className={styles.materialInfo}>
+              <strong>{file.title}</strong>
+              {file.file_size_bytes && (
+                <span className={styles.fileSize}>
+                  {(file.file_size_bytes / 1024).toFixed(1)} KB
+                </span>
+              )}
+              {file.processing_metadata.word_count && (
+                <span className={styles.wordCount}>
+                  {file.processing_metadata.word_count} words
+                </span>
+              )}
+              {file.processing_metadata.chunk_count && (
+                <span className={styles.chunkCount}>
+                  {file.processing_metadata.chunk_count} chunks
+                </span>
+              )}
+            </div>
+
+            {file.processed_status === 'failed' && (
+              <div className={styles.errorMessage}>
+                {file.processing_metadata.error || 'Processing failed'}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Show manual materials */}
         {materials.map((material, idx) => (
           <div key={idx} className={styles.materialCard}>
             <div className={styles.cardHeader}>
@@ -62,7 +169,7 @@ export function MaterialsStep({ materials, onAdd, onUpdate, onRemove }: Material
           </div>
         ))}
         
-        {materials.length === 0 && (
+        {materials.length === 0 && uploadedFiles.length === 0 && (
           <p className={styles.empty}>No materials added yet (optional)</p>
         )}
       </div>

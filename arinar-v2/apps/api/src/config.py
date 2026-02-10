@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
     require_auth: bool = True
+    
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+    
+    # MinIO
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "arinar-materials"
+    minio_secure: bool = False
 
 
 settings = Settings()

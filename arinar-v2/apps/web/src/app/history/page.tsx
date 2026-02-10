@@ -4,7 +4,7 @@ import AppNav from '@/components/layout/AppNav';
 import DebateHistory from '@/components/dashboard/DebateHistory';
 import styles from './history.module.css';
 
-const DEFAULT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
+const DEFAULT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000101';
 
 export default function HistoryPage() {
   return (

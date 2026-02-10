@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
-from .routes import health, agents, debates, events, openrouter, personas
+from .routes import health, agents, debates, events, openrouter, personas, materials, memory, preflight
 
 
 app = FastAPI(
@@ -27,6 +27,9 @@ app.include_router(debates.router, tags=["debates"])
 app.include_router(events.router, tags=["events"])
 app.include_router(openrouter.router, tags=["openrouter"])
 app.include_router(personas.router, tags=["personas"])
+app.include_router(materials.router, tags=["materials"])
+app.include_router(memory.router, tags=["memory"])
+app.include_router(preflight.router, tags=["preflight"])
 
 
 if __name__ == "__main__":

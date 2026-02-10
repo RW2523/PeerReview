@@ -169,3 +169,28 @@ def check_workspace_access(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: debate belongs to different workspace"
         )
+
+
+def require_auth(authorization: str = Header(None)) -> str:
+    """
+    Convenience dependency for routes that just need workspace_id
+    
+    Args:
+        authorization: Authorization header value
+    
+    Returns:
+        workspace_id string
+    
+    Raises:
+        HTTPException: 401 if token missing/invalid
+    """
+    user = get_current_user(authorization)
+    workspace_id = user.get('workspace_id')
+    
+    if not workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User not associated with any workspace"
+        )
+    
+    return workspace_id

@@ -46,7 +46,16 @@ test('OpenAPI contains all required endpoints', () => {
     '/openrouter/models:',
     '/openrouter/account:',
     '/personas/generate-draft:',
-    '/personas/validate:'
+    '/personas/validate:',
+    '/workspaces/{workspace_id}/memory/importable:',
+    '/debates/{debate_id}/memory/preview:',
+    '/debates/{debate_id}/memory/import:',
+    '/debates/{debate_id}/memory/grants:',
+    '/debates/{debate_id}/memory/grants/{grant_id}:',
+    '/debates/{debate_id}/preflight/start:',
+    '/debates/{debate_id}/preflight/status:',
+    '/debates/{debate_id}/preflight/retry:',
+    '/debates/{debate_id}/preflight/skip:'
   ];
   
   for (const path of requiredPaths) {

@@ -65,16 +65,19 @@ test:
 api-test:
 	@echo "🧪 Running API tests..."
 	@echo ""
-	@if ! command -v python3 >/dev/null 2>&1; then \
-		echo "❌ python3 not found. Install Python 3.8+ first."; \
-		exit 1; \
-	fi
 	@echo "→ Running pytest..."
 	@cd apps/api && \
-		if command -v python3.11 >/dev/null 2>&1; then \
+		if [ -x .venv/bin/python3.11 ]; then \
+			.venv/bin/python3.11 -m pytest tests/ -v || exit 1; \
+		elif [ -x .venv/bin/python ]; then \
+			.venv/bin/python -m pytest tests/ -v || exit 1; \
+		elif command -v python3.11 >/dev/null 2>&1; then \
 			python3.11 -m pytest tests/ -v || exit 1; \
-		else \
+		elif command -v python3 >/dev/null 2>&1; then \
 			python3 -m pytest tests/ -v || exit 1; \
+		else \
+			echo "❌ No python interpreter found. Install Python 3.11+ and/or create apps/api/.venv."; \
+			exit 1; \
 		fi
 	@echo ""
 	@echo "✅ API tests passed"

@@ -1,0 +1,60 @@
+/**
+ * Participant management hook for setup wizard
+ */
+
+import { useState, useCallback } from 'react';
+import * as api from '@/lib/api';
+
+export function useParticipants() {
+  const [participants, setParticipants] = useState<api.SetupParticipant[]>([]);
+
+  const handleAddFromTemplate = useCallback((template: api.AgentTemplate) => {
+    setParticipants(prev => {
+      if (prev.length >= 8) {
+        alert('Maximum 8 participants allowed');
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          name: template.label,
+          role_description: template.role_title,
+          system_prompt: template.system_prompt,
+          model_id: template.model_id,
+          model_config: template.model_config,
+        },
+      ];
+    });
+  }, []);
+
+  const handleAddExisting = useCallback((agent: api.Agent) => {
+    setParticipants(prev => {
+      if (prev.length >= 8) {
+        alert('Maximum 8 participants allowed');
+        return prev;
+      }
+      return [...prev, { agent_id: agent.agent_id }];
+    });
+  }, []);
+
+  const handleUpdate = useCallback((idx: number, updates: Partial<api.SetupParticipant>) => {
+    setParticipants(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], ...updates };
+      return updated;
+    });
+  }, []);
+
+  const handleRemove = useCallback((idx: number) => {
+    setParticipants(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  return {
+    participants,
+    setParticipants,
+    handleAddFromTemplate,
+    handleAddExisting,
+    handleUpdate,
+    handleRemove,
+  };
+}

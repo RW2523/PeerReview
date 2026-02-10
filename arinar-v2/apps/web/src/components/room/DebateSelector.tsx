@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import styles from './DebateSelector.module.css';
+import * as api from '@/lib/api';
 
 interface DebateSelectorProps {
   onDebateLoaded: (debateId: string, title: string, state: string) => void;
@@ -24,17 +25,7 @@ export default function DebateSelector({ onDebateLoaded }: DebateSelectorProps) 
     setError(null);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/debates/${debateIdInput}`);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Debate not found');
-        }
-        throw new Error(`Failed to load debate: ${response.statusText}`);
-      }
-
-      const debate = await response.json();
+      const debate = await api.getDebate(debateIdInput);
       onDebateLoaded(debate.debate_id, debate.title || 'Untitled', debate.state);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load debate');
@@ -53,30 +44,7 @@ export default function DebateSelector({ onDebateLoaded }: DebateSelectorProps) 
     setError(null);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      
-      // Use default workspace from demo (can be made configurable later)
-      const payload = {
-        workspace_id: '00000000-0000-0000-0000-000000000001',
-        title: titleInput,
-        policy_config: {
-          problem_statement: 'Created from Decision Room',
-        },
-      };
-
-      const response = await fetch(`${API_URL}/debates`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create debate: ${response.statusText}`);
-      }
-
-      const debate = await response.json();
+      const debate = await api.createDebate('00000000-0000-0000-0000-000000000101', titleInput);
       onDebateLoaded(debate.debate_id, debate.title, debate.state);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create debate');

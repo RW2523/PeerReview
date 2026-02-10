@@ -23,33 +23,40 @@ def disable_auth_for_setup_tests():
 
 
 def test_get_agent_templates():
-    """Test GET /agent-templates returns expected structure"""
+    """Test GET /agent-templates returns expected structure and category coverage"""
     response = client.get("/agent-templates")
     
     assert response.status_code == 200
     templates = response.json()
     
     assert isinstance(templates, list)
-    assert len(templates) >= 6  # At least 6 templates (roles + personas)
+    assert len(templates) >= 6  # At least 6 templates
     
-    # Check first template structure
-    template = templates[0]
-    assert 'template_id' in template
-    assert 'label' in template
-    assert 'role_title' in template
-    assert 'system_prompt' in template
-    assert 'model_id' in template
-    assert 'model_config' in template
+    # Check that all templates have required structure
+    for template in templates:
+        assert 'template_id' in template
+        assert 'label' in template
+        assert 'role_title' in template
+        assert 'system_prompt' in template
+        assert 'model_id' in template
+        assert 'model_config' in template
+        assert 'category' in template  # New field
+        # character is optional (some templates may not have it)
+        
+        # Validate structure types
+        assert isinstance(template['template_id'], str)
+        assert isinstance(template['label'], str)
+        assert isinstance(template['system_prompt'], str)
+        assert isinstance(template['model_id'], str)
+        assert isinstance(template['model_config'], dict)
+        assert isinstance(template['category'], str)
     
-    # Verify we have role templates
-    role_ids = [t['template_id'] for t in templates]
-    assert 'pm' in role_ids
-    assert 'engineer' in role_ids
-    assert 'designer' in role_ids
-    
-    # Verify we have persona templates
-    persona_ids = [t['template_id'] for t in templates if t['template_id'].startswith('persona-')]
-    assert len(persona_ids) >= 2
+    # Verify category coverage (ensure diversity of templates)
+    categories = {t['category'] for t in templates}
+    assert 'Product' in categories
+    assert 'Engineering' in categories
+    assert 'Design' in categories
+    assert len(categories) >= 3  # At least 3 different categories
 
 
 def test_create_and_list_agents():

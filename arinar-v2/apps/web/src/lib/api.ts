@@ -372,3 +372,359 @@ export async function listDebates(
   
   return response.json();
 }
+
+// Materials upload and status
+export interface MaterialUploadResponse {
+  material_ids: string[];
+  job_ids: string[];
+  total_files: number;
+}
+
+export interface MaterialStatus {
+  material_id: string;
+  title: string;
+  kind: string;
+  file_size_bytes?: number;
+  file_mime_type?: string;
+  processed_status: string;
+  processing_metadata: Record<string, any>;
+  created_at: string;
+  processing_started_at?: string;
+  processing_completed_at?: string;
+}
+
+export interface MaterialsStatusResponse {
+  debate_id: string;
+  total_materials: number;
+  status_summary: Record<string, number>;
+  materials: MaterialStatus[];
+}
+
+export async function uploadMaterials(
+  debateId: string,
+  files: File[]
+): Promise<MaterialUploadResponse> {
+  const token = await getAccessToken();
+  const formData = new FormData();
+  
+  files.forEach(file => {
+    formData.append('files', file);
+  });
+  
+  const response = await fetch(`${API_URL}/debates/${debateId}/materials/upload`, {
+    method: 'POST',
+    headers: {
+      'Authorization': token ? `Bearer ${token}` : '',
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to upload materials: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function getMaterialsStatus(debateId: string): Promise<MaterialsStatusResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/materials/status`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get materials status: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function retryMaterial(debateId: string, materialId: string): Promise<any> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/materials/retry`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ material_id: materialId }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to retry material: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+// Memory Import API
+
+export interface ImportableDebate {
+  debate_id: string;
+  title: string;
+  state: string;
+  created_at: string;
+  ended_at?: string | null;
+  chunk_count: number;
+  material_count: number;
+  artifact_count: number;
+  participant_count: number;
+}
+
+export interface ImportableSourcesResponse {
+  workspace_id: string;
+  debates: ImportableDebate[];
+  total_count: number;
+}
+
+export interface MemoryPreviewChunk {
+  source_type: string;
+  title: string;
+  chunk_count: number;
+  last_updated: string;
+}
+
+export interface MemoryPreviewResponse {
+  source_debate_id: string;
+  source_title: string;
+  total_chunks: number;
+  breakdown: MemoryPreviewChunk[];
+  date_range: {
+    start?: string | null;
+    end?: string | null;
+  };
+}
+
+export interface MemoryImportRequest {
+  source_debate_ids: string[];
+  source_type?: 'debate_full' | 'materials_only';
+  scope?: 'all_agents' | 'specific_agents';
+  participant_ids?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface MemoryImportResponse {
+  debate_id: string;
+  grants_created: number;
+  grant_ids: string[];
+}
+
+export interface MemoryGrant {
+  grant_id: string;
+  source_debate_id?: string | null;
+  source_debate_title?: string | null;
+  source_artifact_id?: string | null;
+  source_artifact_title?: string | null;
+  source_type: string;
+  scope: string;
+  allowed_participant_ids?: string[] | null;
+  granted_by: string;
+  granted_at: string;
+  expires_at?: string | null;
+  metadata: Record<string, any>;
+}
+
+export interface MemoryGrantsResponse {
+  debate_id: string;
+  grants: MemoryGrant[];
+  total_count: number;
+}
+
+export async function listImportableMemorySources(
+  workspaceId: string,
+  limit?: number
+): Promise<ImportableSourcesResponse> {
+  const headers = await getAuthHeaders();
+  const params = new URLSearchParams();
+  if (limit) params.append('limit', limit.toString());
+  
+  const response = await fetch(`${API_URL}/workspaces/${workspaceId}/memory/importable?${params}`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to list importable sources: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function previewMemoryImport(
+  debateId: string,
+  sourceDebateId: string
+): Promise<MemoryPreviewResponse> {
+  const headers = await getAuthHeaders();
+  const params = new URLSearchParams({ source_debate_id: sourceDebateId });
+  
+  const response = await fetch(`${API_URL}/debates/${debateId}/memory/preview?${params}`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to preview memory import: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function importMemory(
+  debateId: string,
+  request: MemoryImportRequest
+): Promise<MemoryImportResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/memory/import`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(request),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to import memory: ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+export async function listMemoryGrants(debateId: string): Promise<MemoryGrantsResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/memory/grants`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to list memory grants: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function revokeMemoryGrant(debateId: string, grantId: string): Promise<any> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/memory/grants/${grantId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to revoke memory grant: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+// Preflight API
+
+export interface ParticipantRunStatus {
+  participant_run_id: string;
+  participant_id: string;
+  agent_id?: string;
+  status: 'queued' | 'running' | 'success' | 'failed' | 'skipped';
+  started_at?: string;
+  completed_at?: string;
+  error?: string;
+  skip_reason?: string;
+  prep_pack_knowledge_id?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface PreflightStartResponse {
+  run_id: string;
+  debate_id: string;
+  status: string;
+  participant_count: number;
+  participant_runs: Array<{
+    participant_run_id: string;
+    participant_id: string;
+    agent_id?: string;
+    status: string;
+  }>;
+}
+
+export interface PreflightStatusResponse {
+  run_id: string;
+  debate_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  error?: string;
+  participant_runs: ParticipantRunStatus[];
+}
+
+export interface PreflightActionResponse {
+  participant_run_id: string;
+  participant_id: string;
+  status: string;
+  message: string;
+}
+
+export async function startPreflight(debateId: string): Promise<PreflightStartResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/preflight/start`, {
+    method: 'POST',
+    headers,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to start preflight: ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+export async function getPreflightStatus(debateId: string): Promise<PreflightStatusResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/preflight/status`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to get preflight status: ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+export async function retryPreflightParticipant(
+  debateId: string,
+  participantId: string
+): Promise<PreflightActionResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/preflight/retry`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ participant_id: participantId }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to retry preflight: ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+export async function skipPreflightParticipant(
+  debateId: string,
+  participantId: string,
+  reason: string
+): Promise<PreflightActionResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/preflight/skip`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ participant_id: participantId, reason }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to skip preflight: ${response.statusText} - ${errorText}`);
+  }
+  
+  return response.json();
+}
