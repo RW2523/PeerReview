@@ -15,10 +15,12 @@ import { useMemoryImport } from '@/hooks/useMemoryImport';
 import { useSetupValidation } from '@/hooks/useSetupValidation';
 import { useParticipants } from '@/hooks/useParticipants';
 import { useMaterials } from '@/hooks/useMaterials';
+import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import styles from './setup.module.css';
 
 export default function SetupPage() {
   const router = useRouter();
+  const { apiKey } = useOpenRouterKey();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -148,6 +150,12 @@ export default function SetupPage() {
   };
 
   const handleLaunchAfterPreflight = () => {
+    // Validate API key before launching
+    if (!apiKey) {
+      alert('⚠️ OpenRouter API Key Required\n\nYou need to add your OpenRouter API key in Settings before starting the debate.\n\nThe AI agents need this key to participate in the discussion.');
+      return;
+    }
+
     if (createdDebateId) {
       router.push(`/room?debate_id=${createdDebateId}`);
     }
@@ -163,6 +171,27 @@ export default function SetupPage() {
         <h1>Meeting Setup</h1>
         <p className={styles.subtitle}>Configure your AI-moderated discussion</p>
       </header>
+
+      {!apiKey && (
+        <div style={{
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffc107',
+          borderRadius: '8px',
+          padding: '16px 20px',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <span style={{ fontSize: '24px' }}>⚠️</span>
+          <div>
+            <strong style={{ color: '#856404' }}>OpenRouter API Key Required</strong>
+            <p style={{ margin: '4px 0 0 0', color: '#856404', fontSize: '14px' }}>
+              You need to add your OpenRouter API key in <a href="/settings" style={{ color: '#0066cc', textDecoration: 'underline' }}>Settings</a> before launching the meeting. AI agents need this key to participate.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className={styles.wizard}>
         <SetupStepper steps={steps} currentStep={step} />
@@ -278,12 +307,14 @@ export default function SetupPage() {
           {(step === 5 || step === 6) && (
             <button
               onClick={handleLaunchAfterPreflight}
-              disabled={isLoading || !canEnterRoom}
+              disabled={isLoading || !canEnterRoom || !apiKey}
               className={styles.btnLaunch}
-              title={!canEnterRoom ? 'Complete agent preparation first' : ''}
+              title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete agent preparation first' : ''}
             >
               <span className={styles.launchIcon}>🚀</span>
-              <span>{isLoading ? 'Loading...' : 'Launch Meeting'}</span>
+              <span>
+                {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Meeting'}
+              </span>
             </button>
           )}
         </div>

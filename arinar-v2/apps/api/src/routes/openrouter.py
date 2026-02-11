@@ -100,6 +100,11 @@ async def get_openrouter_account(
     api_key = x_openrouter_key.strip()
     management_key = x_openrouter_management_key.strip() if x_openrouter_management_key else None
     
+    # Debug logging
+    print(f"🔑 Account request received:")
+    print(f"  API Key: {api_key[:20]}... (len={len(api_key)})")
+    print(f"  Management Key: {management_key[:20] if management_key else 'None'}... (len={len(management_key) if management_key else 0})")
+    
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -140,11 +145,13 @@ async def get_openrouter_account(
             
             if management_key:
                 try:
+                    print(f"💰 Fetching credits with management key...")
                     credits_response = await client.get(
                         "https://openrouter.ai/api/v1/credits",
                         headers={"Authorization": f"Bearer {management_key}"},
                         timeout=10.0
                     )
+                    print(f"  Credits API status: {credits_response.status_code}")
                     if credits_response.status_code == 200:
                         credits_data = credits_response.json().get("data")
                         if credits_data:
@@ -152,8 +159,14 @@ async def get_openrouter_account(
                             total_credits = credits_data.get("total_credits", 0)
                             total_usage = credits_data.get("total_usage", 0)
                             credits_balance = total_credits - total_usage
+                            print(f"  ✅ Credits fetched: balance=${credits_balance}")
+                        else:
+                            print(f"  ⚠️  Credits response has no 'data' field")
+                    else:
+                        print(f"  ⚠️  Credits API returned non-200: {credits_response.status_code}")
+                        print(f"  Response: {credits_response.text[:200]}")
                 except Exception as e:
-                    print(f"Credits endpoint error with management key: {e}")
+                    print(f"❌ Credits endpoint error with management key: {e}")
             
             # Build response
             note = None
@@ -162,7 +175,7 @@ async def get_openrouter_account(
             elif not credits_data:
                 note = "Could not fetch credits. Check management key permissions."
             
-            return {
+            response_data = {
                 "key": key_data or {
                     "label": "API Key",
                     "is_valid": True,
@@ -177,6 +190,13 @@ async def get_openrouter_account(
                 "has_management_key": management_key is not None,
                 "note": note
             }
+            
+            print(f"📤 Returning response:")
+            print(f"  has_management_key: {response_data['has_management_key']}")
+            print(f"  credits: {response_data['credits']}")
+            print(f"  note: {response_data['note']}")
+            
+            return response_data
         
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401:

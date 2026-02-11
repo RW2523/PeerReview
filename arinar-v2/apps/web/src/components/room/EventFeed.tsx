@@ -61,6 +61,12 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
           try {
             const event = JSON.parse(msg.data);
             
+            // Validate event has minimum required fields
+            if (!event || typeof event !== 'object') {
+              console.warn('Invalid event received:', event);
+              return;
+            }
+
             // Filter out keepalive events
             if (event.event_type === 'keepalive') {
               return;
@@ -80,6 +86,12 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
               if (payload?.participant_id) {
                 onTyping(payload.participant_id);
               }
+            }
+
+            // Ensure event has an ID (generate one if missing)
+            if (!event.event_id) {
+              event.event_id = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              console.warn('Event missing event_id, generated temporary ID:', event.event_id);
             }
 
             setEvents((prev) => [...prev, event]);
@@ -166,8 +178,11 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
             <p>No events yet. Start the debate to see live updates.</p>
           </div>
         ) : (
-          events.map((event) => (
-            <EventCard key={event.event_id} event={event} />
+          events.map((event, index) => (
+            <EventCard 
+              key={event.event_id || `event-${index}-${event.created_at || Date.now()}`} 
+              event={event} 
+            />
           ))
         )}
       </div>
@@ -184,7 +199,8 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
 function EventCard({ event }: { event: Event }) {
   const [expanded, setExpanded] = useState(false);
 
-  const getEventColor = (type: string) => {
+  const getEventColor = (type: string | undefined) => {
+    if (!type) return 'var(--text-2)';
     if (type.includes('agent_message')) return 'var(--accent)';
     if (type.includes('intervention')) return 'var(--warning)';
     if (type.includes('summary')) return 'var(--success)';
@@ -209,10 +225,10 @@ function EventCard({ event }: { event: Event }) {
       <div className={styles.eventHeader}>
         <div className={styles.eventMeta}>
           <span className={styles.actor}>{getActor()}</span>
-          <span className={styles.eventType}>{event.event_type}</span>
+          <span className={styles.eventType}>{event.event_type || 'unknown'}</span>
         </div>
         <span className={styles.timestamp}>
-          {new Date(event.created_at).toLocaleTimeString()}
+          {event.created_at ? new Date(event.created_at).toLocaleTimeString() : 'N/A'}
         </span>
       </div>
 

@@ -18,7 +18,7 @@ export function ManagementKeyCard({
   onClear
 }: ManagementKeyCardProps) {
   const [keyInput, setKeyInput] = useState('');
-  const [selectedPersistence, setSelectedPersistence] = useState<KeyPersistence>('memory');
+  const [selectedPersistence, setSelectedPersistence] = useState<KeyPersistence>('local');
 
   const handleSave = () => {
     const trimmedKey = keyInput.trim();
@@ -108,8 +108,8 @@ export function ManagementKeyCard({
                 onChange={(e) => setSelectedPersistence(e.target.value as KeyPersistence)}
               />
               <div>
-                <strong>Save on this device</strong>
-                <p className={styles.warning}>⚠ Key stored in browser localStorage</p>
+                <strong>Save on this device (Recommended)</strong>
+                <p>Key persists across sessions. Stored in browser localStorage.</p>
               </div>
             </label>
           </div>

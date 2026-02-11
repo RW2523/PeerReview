@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AppNav from '@/components/layout/AppNav';
 import DebateSelector from '@/components/room/DebateSelector';
 import EventFeed from '@/components/room/EventFeed';
@@ -23,6 +24,7 @@ import styles from './room.module.css';
  * - AgendaPanel: localStorage keyed by debateId
  */
 export default function RoomPage() {
+  const searchParams = useSearchParams();
   const [debateId, setDebateId] = useState<string | null>(null);
   const [debateTitle, setDebateTitle] = useState<string>('');
   const [debateState, setDebateState] = useState<string>('pending');
@@ -36,6 +38,21 @@ export default function RoomPage() {
     setDebateTitle(title);
     setDebateState(state);
   };
+
+  // Auto-load debate from URL params (e.g., from setup flow)
+  useEffect(() => {
+    const debateIdFromUrl = searchParams.get('debate_id');
+    if (debateIdFromUrl && !debateId) {
+      // Auto-load the debate
+      api.getDebate(debateIdFromUrl)
+        .then(debate => {
+          handleDebateLoaded(debate.debate_id, debate.title || 'Untitled', debate.state);
+        })
+        .catch(err => {
+          console.error('Failed to auto-load debate:', err);
+        });
+    }
+  }, [searchParams, debateId]);
 
   // Presence join/leave (TICKET-14B)
   useEffect(() => {

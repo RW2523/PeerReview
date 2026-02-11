@@ -10,9 +10,15 @@ export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { apiKey, hasKey } = useOpenRouterKey();
+
+  // Only show credit widget after mounting to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -61,8 +67,8 @@ export default function UserMenu() {
 
   return (
     <div className={styles.userMenu} ref={menuRef}>
-      {/* Credit Widget */}
-      {hasKey && (
+      {/* Credit Widget - only render after mount to avoid hydration mismatch */}
+      {mounted && hasKey && (
         <div className={styles.creditWidget}>
           {loading ? (
             <span className={styles.creditLoading}>...</span>

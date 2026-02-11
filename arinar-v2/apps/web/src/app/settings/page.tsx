@@ -23,7 +23,7 @@ export default function SettingsPage() {
   } = useOpenRouterKey();
   
   const [keyInput, setKeyInput] = useState('');
-  const [selectedPersistence, setSelectedPersistence] = useState<KeyPersistence>('memory');
+  const [selectedPersistence, setSelectedPersistence] = useState<KeyPersistence>('local');
   const [accountInfo, setAccountInfo] = useState<api.OpenRouterAccountResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,9 +132,30 @@ export default function SettingsPage() {
     <>
       <AppNav />
       <div className={styles.container}>
-        <div className={styles.content}>
-          <h1>Settings</h1>
-          <p className={styles.subtitle}>Enter your OpenRouter API key to enable AI features</p>
+      <div className={styles.content}>
+        <h1>Settings</h1>
+        <p className={styles.subtitle}>Enter your OpenRouter API key to enable AI features</p>
+        
+        {!apiKey && (
+          <div style={{
+            backgroundColor: '#e3f2fd',
+            border: '1px solid #2196f3',
+            borderRadius: '8px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <span style={{ fontSize: '24px' }}>💡</span>
+            <div>
+              <strong style={{ color: '#1565c0' }}>First Time Setup</strong>
+              <p style={{ margin: '4px 0 0 0', color: '#1565c0', fontSize: '14px' }}>
+                Choose "Save on this device" to keep your API key across page refreshes. You can always clear it later.
+              </p>
+            </div>
+          </div>
+        )}
 
           {/* API Key Card */}
           <section className={styles.card}>
@@ -209,8 +230,8 @@ export default function SettingsPage() {
                         onChange={(e) => setSelectedPersistence(e.target.value as KeyPersistence)}
                       />
                       <div>
-                        <strong>Save on this device</strong>
-                        <p className={styles.warning}>⚠ Key stored in browser localStorage</p>
+                        <strong>Save on this device (Recommended)</strong>
+                        <p>Key persists across sessions. Stored in browser localStorage.</p>
                       </div>
                     </label>
                   </div>
