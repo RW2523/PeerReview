@@ -16,6 +16,8 @@ interface PreflightStepProps {
   participants: api.SetupParticipant[];
   participantIds: string[];
   onCanContinueChange?: (canContinue: boolean) => void;
+  meetingTitle?: string;
+  meetingPurpose?: string;
 }
 
 export function PreflightStep({
@@ -23,6 +25,8 @@ export function PreflightStep({
   participants,
   participantIds,
   onCanContinueChange,
+  meetingTitle,
+  meetingPurpose,
 }: PreflightStepProps) {
   const {
     status,
@@ -301,8 +305,8 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
         content={prepPackContent}
         participantName={prepPackParticipantId ? getParticipantName(prepPackParticipantId) : 'Unknown'}
         participantRole={prepPackParticipantId ? getParticipantRole(prepPackParticipantId) : 'Unknown'}
-        meetingTitle={debateId ? 'Meeting Setup' : undefined}
-        meetingPurpose="Strategic debate on key decisions"
+        meetingTitle={meetingTitle}
+        meetingPurpose={meetingPurpose}
         materialsCount={prepPackParticipantId && status ? 
           status.participant_runs.find(r => r.participant_id === prepPackParticipantId)?.metadata?.chunks_processed || 0 
           : 0

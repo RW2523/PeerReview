@@ -119,6 +119,22 @@ export async function endDebate(debateId: string): Promise<DebateResponse> {
   return response.json();
 }
 
+export async function triggerNextTurn(debateId: string, openrouterKey: string): Promise<any> {
+  const headers = await getAuthHeaders();
+  headers['X-OpenRouter-Key'] = openrouterKey;
+  
+  const response = await fetch(`${API_URL}/debates/${debateId}/turn/next`, {
+    method: 'POST',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to trigger next turn: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
 export async function intervene(debateId: string, request: InterventionRequest): Promise<any> {
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_URL}/debates/${debateId}/intervene`, {

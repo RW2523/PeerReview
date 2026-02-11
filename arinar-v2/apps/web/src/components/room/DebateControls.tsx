@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import styles from './DebateControls.module.css';
 import * as api from '@/lib/api';
+import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 
 interface DebateControlsProps {
   debateId: string;
@@ -11,9 +12,11 @@ interface DebateControlsProps {
 }
 
 export default function DebateControls({ debateId, currentState, onStateChange }: DebateControlsProps) {
+  const { apiKey } = useOpenRouterKey();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [triggeringTurn, setTriggeringTurn] = useState(false);
 
   const handleStart = async () => {
     setLoading(true);
@@ -68,10 +71,29 @@ export default function DebateControls({ debateId, currentState, onStateChange }
     }
   };
 
+  const handleNextTurn = async () => {
+    if (!apiKey) {
+      setError('OpenRouter API key required. Please add it in Settings.');
+      return;
+    }
+
+    setTriggeringTurn(true);
+    setError(null);
+    try {
+      await api.triggerNextTurn(debateId, apiKey);
+      // Success! The event will appear in the feed via SSE
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to trigger agent turn');
+    } finally {
+      setTriggeringTurn(false);
+    }
+  };
+
   const canStart = currentState === 'pending';
   const canPause = currentState === 'running';
   const canResume = currentState === 'paused';
   const canEnd = currentState === 'running' || currentState === 'paused';
+  const canTriggerTurn = currentState === 'running' && apiKey;
 
   return (
     <div className={styles.controls}>
@@ -106,6 +128,15 @@ export default function DebateControls({ debateId, currentState, onStateChange }
           className={canResume ? styles.btnPrimary : ''}
         >
           {loading && currentState === 'paused' ? 'Resuming...' : 'Resume'}
+        </button>
+
+        <button
+          onClick={handleNextTurn}
+          disabled={!canTriggerTurn || triggeringTurn}
+          className={canTriggerTurn ? styles.btnPrimary : ''}
+          title={!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak'}
+        >
+          {triggeringTurn ? 'Agent thinking...' : '▶ Next Turn'}
         </button>
 
         <button
