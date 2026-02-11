@@ -172,12 +172,26 @@ async def get_debate(
     # Check workspace access (raises HTTPException if denied)
     check_workspace_access(current_user, debate['workspace_id'])
     
+    # Fetch participants
+    participants = service.get_participants(debate_id)
+    participant_list = [
+        {
+            "participant_id": p['participant_id'],
+            "participant_type": p.get('participant_type', 'agent'),
+            "role_name": p.get('role_name', 'Unknown'),
+            "agent_config": p.get('agent_config'),
+            "created_at": p['created_at'].isoformat() if p.get('created_at') else None
+        }
+        for p in participants
+    ]
+    
     return DebateResponse(
         debate_id=debate['debate_id'],
         workspace_id=debate['workspace_id'],
         title=debate['title'],
         state=debate['state'],
-        created_at=debate['created_at'].isoformat()
+        created_at=debate['created_at'].isoformat(),
+        participants=participant_list
     )
 
 

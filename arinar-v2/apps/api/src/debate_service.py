@@ -341,7 +341,7 @@ class DebateService:
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
             cursor.execute("""
-                SELECT participant_id, debate_id, agent_id, agent_config, created_at
+                SELECT participant_id, debate_id, participant_type, role_name, agent_config, created_at
                 FROM participants
                 WHERE debate_id = %s
                 ORDER BY created_at ASC

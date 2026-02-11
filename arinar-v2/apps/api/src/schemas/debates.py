@@ -27,6 +27,15 @@ class CreateDebateRequest(BaseModel):
     policy_config: Optional[Dict[str, Any]] = Field(default=None, description="Policy configuration")
 
 
+class ParticipantInfo(BaseModel):
+    """Participant information"""
+    participant_id: str
+    participant_type: str
+    role_name: str
+    agent_config: Optional[Dict[str, Any]] = None
+    created_at: str
+
+
 class DebateResponse(BaseModel):
     """Debate response"""
     debate_id: str
@@ -34,6 +43,7 @@ class DebateResponse(BaseModel):
     title: str
     state: str
     created_at: str
+    participants: List[ParticipantInfo] = Field(default_factory=list, description="Debate participants")
 
 
 class InterveneRequest(BaseModel):

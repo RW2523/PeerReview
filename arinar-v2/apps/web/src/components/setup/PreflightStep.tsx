@@ -44,6 +44,7 @@ export function PreflightStep({
   const [skipReason, setSkipReason] = useState('');
   const [prepPackDialogOpen, setPrepPackDialogOpen] = useState(false);
   const [prepPackContent, setPrepPackContent] = useState<string | null>(null);
+  const [prepPackParticipantId, setPrepPackParticipantId] = useState<string | null>(null);
 
   // Notify parent when readiness changes
   useEffect(() => {
@@ -108,6 +109,7 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
 [Full prep pack content would be fetched from backend in production]`;
     
     setPrepPackContent(preview);
+    setPrepPackParticipantId(participantRun.participant_id);
     setPrepPackDialogOpen(true);
   };
 
@@ -117,6 +119,14 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
       return participants[index].name || participants[index].role_description || 'Participant';
     }
     return 'Unknown Participant';
+  };
+
+  const getParticipantRole = (participantId: string): string => {
+    const index = participantIds.indexOf(participantId);
+    if (index !== -1 && index < participants.length) {
+      return participants[index].role || participants[index].role_description || 'Agent';
+    }
+    return 'Agent';
   };
 
   const getInitials = (name: string): string => {
@@ -289,7 +299,18 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
       <PrepPackDialog
         isOpen={prepPackDialogOpen}
         content={prepPackContent}
-        onClose={() => setPrepPackDialogOpen(false)}
+        participantName={prepPackParticipantId ? getParticipantName(prepPackParticipantId) : 'Unknown'}
+        participantRole={prepPackParticipantId ? getParticipantRole(prepPackParticipantId) : 'Unknown'}
+        meetingTitle={debateId ? 'Meeting Setup' : undefined}
+        meetingPurpose="Strategic debate on key decisions"
+        materialsCount={prepPackParticipantId && status ? 
+          status.participant_runs.find(r => r.participant_id === prepPackParticipantId)?.metadata?.chunks_processed || 0 
+          : 0
+        }
+        onClose={() => {
+          setPrepPackDialogOpen(false);
+          setPrepPackParticipantId(null);
+        }}
       />
     </div>
   );

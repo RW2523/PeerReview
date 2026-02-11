@@ -130,7 +130,7 @@ export default function RoomPage() {
         if (data.participants) {
           const participantList = data.participants.map((p: any) => ({
             id: p.participant_id,
-            name: p.agent_config?.name || p.agent_id || 'Unknown',
+            name: p.agent_config?.name || p.role_name || 'Unknown Agent',
           }));
           setParticipants(participantList);
         }

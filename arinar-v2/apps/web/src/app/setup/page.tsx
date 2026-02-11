@@ -149,15 +149,31 @@ export default function SetupPage() {
     }
   };
 
-  const handleLaunchAfterPreflight = () => {
+  const handleLaunchAfterPreflight = async () => {
     // Validate API key before launching
     if (!apiKey) {
       alert('⚠️ OpenRouter API Key Required\n\nYou need to add your OpenRouter API key in Settings before starting the debate.\n\nThe AI agents need this key to participate in the discussion.');
       return;
     }
 
-    if (createdDebateId) {
+    if (!createdDebateId) {
+      alert('No debate created yet. Please complete the setup first.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Start the debate (pending -> running)
+      await api.startDebate(createdDebateId);
+      
+      // Navigate to room
       router.push(`/room?debate_id=${createdDebateId}`);
+    } catch (err: any) {
+      console.error('Failed to start debate:', err);
+      alert(`Failed to start debate: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -245,6 +261,8 @@ export default function SetupPage() {
               participants={participants}
               participantIds={createdParticipantIds}
               onCanContinueChange={setCanEnterRoom}
+              meetingTitle={title}
+              meetingPurpose={problemStatement}
             />
           )}
 
