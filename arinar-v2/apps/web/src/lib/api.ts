@@ -21,6 +21,11 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   };
 }
 
+// ============================================================================
+// DEBATES DOMAIN (lines 24-220)
+// TODO: Extract to api/debates.ts
+// ============================================================================
+
 export interface DebateResponse {
   debate_id: string;
   workspace_id: string;
@@ -120,7 +125,7 @@ export async function endDebate(debateId: string): Promise<DebateResponse> {
 }
 
 export async function triggerNextTurn(debateId: string, openrouterKey: string): Promise<any> {
-  const headers = await getAuthHeaders();
+  const headers = await getAuthHeaders() as Record<string, string>;
   headers['X-OpenRouter-Key'] = openrouterKey;
   
   const response = await fetch(`${API_URL}/debates/${debateId}/turn/next`, {
@@ -221,6 +226,11 @@ export async function getSummary(debateId: string): Promise<SummaryResponse> {
 }
 
 // M4 Meeting Setup endpoints
+// ============================================================================
+// AGENTS & SETUP DOMAIN (lines 224-320)
+// TODO: Extract to api/agents.ts and api/setup.ts
+// ============================================================================
+
 export interface AgentTemplate {
   template_id: string;
   label: string;
@@ -319,6 +329,11 @@ export async function setupDebate(request: DebateSetupRequest): Promise<DebateSe
 }
 
 // OpenRouter account info
+// ============================================================================
+// OPENROUTER DOMAIN (lines 322-405)
+// TODO: Extract to api/openrouter.ts
+// ============================================================================
+
 export interface OpenRouterAccountResponse {
   key?: {
     label?: string;
@@ -427,6 +442,11 @@ export async function listDebates(
 }
 
 // Materials upload and status
+// ============================================================================
+// MATERIALS DOMAIN (lines 430-510)  
+// TODO: Extract to api/materials.ts
+// ============================================================================
+
 export interface MaterialUploadResponse {
   material_ids: string[];
   job_ids: string[];
@@ -509,6 +529,11 @@ export async function retryMaterial(debateId: string, materialId: string): Promi
 }
 
 // Memory Import API
+
+// ============================================================================
+// MEMORY DOMAIN (lines 513-670)
+// TODO: Extract to api/memory.ts  
+// ============================================================================
 
 export interface ImportableDebate {
   debate_id: string;
@@ -669,6 +694,11 @@ export async function revokeMemoryGrant(debateId: string, grantId: string): Prom
 
 // Preflight API
 
+// ============================================================================
+// PREFLIGHT DOMAIN (lines 672-785)
+// TODO: Extract to api/preflight.ts
+// ============================================================================
+
 export interface ParticipantRunStatus {
   participant_run_id: string;
   participant_id: string;
@@ -786,6 +816,11 @@ export async function skipPreflightParticipant(
 // Workspace Settings
 // ============================================================================
 
+// ============================================================================
+// WORKSPACE SETTINGS DOMAIN (lines 789-835)
+// TODO: Extract to api/workspace.ts
+// ============================================================================
+
 export interface WorkspaceModelsRequest {
   embeddings_model_id: string;
   ocr_model_id: string;
@@ -834,6 +869,11 @@ export async function updateWorkspaceModels(
 
 // ============================================================================
 // Presence & Typing (TICKET-14)
+// ============================================================================
+
+// ============================================================================
+// PRESENCE DOMAIN (lines 839-878)
+// TODO: Extract to api/presence.ts
 // ============================================================================
 
 export interface PresenceResponse {

@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from psycopg2.extras import Json
 
 from src.config import settings
+from src.database import get_cursor
 from src.schemas.memory import MemoryChunkResult, MemoryRetrievalResponse
 
 
@@ -137,7 +138,7 @@ def retrieve_allowed_chunks(
         MemoryRetrievalResponse with chunks, grant_ids used, and retrieval_method
     """
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         # 0. Resolve agent_id from participant_id for audit logging
@@ -392,7 +393,7 @@ def check_participant_has_access(
         return True
     
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         cursor.execute("""

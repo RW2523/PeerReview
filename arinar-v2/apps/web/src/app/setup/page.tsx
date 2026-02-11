@@ -16,17 +16,13 @@ import { useSetupValidation } from '@/hooks/useSetupValidation';
 import { useParticipants } from '@/hooks/useParticipants';
 import { useMaterials } from '@/hooks/useMaterials';
 import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
+import { useDebateSetupActions } from '@/hooks/useDebateSetupActions';
 import styles from './setup.module.css';
 
 export default function SetupPage() {
   const router = useRouter();
   const { apiKey } = useOpenRouterKey();
   const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  
-  // Debate creation tracking
-  const [createdDebateId, setCreatedDebateId] = useState<string | null>(null);
-  const [createdParticipantIds, setCreatedParticipantIds] = useState<string[]>([]);
   const [canEnterRoom, setCanEnterRoom] = useState(false);
   
   // Step 1: Basic Info
@@ -76,6 +72,23 @@ export default function SetupPage() {
   const { canGoNext: validateStep } = useSetupValidation();
   
   const workspaceId = '00000000-0000-0000-0000-000000000101';
+
+  // Debate setup actions (create, launch)
+  const {
+    isLoading,
+    createdDebateId,
+    createdParticipantIds,
+    handleCreateDebate: createDebate,
+    handleLaunchDebate,
+  } = useDebateSetupActions({
+    workspaceId,
+    title,
+    problemStatement,
+    timeboxMinutes,
+    participants,
+    materials,
+    selectedMemorySources: memoryImport.selectedSources,
+  });
   const steps = [
     { id: 1, label: 'Basic Info' },
     { id: 2, label: 'Materials' },
@@ -107,73 +120,26 @@ export default function SetupPage() {
   }, []);
 
   const handleCreateDebate = async () => {
-    if (participants.length === 0) {
-      alert('At least 1 participant required');
-      return;
-    }
-    
     // Validate memory import
     const memoryError = validateMemoryImport(participants);
     if (memoryError) {
       alert(memoryError);
       return;
     }
-    
-    setIsLoading(true);
-    try {
-      // 1. Create debate (returns participant_ids)
-      const result = await api.setupDebate({
-        workspace_id: workspaceId,
-        title,
-        problem_statement: problemStatement,
-        timebox_minutes: timeboxMinutes,
-        participants,
-        materials,
-      });
-      
-      // 2. Create memory grants if enabled (pass participant_ids for mapping)
-      const shouldContinue = await createMemoryGrants(result.debate_id, result.participant_ids);
-      if (!shouldContinue) {
-        setIsLoading(false);
-        return;
+
+    const result = await createDebate();
+    if (result) {
+      // Create memory grants if enabled
+      const shouldContinue = await createMemoryGrants(result.debateId, result.participantIds);
+      if (shouldContinue) {
+        setStep(5);
       }
-      
-      // 3. Store debate_id and participant_ids, move to preflight step
-      setCreatedDebateId(result.debate_id);
-      setCreatedParticipantIds(result.participant_ids);
-      setStep(5); // Move to preflight
-      setIsLoading(false);
-    } catch (err: any) {
-      alert(`Failed to create debate: ${err.message}`);
-      setIsLoading(false);
     }
   };
 
-  const handleLaunchAfterPreflight = async () => {
-    // Validate API key before launching
-    if (!apiKey) {
-      alert('⚠️ OpenRouter API Key Required\n\nYou need to add your OpenRouter API key in Settings before starting the debate.\n\nThe AI agents need this key to participate in the discussion.');
-      return;
-    }
-
-    if (!createdDebateId) {
-      alert('No debate created yet. Please complete the setup first.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Start the debate (pending -> running)
-      await api.startDebate(createdDebateId);
-      
-      // Navigate to room
-      router.push(`/room?debate_id=${createdDebateId}`);
-    } catch (err: any) {
-      console.error('Failed to start debate:', err);
-      alert(`Failed to start debate: ${err.message || 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
+  const handleLaunchAfterPreflight = () => {
+    if (createdDebateId) {
+      handleLaunchDebate(createdDebateId, apiKey);
     }
   };
 

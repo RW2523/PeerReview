@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any
 from psycopg2.extras import Json
 
 from src.config import settings
+from src.database import get_cursor
 from src.services.memory_retrieval import retrieve_allowed_chunks
 
 # Try to import Celery, but make it optional
@@ -36,7 +37,7 @@ def orchestrate_preflight_impl(run_id: str, debate_id: str):
     print(f"🚀 Starting preflight orchestration: run_id={run_id}, debate_id={debate_id}")
     
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         # Update run status to running
@@ -70,7 +71,9 @@ def orchestrate_preflight_impl(run_id: str, debate_id: str):
         # Process each participant synchronously (V1 simplicity)
         # Later: can use Celery group/chord for parallel execution
         print(f"📋 Processing {len(participant_runs)} participants...")
-        for participant_run_id, participant_id in participant_runs:
+        for run in participant_runs:
+            participant_run_id = run['participant_run_id']
+            participant_id = run['participant_id']
             try:
                 print(f"  → Processing participant {participant_id}...")
                 prepare_participant_preflight(
@@ -93,7 +96,7 @@ def orchestrate_preflight_impl(run_id: str, debate_id: str):
             GROUP BY status
         """, (run_id,))
         
-        status_counts = dict(cursor.fetchall())
+        status_counts = {row['status']: row['count'] for row in cursor.fetchall()}
         print(f"📊 Participant status summary: {status_counts}")
         
         # Determine overall run status
@@ -137,7 +140,7 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
     print(f"    🔄 Preparing participant: run_id={participant_run_id}, participant={participant_id}")
     
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         # Update participant run status
@@ -161,7 +164,9 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         if not result:
             raise ValueError(f"Participant {participant_id} not found")
         
-        agent_config, debate_title, policy_config = result
+        agent_config = result['agent_config']
+        debate_title = result['title']
+        policy_config = result['policy_config']
         
         # Extract agent details
         # agent_id can be None for inline agents (created from templates)
@@ -187,7 +192,7 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                 cursor.execute("""
                     SELECT workspace_id FROM debates WHERE debate_id = %s
                 """, (debate_id,))
-                workspace_id = cursor.fetchone()[0]
+                workspace_id = cursor.fetchone()['workspace_id']
                 
                 cursor.execute("""
                     INSERT INTO agents (agent_id, workspace_id, name, system_prompt, model_id, model_config, created_at, updated_at)
@@ -227,8 +232,8 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         
         run_metadata = cursor.fetchone()
         stored_query_embedding = None
-        if run_metadata and run_metadata[0]:
-            stored_query_embedding = run_metadata[0].get('query_embedding')
+        if run_metadata and run_metadata['metadata']:
+            stored_query_embedding = run_metadata['metadata'].get('query_embedding')
         
         # Build semantic query for logging/audit (even if embedding pre-computed)
         semantic_query = f"{problem_statement[:300] if problem_statement else 'context summary'}\n\nRole: {system_prompt[:200]}"
@@ -372,7 +377,7 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
             })
         ))
         
-        prep_pack_knowledge_id = cursor.fetchone()[0]
+        prep_pack_knowledge_id = cursor.fetchone()['knowledge_id']
         print(f"    ✓ Prep pack persisted: knowledge_id={prep_pack_knowledge_id}")
         
         # 6. Update participant run to success (TICKET-13C: include retrieval metadata)

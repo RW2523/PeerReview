@@ -12,6 +12,7 @@ from datetime import datetime
 
 from src.config import settings
 from src.auth import require_auth
+from src.database import get_cursor
 from src.tasks.preflight import orchestrate_preflight
 from src.services.memory_retrieval import get_query_embedding
 
@@ -82,7 +83,7 @@ def check_workspace_access(workspace_id: str, auth_workspace_id: str):
 def get_debate_workspace(debate_id: str) -> str:
     """Get workspace_id for a debate"""
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     try:
         cursor.execute("SELECT workspace_id FROM debates WHERE debate_id = %s", (debate_id,))
         result = cursor.fetchone()
@@ -91,7 +92,7 @@ def get_debate_workspace(debate_id: str) -> str:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Debate {debate_id} not found"
             )
-        return result[0]
+        return result['workspace_id']
     finally:
         cursor.close()
         conn.close()
@@ -123,7 +124,7 @@ def start_preflight(
     check_workspace_access(debate_workspace, workspace_id)
     
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         # Check if a preflight run already exists for this debate
@@ -133,7 +134,8 @@ def start_preflight(
         
         existing_run = cursor.fetchone()
         if existing_run:
-            run_id, existing_status = existing_run
+            run_id = existing_run['run_id']
+            existing_status = existing_run['status']
             if existing_status in ('queued', 'running'):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -151,7 +153,7 @@ def start_preflight(
             RETURNING run_id
         """, (debate_id,))
         
-        run_id = cursor.fetchone()[0]
+        run_id = cursor.fetchone()['run_id']
         
         # Get participants, policy config, and workspace settings for query embedding
         cursor.execute("""
@@ -172,14 +174,15 @@ def start_preflight(
             )
         
         # Get common data for query embedding generation (TICKET-13C.1)
-        policy_config = participants[0][2] if participants else {}
-        embeddings_model_id = participants[0][3] if participants and participants[0][3] else 'moonshot/kimi-embeddings-v1'
+        policy_config = participants[0]['policy_config'] if participants else {}
+        embeddings_model_id = participants[0]['embeddings_model'] if participants and participants[0]['embeddings_model'] else 'moonshot/kimi-embeddings-v1'
         problem_statement = policy_config.get('problem_statement', '') if policy_config else ''
         
         # Create participant run entries with query embeddings (BYOK-safe)
         participant_runs = []
         for participant in participants:
-            participant_id, agent_config = participant[0], participant[1]
+            participant_id = participant['participant_id']
+            agent_config = participant['agent_config']
             agent_id = agent_config.get('agent_id') if agent_config else None
             
             # Generate query embedding if OpenRouter key provided (BYOK: not stored)
@@ -209,10 +212,10 @@ def start_preflight(
             
             participant_run = cursor.fetchone()
             participant_runs.append({
-                'participant_run_id': participant_run[0],
-                'participant_id': participant_run[1],
-                'agent_id': participant_run[2],
-                'status': participant_run[3],
+                'participant_run_id': participant_run['participant_run_id'],
+                'participant_id': participant_run['participant_id'],
+                'agent_id': participant_run['agent_id'],
+                'status': participant_run['status'],
                 'has_query_embedding': query_embedding is not None
             })
         
@@ -235,17 +238,55 @@ def start_preflight(
                 detail=f"Preflight execution failed: {str(e)}"
             )
         
+        # Fetch actual status after inline execution
+        cursor.execute("""
+            SELECT status FROM preflight_runs WHERE run_id = %s
+        """, (run_id,))
+        
+        final_run = cursor.fetchone()
+        actual_status = final_run['status'] if final_run else 'unknown'
+        
+        # Refresh participant statuses
+        cursor.execute("""
+            SELECT participant_run_id, participant_id, agent_id, status,
+                   started_at, completed_at, error, skip_reason,
+                   prep_pack_knowledge_id, metadata
+            FROM preflight_participant_runs
+            WHERE run_id = %s
+            ORDER BY started_at ASC NULLS LAST
+        """, (run_id,))
+        
+        updated_participant_runs = [
+            {
+                'participant_run_id': r['participant_run_id'],
+                'participant_id': r['participant_id'],
+                'agent_id': r['agent_id'],
+                'status': r['status'],
+                'started_at': r['started_at'].isoformat() if r['started_at'] else None,
+                'completed_at': r['completed_at'].isoformat() if r['completed_at'] else None,
+                'error': r['error'],
+                'skip_reason': r['skip_reason'],
+                'prep_pack_knowledge_id': r['prep_pack_knowledge_id'],
+                'metadata': r['metadata']
+            }
+            for r in cursor.fetchall()
+        ]
+        
         return PreflightStartResponse(
             run_id=run_id,
             debate_id=debate_id,
-            status='queued',
-            participant_count=len(participant_runs),
-            participant_runs=participant_runs
+            status=actual_status,
+            participant_count=len(updated_participant_runs),
+            participant_runs=updated_participant_runs
         )
     
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        print(f"❌ Preflight route error: {e}")
+        print(f"❌ Error type: {type(e)}")
+        traceback.print_exc()
         conn.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -273,7 +314,7 @@ def get_preflight_status(
     check_workspace_access(debate_workspace, workspace_id)
     
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         # Get preflight run
@@ -292,7 +333,13 @@ def get_preflight_status(
                 detail="No preflight run found for this debate"
             )
         
-        run_id, debate_id, run_status, created_at, started_at, completed_at, error = run
+        run_id = run['run_id']
+        debate_id = run['debate_id']
+        run_status = run['status']
+        created_at = run['created_at']
+        started_at = run['started_at']
+        completed_at = run['completed_at']
+        error = run['error']
         
         # Get participant runs
         cursor.execute("""
@@ -308,16 +355,16 @@ def get_preflight_status(
         participant_runs = []
         for row in cursor.fetchall():
             participant_runs.append(ParticipantRunStatus(
-                participant_run_id=row[0],
-                participant_id=row[1],
-                agent_id=row[2],
-                status=row[3],
-                started_at=row[4],
-                completed_at=row[5],
-                error=row[6],
-                skip_reason=row[7],
-                prep_pack_knowledge_id=row[8],
-                metadata=row[9] or {}
+                participant_run_id=row['participant_run_id'],
+                participant_id=row['participant_id'],
+                agent_id=row['agent_id'],
+                status=row['status'],
+                started_at=row['started_at'],
+                completed_at=row['completed_at'],
+                error=row['error'],
+                skip_reason=row['skip_reason'],
+                prep_pack_knowledge_id=row['prep_pack_knowledge_id'],
+                metadata=row['metadata'] or {}
             ))
         
         return PreflightStatusResponse(
@@ -354,7 +401,7 @@ def retry_participant_preflight(
     check_workspace_access(debate_workspace, workspace_id)
     
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         # Get current run and participant run
@@ -374,7 +421,9 @@ def retry_participant_preflight(
                 detail="Participant preflight run not found"
             )
         
-        run_id, participant_run_id, current_status = result
+        run_id = result['run_id']
+        participant_run_id = result['participant_run_id']
+        current_status = result['status']
         
         if current_status != 'failed':
             raise HTTPException(
@@ -433,7 +482,7 @@ def skip_participant_preflight(
     check_workspace_access(debate_workspace, workspace_id)
     
     conn = psycopg2.connect(settings.database_url)
-    cursor = conn.cursor()
+    cursor = get_cursor(conn)
     
     try:
         # Get current run and participant run
@@ -453,7 +502,9 @@ def skip_participant_preflight(
                 detail="Participant preflight run not found"
             )
         
-        run_id, participant_run_id, current_status = result
+        run_id = result['run_id']
+        participant_run_id = result['participant_run_id']
+        current_status = result['status']
         
         if current_status in ('success', 'skipped'):
             raise HTTPException(
