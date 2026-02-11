@@ -217,6 +217,7 @@ function EventCard({ event }: { event: Event }) {
   const getMessage = () => {
     if (event.payload?.message) return event.payload.message;
     if (event.payload?.content) return event.payload.content;
+    if (event.payload?.text) return event.payload.text;
     return null;
   };
 

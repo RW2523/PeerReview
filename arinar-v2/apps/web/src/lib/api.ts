@@ -745,8 +745,14 @@ export interface PreflightActionResponse {
   message: string;
 }
 
-export async function startPreflight(debateId: string): Promise<PreflightStartResponse> {
+export async function startPreflight(debateId: string, openrouterKey?: string | null): Promise<PreflightStartResponse> {
   const headers = await getAuthHeaders();
+  
+  // Add OpenRouter key if provided (for real AI prep generation)
+  if (openrouterKey) {
+    (headers as Record<string, string>)['X-OpenRouter-Key'] = openrouterKey;
+  }
+  
   const response = await fetch(`${API_URL}/debates/${debateId}/preflight/start`, {
     method: 'POST',
     headers,

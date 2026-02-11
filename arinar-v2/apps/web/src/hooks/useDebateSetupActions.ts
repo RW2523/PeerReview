@@ -114,6 +114,9 @@ export function useDebateSetupActions(
       // Start the debate (pending -> running)
       await api.startDebate(debateId);
 
+      // Trigger first agent turn immediately
+      await api.triggerNextTurn(debateId, apiKey);
+
       // Navigate to room
       router.push(`/room?debate_id=${debateId}`);
     } catch (err: any) {

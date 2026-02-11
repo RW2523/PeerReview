@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import * as api from '@/lib/api';
 import { usePreflight } from '@/hooks/usePreflight';
 import { SkipDialog, PrepPackDialog } from './PreflightDialogs';
+import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import styles from './SetupSteps.module.css';
 
 interface PreflightStepProps {
@@ -32,6 +33,7 @@ export function PreflightStep({
   meetingAgenda,
   desiredOutcomes,
 }: PreflightStepProps) {
+  const { apiKey } = useOpenRouterKey();
   const {
     status,
     isPolling,
@@ -67,8 +69,13 @@ export function PreflightStep({
       return;
     }
     
+    if (!apiKey) {
+      alert('⚠️ OpenRouter API Key Required\n\nPlease add your OpenRouter API key in Settings before running preflight preparation.');
+      return;
+    }
+    
     try {
-      await startPreflight(debateId);
+      await startPreflight(debateId, apiKey);
       } catch (err: any) {
       console.error('Failed to start preflight:', err);
     }

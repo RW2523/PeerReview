@@ -113,7 +113,26 @@ async def get_openrouter_account(
     
     async with httpx.AsyncClient() as client:
         try:
-            # Validate key by fetching models (works with all key types)
+            # Validate key by making a minimal chat completion request
+            # This actually requires authentication unlike the models endpoint
+            validation_response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://arinar.ai",
+                    "X-Title": "Arinar"
+                },
+                json={
+                    "model": "openai/gpt-4o-mini",
+                    "messages": [{"role": "user", "content": "test"}],
+                    "max_tokens": 1
+                },
+                timeout=15.0
+            )
+            validation_response.raise_for_status()
+            
+            # Key is valid, now fetch models list for UI
             models_response = await client.get(
                 "https://openrouter.ai/api/v1/models",
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -199,18 +218,53 @@ async def get_openrouter_account(
             return response_data
         
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401:
+            error_text = e.response.text
+            status_code = e.response.status_code
+            
+            # Parse error message for better user feedback
+            if status_code == 401:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid OpenRouter API key"
+                    detail="Invalid OpenRouter API key - please check your key and try again"
                 )
+            elif status_code == 502:
+                # Check if it's the Clerk authentication issue
+                if "Clerk" in error_text or "authentication" in error_text.lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="OpenRouter authentication service (Clerk) is temporarily unavailable. Please try again in a few minutes, or get a fresh API key from openrouter.ai/keys"
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="OpenRouter service error - please try again later"
+                )
+            elif status_code == 429:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="OpenRouter rate limit exceeded - please wait a moment and try again"
+                )
+            
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"OpenRouter API error: {e.response.status_code}"
+                detail=f"OpenRouter API error ({status_code}): {error_text[:200]}"
+            )
+        
+        except httpx.TimeoutException:
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="OpenRouter request timed out - please check your connection and try again"
             )
         
         except Exception as e:
+            error_message = str(e)
+            # Check for common network errors
+            if "connection" in error_message.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Cannot connect to OpenRouter - please check your internet connection"
+                )
+            
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch account info: {str(e)}"
+                detail=f"Failed to validate OpenRouter key: {error_message[:200]}"
             )

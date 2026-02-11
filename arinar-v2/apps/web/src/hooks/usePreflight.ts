@@ -79,10 +79,10 @@ export function usePreflight(): UsePreflightResult {
   }, [refreshStatus]);
 
   // Start preflight
-  const startPreflight = useCallback(async (debateId: string) => {
+  const startPreflight = useCallback(async (debateId: string, openrouterKey?: string | null) => {
     try {
       setError(null);
-      const startResponse = await api.startPreflight(debateId);
+      const startResponse = await api.startPreflight(debateId, openrouterKey);
       
       // Convert start response to status format for immediate UI update
       setStatus({

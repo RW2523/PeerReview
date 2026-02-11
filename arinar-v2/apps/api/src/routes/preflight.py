@@ -178,6 +178,17 @@ def start_preflight(
         embeddings_model_id = participants[0]['embeddings_model'] if participants and participants[0]['embeddings_model'] else 'moonshot/kimi-embeddings-v1'
         problem_statement = policy_config.get('problem_statement', '') if policy_config else ''
         
+        # Store OpenRouter key in policy_config for preflight task to use (temporary)
+        if x_openrouter_key and policy_config is not None:
+            policy_config['openrouter_key'] = x_openrouter_key
+            cursor.execute("""
+                UPDATE debates 
+                SET policy_config = %s, updated_at = NOW()
+                WHERE debate_id = %s
+            """, (Json(policy_config), debate_id))
+            conn.commit()
+            print(f"✅ OpenRouter key stored in policy_config for preflight generation")
+        
         # Create participant run entries with query embeddings (BYOK-safe)
         participant_runs = []
         for participant in participants:

@@ -71,7 +71,18 @@ async def trigger_next_turn(
             detail=f"OpenRouter authentication failed: {str(e)}"
         )
     except Exception as e:
+        import traceback
+        error_detail = str(e)
+        
+        # Better error messages for common issues
+        if "OpenRouter API error" in error_detail:
+            if "502" in error_detail or "Clerk" in error_detail:
+                error_detail = "OpenRouter API authentication failed. Please check your API key or try again later."
+            elif "401" in error_detail or "authentication" in error_detail.lower():
+                error_detail = "Invalid OpenRouter API key. Please update your API key in Settings."
+        
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to execute turn: {str(e)}"
+            detail=f"Failed to execute turn: {error_detail}"
         )

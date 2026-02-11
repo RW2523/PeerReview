@@ -92,13 +92,13 @@ class StreamService:
                     return None
                 
                 return {
-                    'debate_id': row[0],
-                    'workspace_id': row[1],
-                    'title': row[2],
-                    'state': row[3],
-                    'policy_config': row[4],
-                    'created_at': row[5],
-                    'updated_at': row[6]
+                    'debate_id': row['debate_id'],
+                    'workspace_id': row['workspace_id'],
+                    'title': row['title'],
+                    'state': row['state'],
+                    'policy_config': row['policy_config'],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at']
                 }
     
     def _get_events(
@@ -111,7 +111,7 @@ class StreamService:
             with get_cursor(conn) as cur:
                 cur.execute("""
                     SELECT event_id, debate_id, event_type, sequence_number,
-                           occurred_at, payload, agent_id, participant_id
+                           created_at, content, sender_id
                     FROM events
                     WHERE debate_id = %s
                       AND sequence_number > %s
@@ -121,14 +121,13 @@ class StreamService:
                 events = []
                 for row in cur.fetchall():
                     events.append({
-                        'event_id': row[0],
-                        'debate_id': row[1],
-                        'event_type': row[2],
-                        'sequence_number': row[3],
-                        'occurred_at': row[4],
-                        'payload': row[5],
-                        'agent_id': row[6],
-                        'participant_id': row[7]
+                        'event_id': row['event_id'],
+                        'debate_id': row['debate_id'],
+                        'event_type': row['event_type'],
+                        'sequence_number': row['sequence_number'],
+                        'occurred_at': row['created_at'],
+                        'payload': row['content'],
+                        'sender_id': row['sender_id']
                     })
                 
                 return events
