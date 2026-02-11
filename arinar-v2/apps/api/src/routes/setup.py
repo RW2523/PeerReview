@@ -29,6 +29,8 @@ async def setup_debate(
             workspace_id=request.workspace_id,
             title=request.title,
             problem_statement=request.problem_statement,
+            agenda=request.agenda,
+            desired_outcomes=request.desired_outcomes,
             timebox_minutes=request.timebox_minutes,
             participants=[
                 p.model_dump(exclude_none=True, by_alias=True) for p in request.participants

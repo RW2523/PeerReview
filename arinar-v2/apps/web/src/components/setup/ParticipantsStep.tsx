@@ -11,6 +11,7 @@ interface ParticipantsStepProps {
   onAddExisting: (agent: api.Agent) => void;
   onUpdate: (idx: number, updates: Partial<api.SetupParticipant>) => void;
   onRemove: (idx: number) => void;
+  onReorder?: (fromIdx: number, toIdx: number) => void;
 }
 
 export function ParticipantsStep({
@@ -21,12 +22,25 @@ export function ParticipantsStep({
   onAddExisting,
   onUpdate,
   onRemove,
+  onReorder,
 }: ParticipantsStepProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [showAllAgents, setShowAllAgents] = useState(false);
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
+
+  const handleMoveUp = (idx: number) => {
+    if (idx > 0 && onReorder) {
+      onReorder(idx, idx - 1);
+    }
+  };
+
+  const handleMoveDown = (idx: number) => {
+    if (idx < participants.length - 1 && onReorder) {
+      onReorder(idx, idx + 1);
+    }
+  };
 
   // Get unique categories
   const categories = ['All', ...Array.from(new Set(templates.map(t => t.category)))];
@@ -165,6 +179,9 @@ export function ParticipantsStep({
         <div className={styles.selectedPanel}>
           <div className={styles.selectedPanelSticky}>
             <h3>Selected Participants ({participants.length}/8)</h3>
+            {participants.length > 1 && (
+              <p className={styles.orderHint}>💡 Use ↑/↓ arrows to define turn order</p>
+            )}
             
             {participants.length === 0 && (
               <div className={styles.emptyState}>
@@ -177,10 +194,33 @@ export function ParticipantsStep({
             {participants.map((participant, idx) => (
               <div key={idx} className={styles.selectedParticipantCard}>
                 <div className={styles.cardHeader}>
-                  <span className={styles.participantName}>
-                    {participant.agent_id ? `📌 ${participant.name}` : participant.name}
-                  </span>
+                  <div className={styles.participantHeaderLeft}>
+                    <span className={styles.turnOrderBadge}>#{idx + 1}</span>
+                    <span className={styles.participantName}>
+                      {participant.agent_id ? `📌 ${participant.name}` : participant.name}
+                    </span>
+                  </div>
                   <div className={styles.cardActions}>
+                    {onReorder && participants.length > 1 && (
+                      <div className={styles.orderControls}>
+                        <button
+                          onClick={() => handleMoveUp(idx)}
+                          disabled={idx === 0}
+                          className={styles.btnOrder}
+                          title="Move up in turn order"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => handleMoveDown(idx)}
+                          disabled={idx === participants.length - 1}
+                          className={styles.btnOrder}
+                          title="Move down in turn order"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    )}
                     {!participant.agent_id && (
                       <button
                         onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}

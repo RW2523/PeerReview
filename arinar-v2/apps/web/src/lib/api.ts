@@ -273,6 +273,8 @@ export interface DebateSetupRequest {
   workspace_id: string;
   title: string;
   problem_statement: string;
+  agenda?: string[];
+  desired_outcomes?: string[];
   timebox_minutes?: number;
   participants: SetupParticipant[];
   materials?: SetupMaterial[];

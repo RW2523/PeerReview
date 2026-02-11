@@ -63,7 +63,10 @@ interface PrepPackDialogProps {
   participantRole: string;
   meetingTitle?: string;
   meetingPurpose?: string;
+  meetingAgenda?: string[];
+  desiredOutcomes?: string[];
   materialsCount?: number;
+  memoryChunksCount?: number;
   onClose: () => void;
 }
 
@@ -74,7 +77,10 @@ export function PrepPackDialog({
   participantRole,
   meetingTitle,
   meetingPurpose,
+  meetingAgenda,
+  desiredOutcomes,
   materialsCount = 0,
+  memoryChunksCount = 0,
   onClose 
 }: PrepPackDialogProps) {
   if (!isOpen || !content) return null;
@@ -133,7 +139,7 @@ export function PrepPackDialog({
         </div>
 
         {/* Meeting Context */}
-        {(meetingTitle || meetingPurpose) && (
+        {(meetingTitle || meetingPurpose || meetingAgenda || desiredOutcomes) && (
           <div style={{ 
             marginBottom: '1.5rem',
             padding: '1rem',
@@ -147,18 +153,42 @@ export function PrepPackDialog({
               fontWeight: 600,
               color: 'var(--accent)'
             }}>
-              📋 Meeting Context
+              📋 Meeting Context Understanding
             </h3>
             {meetingTitle && (
               <div style={{ marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>Title: </span>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-1)' }}>Title: </span>
                 <span style={{ fontSize: '0.875rem' }}>{meetingTitle}</span>
               </div>
             )}
             {meetingPurpose && (
-              <div>
-                <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>Purpose: </span>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-1)' }}>Purpose: </span>
                 <span style={{ fontSize: '0.875rem' }}>{meetingPurpose}</span>
+              </div>
+            )}
+            {meetingAgenda && meetingAgenda.length > 0 && (
+              <div style={{ marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-1)', display: 'block', marginBottom: '0.25rem' }}>
+                  Agenda:
+                </span>
+                <ul style={{ margin: '0', paddingLeft: '1.5rem', fontSize: '0.875rem' }}>
+                  {meetingAgenda.map((item, idx) => (
+                    <li key={idx} style={{ marginBottom: '0.25rem' }}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {desiredOutcomes && desiredOutcomes.length > 0 && (
+              <div>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-1)', display: 'block', marginBottom: '0.25rem' }}>
+                  Desired Outcomes:
+                </span>
+                <ul style={{ margin: '0', paddingLeft: '1.5rem', fontSize: '0.875rem' }}>
+                  {desiredOutcomes.map((item, idx) => (
+                    <li key={idx} style={{ marginBottom: '0.25rem' }}>{item}</li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
@@ -191,27 +221,31 @@ export function PrepPackDialog({
         <div style={{ 
           marginBottom: '1.5rem',
           padding: '1rem',
-          background: 'var(--bg-panel)',
-          border: '1px solid var(--border)',
+          background: '#e8f5e9',
+          border: '2px solid #4caf50',
           borderRadius: '8px',
         }}>
           <h3 style={{ 
             margin: '0 0 0.75rem 0', 
             fontSize: '1rem', 
-            fontWeight: 600 
+            fontWeight: 600,
+            color: '#2e7d32'
           }}>
-            🎯 Preparation Status
+            ✅ Preparation Complete
           </h3>
-          <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
-            <p style={{ margin: '0 0 0.5rem 0' }}>
-              <strong>Status:</strong> <span style={{ color: 'var(--success)' }}>✓ Ready</span>
-            </p>
-            <p style={{ margin: '0 0 0.5rem 0' }}>
-              <strong>Materials Reviewed:</strong> {materialsCount} chunk(s)
-            </p>
-            <p style={{ margin: 0 }}>
-              <strong>Grants Used:</strong> 0 tokens
-            </p>
+          <div style={{ fontSize: '0.875rem', lineHeight: '1.8', color: '#1b5e20' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ minWidth: '140px', fontWeight: 600 }}>Status:</span>
+              <span style={{ color: '#2e7d32', fontWeight: 600 }}>✓ Ready to participate</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ minWidth: '140px', fontWeight: 600 }}>Materials Analyzed:</span>
+              <span>{materialsCount} document(s)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span style={{ minWidth: '140px', fontWeight: 600 }}>Memory Chunks:</span>
+              <span>{memoryChunksCount} chunk(s) from knowledge base</span>
+            </div>
           </div>
         </div>
 
@@ -243,17 +277,18 @@ export function PrepPackDialog({
           </pre>
         </div>
 
-        {/* Footer Note */}
+        {/* Agent Understanding Section */}
         <div style={{ 
           padding: '0.75rem 1rem',
-          background: '#fff3cd',
-          border: '1px solid #ffc107',
+          background: '#e3f2fd',
+          border: '1px solid #2196f3',
           borderRadius: '8px',
           fontSize: '0.8125rem',
-          color: '#856404',
+          color: '#0d47a1',
           marginBottom: '1.5rem'
         }}>
-          <strong>Note:</strong> In production, this prep pack content will be fetched from the backend with full analysis details.
+          <strong>💡 Agent's Understanding:</strong> This agent has reviewed the meeting context, analyzed {materialsCount} material(s), 
+          and retrieved {memoryChunksCount} relevant memory chunk(s) to prepare for informed participation.
         </div>
 
         {/* Actions */}

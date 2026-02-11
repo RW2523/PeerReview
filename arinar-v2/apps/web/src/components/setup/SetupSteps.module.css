@@ -1254,3 +1254,143 @@
     transform: translateY(0);
   }
 }
+
+/* List input for agenda/outcomes */
+.listInput {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.listInput input {
+  flex: 1;
+}
+
+.addButton {
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.addButton:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.addButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.itemList {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.itemList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--text-0);
+}
+
+.itemList li span {
+  flex: 1;
+}
+
+.removeButton {
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  color: var(--text-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.removeButton:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.removeButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Turn order controls */
+.orderHint {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: var(--space-1) 0 var(--space-3) 0;
+  font-style: italic;
+}
+
+.participantHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.turnOrderBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  background: var(--accent);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.orderControls {
+  display: flex;
+  gap: 2px;
+  margin-right: var(--space-2);
+}
+
+.btnOrder {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.btnOrder:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btnOrder:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

@@ -17,6 +17,8 @@ class DebateSetupRequest(BaseModel):
     workspace_id: str
     title: str
     problem_statement: str
+    agenda: Optional[List[str]] = Field(default=None, description="Meeting agenda items")
+    desired_outcomes: Optional[List[str]] = Field(default=None, description="Desired meeting outcomes")
     timebox_minutes: Optional[int] = None
     participants: List[SetupParticipant]
     materials: Optional[List[SetupMaterial]] = Field(default_factory=list)

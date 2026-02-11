@@ -32,6 +32,8 @@ class MeetingSetupService:
         problem_statement: str,
         participants: List[Dict[str, Any]],
         materials: Optional[List[Dict[str, Any]]] = None,
+        agenda: Optional[List[str]] = None,
+        desired_outcomes: Optional[List[str]] = None,
         timebox_minutes: Optional[int] = None,
     ) -> Tuple[str, List[str], List[str]]:
         """
@@ -47,6 +49,10 @@ class MeetingSetupService:
         policy_config: Dict[str, Any] = {
             "problem_statement": problem_statement,
         }
+        if agenda:
+            policy_config["agenda"] = agenda
+        if desired_outcomes:
+            policy_config["desired_outcomes"] = desired_outcomes
         if timebox_minutes is not None:
             policy_config["timebox_minutes"] = timebox_minutes
 

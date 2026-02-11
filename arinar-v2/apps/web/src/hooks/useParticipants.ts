@@ -49,6 +49,15 @@ export function useParticipants() {
     setParticipants(prev => prev.filter((_, i) => i !== idx));
   }, []);
 
+  const handleReorder = useCallback((fromIdx: number, toIdx: number) => {
+    setParticipants(prev => {
+      const updated = [...prev];
+      const [movedItem] = updated.splice(fromIdx, 1);
+      updated.splice(toIdx, 0, movedItem);
+      return updated;
+    });
+  }, []);
+
   return {
     participants,
     setParticipants,
@@ -56,5 +65,6 @@ export function useParticipants() {
     handleAddExisting,
     handleUpdate,
     handleRemove,
+    handleReorder,
   };
 }

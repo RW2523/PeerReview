@@ -11,6 +11,8 @@ interface UseDebateSetupActionsOptions {
   workspaceId: string;
   title: string;
   problemStatement: string;
+  agenda?: string[];
+  desiredOutcomes?: string[];
   timeboxMinutes?: number;
   participants: SetupParticipant[];
   materials: SetupMaterial[];
@@ -38,6 +40,8 @@ export function useDebateSetupActions(
       workspaceId,
       title,
       problemStatement,
+      agenda,
+      desiredOutcomes,
       timeboxMinutes,
       participants,
       materials,
@@ -56,6 +60,8 @@ export function useDebateSetupActions(
         workspace_id: workspaceId,
         title,
         problem_statement: problemStatement,
+        agenda: agenda && agenda.length > 0 ? agenda : undefined,
+        desired_outcomes: desiredOutcomes && desiredOutcomes.length > 0 ? desiredOutcomes : undefined,
         timebox_minutes: timeboxMinutes || 30,
         participants,
         materials: materials && materials.length > 0 ? materials : undefined,

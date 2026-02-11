@@ -18,6 +18,8 @@ interface PreflightStepProps {
   onCanContinueChange?: (canContinue: boolean) => void;
   meetingTitle?: string;
   meetingPurpose?: string;
+  meetingAgenda?: string[];
+  desiredOutcomes?: string[];
 }
 
 export function PreflightStep({
@@ -27,6 +29,8 @@ export function PreflightStep({
   onCanContinueChange,
   meetingTitle,
   meetingPurpose,
+  meetingAgenda,
+  desiredOutcomes,
 }: PreflightStepProps) {
   const {
     status,
@@ -307,8 +311,14 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
         participantRole={prepPackParticipantId ? getParticipantRole(prepPackParticipantId) : 'Unknown'}
         meetingTitle={meetingTitle}
         meetingPurpose={meetingPurpose}
+        meetingAgenda={meetingAgenda}
+        desiredOutcomes={desiredOutcomes}
         materialsCount={prepPackParticipantId && status ? 
           status.participant_runs.find(r => r.participant_id === prepPackParticipantId)?.metadata?.chunks_processed || 0 
+          : 0
+        }
+        memoryChunksCount={prepPackParticipantId && status ?
+          status.participant_runs.find(r => r.participant_id === prepPackParticipantId)?.metadata?.memory_chunks_used || 0
           : 0
         }
         onClose={() => {

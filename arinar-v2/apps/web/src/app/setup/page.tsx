@@ -28,6 +28,8 @@ export default function SetupPage() {
   // Step 1: Basic Info
   const [title, setTitle] = useState('');
   const [problemStatement, setProblemStatement] = useState('');
+  const [agenda, setAgenda] = useState<string[]>([]);
+  const [desiredOutcomes, setDesiredOutcomes] = useState<string[]>([]);
   const [timeboxMinutes, setTimeboxMinutes] = useState<number | undefined>(30);
 
   // Pre-fill from draft if coming from home page
@@ -61,6 +63,7 @@ export default function SetupPage() {
     handleAddExisting: handleAddExistingAgent,
     handleUpdate: handleUpdateParticipant,
     handleRemove: handleRemoveParticipant,
+    handleReorder: handleReorderParticipant,
   } = useParticipants();
   const [templates, setTemplates] = useState<api.AgentTemplate[]>([]);
   const [agents, setAgents] = useState<api.Agent[]>([]);
@@ -84,6 +87,8 @@ export default function SetupPage() {
     workspaceId,
     title,
     problemStatement,
+    agenda,
+    desiredOutcomes,
     timeboxMinutes,
     participants,
     materials,
@@ -183,9 +188,13 @@ export default function SetupPage() {
             <BasicInfoStep
               title={title}
               problemStatement={problemStatement}
+              agenda={agenda}
+              desiredOutcomes={desiredOutcomes}
               timeboxMinutes={timeboxMinutes}
               onTitleChange={setTitle}
               onProblemChange={setProblemStatement}
+              onAgendaChange={setAgenda}
+              onDesiredOutcomesChange={setDesiredOutcomes}
               onTimeboxChange={setTimeboxMinutes}
               isLoading={isLoading}
             />
@@ -209,6 +218,7 @@ export default function SetupPage() {
               onAddExisting={handleAddExistingAgent}
               onUpdate={handleUpdateParticipant}
               onRemove={handleRemoveParticipant}
+              onReorder={handleReorderParticipant}
             />
           )}
 
@@ -229,6 +239,8 @@ export default function SetupPage() {
               onCanContinueChange={setCanEnterRoom}
               meetingTitle={title}
               meetingPurpose={problemStatement}
+              meetingAgenda={agenda}
+              desiredOutcomes={desiredOutcomes}
             />
           )}
 
