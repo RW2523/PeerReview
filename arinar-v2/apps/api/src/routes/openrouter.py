@@ -70,19 +70,21 @@ async def list_openrouter_models(
 
 @router.get("/openrouter/account")
 async def get_openrouter_account(
-    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key")
+    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
+    x_openrouter_management_key: Optional[str] = Header(None, alias="X-OpenRouter-Management-Key")
 ) -> Dict[str, Any]:
     """
     Get OpenRouter account info: usage, limits, credits.
     
     Uses user's BYOK key to fetch account details from OpenRouter.
-    Key is never stored.
+    Keys are never stored.
     
     Headers:
-        X-OpenRouter-Key: <openrouter-api-key>
+        X-OpenRouter-Key: <openrouter-api-key> (required - for validation)
+        X-OpenRouter-Management-Key: <management-key> (optional - for credits)
     
     Returns:
-        Account info including key usage, limits, rate limits, and credits (if available)
+        Account info including key validation, models available, and credits (if management key provided)
     
     Raises:
         400: Missing API key
@@ -96,6 +98,7 @@ async def get_openrouter_account(
         )
     
     api_key = x_openrouter_key.strip()
+    management_key = x_openrouter_management_key.strip() if x_openrouter_management_key else None
     
     if not api_key:
         raise HTTPException(
@@ -105,40 +108,73 @@ async def get_openrouter_account(
     
     async with httpx.AsyncClient() as client:
         try:
-            # Fetch key info (usage, limits, rate limits)
-            key_response = await client.get(
-                "https://openrouter.ai/api/v1/auth/key",
+            # Validate key by fetching models (works with all key types)
+            models_response = await client.get(
+                "https://openrouter.ai/api/v1/models",
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=10.0
             )
-            key_response.raise_for_status()
-            key_data = key_response.json()
+            models_response.raise_for_status()
+            models_data = models_response.json()
+            model_count = len(models_data.get("data", []))
             
-            # Try to fetch credits (requires management key, may fail)
-            credits_data = None
-            note = None
+            # Try to fetch key info (requires management/dashboard key)
+            key_data = None
+            key_to_check = management_key if management_key else api_key
             
             try:
-                credits_response = await client.get(
-                    "https://openrouter.ai/api/v1/credits",
-                    headers={"Authorization": f"Bearer {api_key}"},
+                key_response = await client.get(
+                    "https://openrouter.ai/api/v1/auth/key",
+                    headers={"Authorization": f"Bearer {key_to_check}"},
                     timeout=10.0
                 )
-                credits_response.raise_for_status()
-                credits_data = credits_response.json()
+                if key_response.status_code == 200:
+                    key_data = key_response.json().get("data", {})
+            except Exception as e:
+                # Management endpoints not available for regular keys (expected)
+                print(f"Key info endpoint unavailable: {e}")
             
-            except httpx.HTTPStatusError as credits_error:
-                if credits_error.response.status_code == 403:
-                    note = "Credits endpoint requires management key. Showing usage/limits only."
-                else:
-                    note = f"Could not fetch credits: {credits_error.response.status_code}"
+            # Try to fetch credits (use management key if provided, otherwise try regular key)
+            credits_data = None
+            credits_balance = None
             
-            except Exception as credits_error:
-                note = f"Could not fetch credits: {str(credits_error)}"
+            if management_key:
+                try:
+                    credits_response = await client.get(
+                        "https://openrouter.ai/api/v1/credits",
+                        headers={"Authorization": f"Bearer {management_key}"},
+                        timeout=10.0
+                    )
+                    if credits_response.status_code == 200:
+                        credits_data = credits_response.json().get("data")
+                        if credits_data:
+                            # Calculate balance
+                            total_credits = credits_data.get("total_credits", 0)
+                            total_usage = credits_data.get("total_usage", 0)
+                            credits_balance = total_credits - total_usage
+                except Exception as e:
+                    print(f"Credits endpoint error with management key: {e}")
+            
+            # Build response
+            note = None
+            if not management_key:
+                note = "Add management API key to view credits balance."
+            elif not credits_data:
+                note = "Could not fetch credits. Check management key permissions."
             
             return {
-                "key": key_data.get("data", {}),
-                "credits": credits_data.get("data") if credits_data else None,
+                "key": key_data or {
+                    "label": "API Key",
+                    "is_valid": True,
+                    "validated_via": "models_endpoint"
+                },
+                "credits": {
+                    "total_credits": credits_data.get("total_credits") if credits_data else None,
+                    "total_usage": credits_data.get("total_usage") if credits_data else None,
+                    "balance": credits_balance
+                } if credits_data else None,
+                "models_available": model_count,
+                "has_management_key": management_key is not None,
                 "note": note
             }
         

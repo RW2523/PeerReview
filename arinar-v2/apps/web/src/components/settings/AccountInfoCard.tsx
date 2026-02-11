@@ -46,22 +46,43 @@ export function AccountInfoCard({
         <div className={styles.loading}>Loading account info...</div>
       ) : accountInfo ? (
         <>
-          {accountInfo.credits ? (
+          {/* Show key validation status */}
+          <div className={styles.metric}>
+            <h3>API Key Status</h3>
+            <div className={styles.metricValue} style={{ color: 'var(--success)' }}>
+              ✓ Valid
+            </div>
+            <div className={styles.metricDetails}>
+              {accountInfo.models_available && (
+                <span>{accountInfo.models_available} models available</span>
+              )}
+              {accountInfo.key?.label && (
+                <span>Label: {accountInfo.key.label}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Show credits if available (management keys only) */}
+          {accountInfo.credits && accountInfo.credits.balance !== null ? (
             <div className={styles.metric}>
               <h3>Credits Balance</h3>
-              <div className={styles.metricValue}>
-                ${accountInfo.credits.balance?.toFixed(2) || '0.00'}
+              <div className={styles.metricValue} style={{ color: 'var(--success)', fontSize: '2rem' }}>
+                ${accountInfo.credits.balance.toFixed(2)}
               </div>
               <div className={styles.metricDetails}>
-                <span>Total: ${accountInfo.credits.total_credits?.toFixed(2)}</span>
-                <span>Used: ${accountInfo.credits.total_usage?.toFixed(2)}</span>
+                {accountInfo.credits.total_credits !== null && (
+                  <span>Total Purchased: ${accountInfo.credits.total_credits.toFixed(2)}</span>
+                )}
+                {accountInfo.credits.total_usage !== null && (
+                  <span>Total Used: ${accountInfo.credits.total_usage.toFixed(2)}</span>
+                )}
               </div>
             </div>
-          ) : accountInfo.key ? (
+          ) : accountInfo.key?.usage !== undefined ? (
             <div className={styles.metric}>
               <h3>Usage & Limits</h3>
               <div className={styles.metricValue}>
-                ${accountInfo.key.usage?.toFixed(2) || '0.00'}
+                ${accountInfo.key.usage.toFixed(2)}
                 {accountInfo.key.limit ? ` / $${accountInfo.key.limit.toFixed(2)}` : ' (Unlimited)'}
               </div>
               {accountInfo.key.rate_limit && (
@@ -74,6 +95,7 @@ export function AccountInfoCard({
             </div>
           ) : null}
 
+          {/* Show note about credits availability */}
           {accountInfo.note && (
             <div className={styles.note}>
               <span>ℹ️</span>

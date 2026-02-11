@@ -6,11 +6,22 @@ import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import { KeyPersistence } from '@/lib/openrouterKeyStore';
 import { DefaultModelsCard } from '@/components/settings/DefaultModelsCard';
 import { AccountInfoCard } from '@/components/settings/AccountInfoCard';
+import { ManagementKeyCard } from '@/components/settings/ManagementKeyCard';
 import * as api from '@/lib/api';
 import styles from './settings.module.css';
 
 export default function SettingsPage() {
-  const { apiKey, persistence, saveKey, clearKey } = useOpenRouterKey();
+  const { 
+    apiKey, 
+    persistence, 
+    saveKey, 
+    clearKey,
+    managementKey,
+    managementPersistence,
+    saveManagementKey,
+    clearManagementKey 
+  } = useOpenRouterKey();
+  
   const [keyInput, setKeyInput] = useState('');
   const [selectedPersistence, setSelectedPersistence] = useState<KeyPersistence>('memory');
   const [accountInfo, setAccountInfo] = useState<api.OpenRouterAccountResponse | null>(null);
@@ -32,7 +43,7 @@ export default function SettingsPage() {
       setAccountInfo(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey]);
+  }, [apiKey, managementKey]);
 
   useEffect(() => {
     if (persistence) {
@@ -47,7 +58,7 @@ export default function SettingsPage() {
     setError(null);
 
     try {
-      const data = await api.getOpenRouterAccount(apiKey);
+      const data = await api.getOpenRouterAccount(apiKey, managementKey);
       setAccountInfo(data);
       setLastUpdated(new Date());
     } catch (err) {
@@ -67,8 +78,8 @@ export default function SettingsPage() {
     setValidationSuccess(false);
 
     try {
-      // Validate key by calling /openrouter/account
-      const data = await api.getOpenRouterAccount(trimmedKey);
+      // Validate key by calling /openrouter/account (with management key if available)
+      const data = await api.getOpenRouterAccount(trimmedKey, managementKey);
       
       // If we got here, key is valid
       setValidationSuccess(true);
@@ -93,10 +104,28 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveManagementKey = (key: string, persistence: KeyPersistence) => {
+    // Save management key to browser storage
+    saveManagementKey(key, persistence);
+    
+    // Refresh account info to fetch credits
+    if (apiKey) {
+      fetchAccountInfo();
+    }
+  };
+
   const handleClearKey = () => {
     clearKey();
     setAccountInfo(null);
     setLastUpdated(null);
+  };
+
+  const handleClearManagementKey = () => {
+    clearManagementKey();
+    // Refresh account info without management key
+    if (apiKey) {
+      fetchAccountInfo();
+    }
   };
 
   return (
@@ -226,6 +255,14 @@ export default function SettingsPage() {
               </>
             )}
           </section>
+
+          {/* Management Key Card */}
+          <ManagementKeyCard
+            managementKey={managementKey}
+            managementPersistence={managementPersistence}
+            onSave={handleSaveManagementKey}
+            onClear={handleClearManagementKey}
+          />
 
           {/* Account Info Card */}
           <AccountInfoCard

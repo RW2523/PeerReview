@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as api from '@/lib/api';
+import { ModelSelector } from './ModelSelector';
 import styles from './SetupSteps.module.css';
 
 interface ParticipantsStepProps {
@@ -23,6 +24,9 @@ export function ParticipantsStep({
 }: ParticipantsStepProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
+  const [showAllAgents, setShowAllAgents] = useState(false);
+  const [agentSearchQuery, setAgentSearchQuery] = useState('');
 
   // Get unique categories
   const categories = ['All', ...Array.from(new Set(templates.map(t => t.category)))];
@@ -31,6 +35,30 @@ export function ParticipantsStep({
   const filteredTemplates = selectedCategory === 'All' 
     ? templates 
     : templates.filter(t => t.category === selectedCategory);
+  
+  // Limit templates shown initially (show 6, then "Show more" button)
+  const displayedTemplates = showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
+  
+  // Filter and limit agents
+  const filteredAgents = agents.filter(agent => 
+    agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase())
+  );
+  const displayedAgents = showAllAgents ? filteredAgents : filteredAgents.slice(0, 6);
+  
+  // Check if template is already selected
+  const isTemplateSelected = (templateId: string) => {
+    return participants.some(p => 
+      p.name && templates.find(t => 
+        t.template_id === templateId && 
+        t.name === p.name
+      )
+    );
+  };
+  
+  // Check if agent is already selected
+  const isAgentSelected = (agentId: string) => {
+    return participants.some(p => p.agent_id === agentId);
+  };
 
   return (
     <div className={styles.section}>
@@ -40,124 +68,180 @@ export function ParticipantsStep({
         <strong> Min 2, Max 8 participants.</strong>
       </p>
 
-      <div className={styles.templates}>
-        <div className={styles.templateHeader}>
-          <h3>Agent Templates</h3>
-          <div className={styles.categoryFilter}>
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`${styles.categoryBtn} ${selectedCategory === category ? styles.categoryBtnActive : ''}`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className={styles.templateGrid}>
-          {filteredTemplates.map((template) => (
-            <button
-              key={template.template_id}
-              onClick={() => onAddFromTemplate(template)}
-              className={styles.templateCard}
-              disabled={participants.length >= 8}
-            >
-              <div className={styles.templateLabel}>{template.label}</div>
-              <div className={styles.templateRole}>{template.role_title}</div>
-              {template.character && (
-                <div className={styles.templateCharacter}>{template.character}</div>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {agents.length > 0 && (
-        <div className={styles.templates}>
-          <h3>Existing Agents</h3>
-          <div className={styles.templateGrid}>
-            {agents.map((agent) => (
-              <button
-                key={agent.agent_id}
-                onClick={() => onAddExisting(agent)}
-                className={styles.templateCard}
-                disabled={participants.length >= 8}
-              >
-                <div className={styles.templateLabel}>{agent.name}</div>
-                <div className={styles.templateRole}>{agent.role_description || 'Custom Agent'}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className={styles.list}>
-        <h3>Selected Participants</h3>
-        {participants.map((participant, idx) => (
-          <div key={idx} className={styles.participantCard}>
-            <div className={styles.cardHeader}>
-              <span className={styles.participantName}>
-                {participant.agent_id ? '(Reference)' : participant.name}
-              </span>
-              <div>
-                {!participant.agent_id && (
+      <div className={styles.twoColumnLayout}>
+        {/* LEFT: Selection Panel */}
+        <div className={styles.selectionPanel}>
+          {/* Agent Templates */}
+          <div className={styles.templates}>
+            <div className={styles.templateHeader}>
+              <h3>Agent Templates</h3>
+              <div className={styles.categoryFilter}>
+                {categories.map((category) => (
                   <button
-                    onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}
-                    className={styles.btnEdit}
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`${styles.categoryBtn} ${selectedCategory === category ? styles.categoryBtnActive : ''}`}
                   >
-                    {editingIdx === idx ? 'Close' : 'Edit'}
+                    {category}
                   </button>
-                )}
-                <button onClick={() => onRemove(idx)} className={styles.btnRemove}>×</button>
+                ))}
               </div>
             </div>
-            
-            {editingIdx === idx && !participant.agent_id && (
-              <div className={styles.editorPanel}>
-                <label>Name</label>
-                <input
-                  type="text"
-                  value={participant.name || ''}
-                  onChange={(e) => onUpdate(idx, { name: e.target.value })}
-                  placeholder="Agent Name"
-                />
-                
-                <label>System Prompt</label>
-                <textarea
-                  value={participant.system_prompt || ''}
-                  onChange={(e) => onUpdate(idx, { system_prompt: e.target.value })}
-                  placeholder="You are..."
-                  rows={4}
-                />
-                
-                <label>Model ID</label>
-                <input
-                  type="text"
-                  value={participant.model_id || ''}
-                  onChange={(e) => onUpdate(idx, { model_id: e.target.value })}
-                  placeholder="anthropic/claude-3.5-sonnet"
-                />
-                
-                <label>Model Config (JSON, optional)</label>
-                <textarea
-                  value={JSON.stringify(participant.model_config || {}, null, 2)}
-                  onChange={(e) => {
-                    try {
-                      onUpdate(idx, { model_config: JSON.parse(e.target.value) });
-                    } catch {}
-                  }}
-                  rows={3}
-                  placeholder='{"temperature": 0.7, "max_tokens": 2000}'
-                />
-              </div>
+            <div className={styles.templateGrid}>
+              {displayedTemplates.map((template) => {
+                const isSelected = isTemplateSelected(template.template_id);
+                return (
+                  <button
+                    key={template.template_id}
+                    onClick={() => onAddFromTemplate(template)}
+                    className={`${styles.templateCard} ${isSelected ? styles.templateCardSelected : ''}`}
+                    disabled={participants.length >= 8 || isSelected}
+                    title={isSelected ? 'Already selected' : 'Click to add'}
+                  >
+                    {isSelected && <div className={styles.selectedBadge}>✓</div>}
+                    <div className={styles.templateLabel}>{template.label}</div>
+                    <div className={styles.templateRole}>{template.role_title}</div>
+                    {template.character && (
+                      <div className={styles.templateCharacter}>{template.character}</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {filteredTemplates.length > 6 && (
+              <button
+                onClick={() => setShowAllTemplates(!showAllTemplates)}
+                className={styles.showMoreBtn}
+              >
+                {showAllTemplates ? '↑ Show Less' : `↓ Show ${filteredTemplates.length - 6} More Templates`}
+              </button>
             )}
           </div>
-        ))}
-        
-        {participants.length === 0 && (
-          <p className={styles.empty}>No participants added yet (min 1 required)</p>
-        )}
+
+          {/* Existing Agents */}
+          {agents.length > 0 && (
+            <div className={styles.templates}>
+              <div className={styles.templateHeader}>
+                <h3>Existing Agents ({agents.length})</h3>
+                <input
+                  type="text"
+                  placeholder="🔍 Search agents..."
+                  value={agentSearchQuery}
+                  onChange={(e) => setAgentSearchQuery(e.target.value)}
+                  className={styles.searchInput}
+                />
+              </div>
+              <div className={styles.templateGrid}>
+                {displayedAgents.map((agent) => {
+                  const isSelected = isAgentSelected(agent.agent_id);
+                  return (
+                    <button
+                      key={agent.agent_id}
+                      onClick={() => onAddExisting(agent)}
+                      className={`${styles.templateCard} ${isSelected ? styles.templateCardSelected : ''}`}
+                      disabled={participants.length >= 8 || isSelected}
+                      title={isSelected ? 'Already selected' : 'Click to add'}
+                    >
+                      {isSelected && <div className={styles.selectedBadge}>✓</div>}
+                      <div className={styles.templateLabel}>{agent.name}</div>
+                      <div className={styles.templateRole}>{agent.role_description || 'Custom Agent'}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              {filteredAgents.length > 6 && (
+                <button
+                  onClick={() => setShowAllAgents(!showAllAgents)}
+                  className={styles.showMoreBtn}
+                >
+                  {showAllAgents ? '↑ Show Less' : `↓ Show ${filteredAgents.length - 6} More Agents`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: Selected Participants (Sticky) */}
+        <div className={styles.selectedPanel}>
+          <div className={styles.selectedPanelSticky}>
+            <h3>Selected Participants ({participants.length}/8)</h3>
+            
+            {participants.length === 0 && (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>👥</div>
+                <p>No participants selected yet</p>
+                <span className={styles.emptyHint}>Click templates on the left to add</span>
+              </div>
+            )}
+
+            {participants.map((participant, idx) => (
+              <div key={idx} className={styles.selectedParticipantCard}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.participantName}>
+                    {participant.agent_id ? `📌 ${participant.name}` : participant.name}
+                  </span>
+                  <div className={styles.cardActions}>
+                    {!participant.agent_id && (
+                      <button
+                        onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}
+                        className={styles.btnEditInline}
+                        title="Edit participant"
+                      >
+                        {editingIdx === idx ? '✕' : '✏️'}
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => onRemove(idx)} 
+                      className={styles.btnRemoveInline}
+                      title="Remove participant"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                
+                {editingIdx === idx && !participant.agent_id && (
+                  <div className={styles.editorPanelInline}>
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={participant.name || ''}
+                      onChange={(e) => onUpdate(idx, { name: e.target.value })}
+                      placeholder="Agent Name"
+                    />
+                    
+                    <label>System Prompt</label>
+                    <textarea
+                      value={participant.system_prompt || ''}
+                      onChange={(e) => onUpdate(idx, { system_prompt: e.target.value })}
+                      placeholder="You are..."
+                      rows={4}
+                    />
+                    
+                    <label>Model ID</label>
+                    <ModelSelector
+                      value={participant.model_id || ''}
+                      onChange={(modelId) => onUpdate(idx, { model_id: modelId })}
+                      placeholder="Select AI model..."
+                    />
+                    
+                    <label>Model Config (JSON)</label>
+                    <textarea
+                      value={JSON.stringify(participant.model_config || {}, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          onUpdate(idx, { model_config: JSON.parse(e.target.value) });
+                        } catch {}
+                      }}
+                      rows={3}
+                      placeholder='{"temperature": 0.7}'
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

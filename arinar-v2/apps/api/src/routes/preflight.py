@@ -4,6 +4,7 @@ Endpoints for agent preparation orchestration
 """
 
 import psycopg2
+from psycopg2.extras import Json
 from fastapi import APIRouter, HTTPException, status, Depends, Header
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -217,8 +218,27 @@ def start_preflight(
         
         conn.commit()
         
-        # Enqueue Celery task
-        orchestrate_preflight.delay(run_id, debate_id)
+        # Try to enqueue Celery task, fallback to synchronous execution
+        try:
+            orchestrate_preflight.delay(run_id, debate_id)
+            print(f"✅ Preflight task enqueued for run_id={run_id}")
+        except Exception as celery_error:
+            print(f"⚠️  Celery unavailable, running preflight synchronously: {celery_error}")
+            # Fallback: run synchronously (blocks request, but ensures it runs)
+            try:
+                orchestrate_preflight(run_id, debate_id)
+                print(f"✅ Preflight completed synchronously for run_id={run_id}")
+            except Exception as sync_error:
+                print(f"❌ Synchronous preflight failed: {sync_error}")
+                # Update run status to failed
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE preflight_runs
+                    SET status = 'failed', error = %s
+                    WHERE run_id = %s
+                """, (str(sync_error), run_id))
+                conn.commit()
+                cursor.close()
         
         return PreflightStartResponse(
             run_id=run_id,

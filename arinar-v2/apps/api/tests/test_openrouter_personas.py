@@ -33,34 +33,29 @@ def test_openrouter_account_invalid_key():
 
 @patch('src.routes.openrouter.httpx.AsyncClient')
 def test_openrouter_account_success_with_credits_fallback(mock_client_class):
-    """Valid key returns account info, credits 403 fallback works"""
-    # Mock key info success
-    mock_key_response = MagicMock()
-    mock_key_response.status_code = 200
-    mock_key_response.raise_for_status = MagicMock()
-    mock_key_response.json.return_value = {
-        "data": {
-            "label": "test-key",
-            "usage": 12.5,
-            "limit": 50.0,
-            "rate_limit": {"requests": 200, "interval": "10s"}
-        }
+    """Valid key returns account info validated via models endpoint"""
+    # Mock models response (used for validation)
+    mock_models_response = MagicMock()
+    mock_models_response.status_code = 200
+    mock_models_response.raise_for_status = MagicMock()
+    mock_models_response.json.return_value = {
+        "data": [{"id": "model1"}, {"id": "model2"}]
     }
     
-    # Mock credits 403 (management key required)
+    # Mock auth/key response (optional, may not be available)
+    mock_key_response = MagicMock()
+    mock_key_response.status_code = 401  # Not available for regular keys
+    
+    # Mock credits response (not available for regular keys)
     mock_credits_response = MagicMock()
-    mock_credits_response.status_code = 403
-    credits_error = httpx.HTTPStatusError(
-        "403 Forbidden",
-        request=MagicMock(),
-        response=mock_credits_response
-    )
-    mock_credits_response.raise_for_status.side_effect = credits_error
+    mock_credits_response.status_code = 401
     
     # Mock async client to return different responses for different URLs
     mock_client = AsyncMock()
     async def mock_get(url, **kwargs):
-        if "auth/key" in url:
+        if "models" in url:
+            return mock_models_response
+        elif "auth/key" in url:
             return mock_key_response
         elif "credits" in url:
             return mock_credits_response
@@ -78,10 +73,12 @@ def test_openrouter_account_success_with_credits_fallback(mock_client_class):
     assert response.status_code == 200
     data = response.json()
     assert "key" in data
-    assert data["key"]["usage"] == 12.5
+    assert data["key"]["is_valid"] == True
+    assert data["key"]["validated_via"] == "models_endpoint"
+    assert data["models_available"] == 2
     assert data["credits"] is None
     assert "note" in data
-    assert "management key" in data["note"].lower()
+    assert "management" in data["note"].lower()
 
 
 # ============================================================================

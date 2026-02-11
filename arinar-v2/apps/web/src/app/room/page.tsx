@@ -27,11 +27,68 @@ export default function RoomPage() {
   const [debateTitle, setDebateTitle] = useState<string>('');
   const [debateState, setDebateState] = useState<string>('pending');
   const [participants, setParticipants] = useState<{ name: string; id: string }[]>([]);
+  const [onlineParticipants, setOnlineParticipants] = useState<Set<string>>(new Set());
+  const [typingParticipants, setTypingParticipants] = useState<Set<string>>(new Set());
+  const typingTimersRef = useState<Map<string, NodeJS.Timeout>>(new Map())[0];
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
     setDebateTitle(title);
     setDebateState(state);
+  };
+
+  // Presence join/leave (TICKET-14B)
+  useEffect(() => {
+    if (!debateId) return;
+
+    // Join presence
+    api.joinPresence(debateId).catch(err => {
+      console.error('Failed to join presence:', err);
+    });
+
+    // Leave presence on unmount
+    return () => {
+      api.leavePresence(debateId).catch(err => {
+        console.error('Failed to leave presence:', err);
+      });
+    };
+  }, [debateId]);
+
+  // Handle presence updates from EventFeed
+  const handlePresenceUpdate = (participantId: string, action: 'join' | 'leave') => {
+    setOnlineParticipants(prev => {
+      const next = new Set(prev);
+      if (action === 'join') {
+        next.add(participantId);
+      } else {
+        next.delete(participantId);
+      }
+      return next;
+    });
+  };
+
+  // Handle typing signals from EventFeed
+  const handleTyping = (participantId: string) => {
+    // Add to typing set
+    setTypingParticipants(prev => new Set(prev).add(participantId));
+
+    // Clear existing timer
+    const existing = typingTimersRef.get(participantId);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    // Remove after 3 seconds
+    const timer = setTimeout(() => {
+      setTypingParticipants(prev => {
+        const next = new Set(prev);
+        next.delete(participantId);
+        return next;
+      });
+      typingTimersRef.delete(participantId);
+    }, 3000);
+
+    typingTimersRef.set(participantId, timer);
   };
 
   // Load agenda data from localStorage

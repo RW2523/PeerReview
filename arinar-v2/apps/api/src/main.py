@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
-from .routes import health, agents, debates, events, openrouter, personas, materials, memory, preflight, artifacts, embeddings, workspace_settings
+from .routes import health, agents, debates, events, openrouter, personas, materials, memory, preflight, artifacts, embeddings, workspace_settings, presence
 
 
 app = FastAPI(
@@ -33,6 +33,7 @@ app.include_router(preflight.router, tags=["preflight"])
 app.include_router(artifacts.router, tags=["artifacts"])
 app.include_router(embeddings.router, tags=["embeddings"])
 app.include_router(workspace_settings.router, tags=["workspace-settings"])
+app.include_router(presence.router, tags=["presence"])
 
 
 if __name__ == "__main__":

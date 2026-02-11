@@ -3,75 +3,123 @@
 import { useState, useEffect, useRef } from 'react';
 import styles from './EventFeed.module.css';
 import * as api from '@/lib/api';
+import { SSEClient } from '@/lib/sseClient';
+import { getAccessToken } from '@/lib/supabase';
 
 interface Event {
   event_id: string;
   event_type: string;
   created_at: string;
   payload: any;
+  content?: any;
 }
 
 interface EventFeedProps {
   debateId: string;
+  onPresenceUpdate?: (participantId: string, action: 'join' | 'leave') => void;
+  onTyping?: (participantId: string) => void;
 }
 
-export default function EventFeed({ debateId }: EventFeedProps) {
+export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: EventFeedProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [error, setError] = useState<string | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const sseClientRef = useRef<SSEClient | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
   useEffect(() => {
     if (!debateId) return;
 
-    const streamUrl = api.getStreamUrl(debateId);
-    setConnectionStatus('connecting');
-    setError(null);
+    let mounted = true;
 
-    const eventSource = new EventSource(streamUrl);
-    eventSourceRef.current = eventSource;
+    const connect = async () => {
+      const streamUrl = api.getStreamUrl(debateId);
+      setConnectionStatus('connecting');
+      setError(null);
 
-    eventSource.onopen = () => {
-      setConnectionStatus('connected');
-    };
-
-    eventSource.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data);
-        
-        // Filter out keepalive events
-        if (event.event_type === 'keepalive') {
-          return;
-        }
-
-        setEvents((prev) => [...prev, event]);
-        
-        // Auto-scroll to bottom if user hasn't scrolled up
-        if (autoScroll && feedRef.current) {
-          setTimeout(() => {
-            feedRef.current?.scrollTo({
-              top: feedRef.current.scrollHeight,
-              behavior: 'smooth',
-            });
-          }, 100);
-        }
-      } catch (err) {
-        console.error('Failed to parse event:', err);
+      // Get auth token for SSE
+      const token = await getAccessToken();
+      const headers: Record<string, string> = {
+        'Accept': 'text/event-stream',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
+
+      const client = new SSEClient(streamUrl, {
+        headers,
+        onOpen: () => {
+          if (mounted) {
+            setConnectionStatus('connected');
+            setError(null);
+          }
+        },
+        onMessage: (msg) => {
+          if (!mounted) return;
+
+          try {
+            const event = JSON.parse(msg.data);
+            
+            // Filter out keepalive events
+            if (event.event_type === 'keepalive') {
+              return;
+            }
+
+            // Handle presence_update events
+            if (event.event_type === 'presence_update' && onPresenceUpdate) {
+              const payload = event.payload || event.content;
+              if (payload?.participant_id && payload?.action) {
+                onPresenceUpdate(payload.participant_id, payload.action);
+              }
+            }
+
+            // Handle typing events
+            if (event.event_type === 'typing' && onTyping) {
+              const payload = event.payload || event.content;
+              if (payload?.participant_id) {
+                onTyping(payload.participant_id);
+              }
+            }
+
+            setEvents((prev) => [...prev, event]);
+            
+            // Auto-scroll to bottom if user hasn't scrolled up
+            if (autoScroll && feedRef.current) {
+              setTimeout(() => {
+                feedRef.current?.scrollTo({
+                  top: feedRef.current.scrollHeight,
+                  behavior: 'smooth',
+                });
+              }, 100);
+            }
+          } catch (err) {
+            console.error('Failed to parse event:', err);
+          }
+        },
+        onError: (err) => {
+          if (mounted) {
+            setConnectionStatus('disconnected');
+            setError('Connection lost. Attempting to reconnect...');
+            console.error('SSE error:', err);
+          }
+        }
+      });
+
+      sseClientRef.current = client;
+      client.connect();
     };
 
-    eventSource.onerror = () => {
-      setConnectionStatus('disconnected');
-      setError('Connection lost. Attempting to reconnect...');
-    };
+    connect();
 
     return () => {
-      eventSource.close();
-      eventSourceRef.current = null;
+      mounted = false;
+      if (sseClientRef.current) {
+        sseClientRef.current.disconnect();
+        sseClientRef.current = null;
+      }
     };
-  }, [debateId, autoScroll]);
+  }, [debateId, autoScroll, onPresenceUpdate, onTyping]);
 
   const handleScroll = () => {
     if (!feedRef.current) return;

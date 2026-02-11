@@ -310,12 +310,16 @@ export interface OpenRouterAccountResponse {
     limit?: number | null;
     rate_limit?: any;
     is_free_tier?: boolean;
+    is_valid?: boolean;
+    validated_via?: string;
   };
   credits?: {
-    total_credits?: number;
-    total_usage?: number;
-    balance?: number;
+    total_credits?: number | null;
+    total_usage?: number | null;
+    balance?: number | null;
   } | null;
+  models_available?: number;
+  has_management_key?: boolean;
   note?: string | null;
 }
 
@@ -343,12 +347,21 @@ export async function listOpenRouterModels(openrouterKey: string): Promise<OpenR
   return response.json();
 }
 
-export async function getOpenRouterAccount(openrouterKey: string): Promise<OpenRouterAccountResponse> {
+export async function getOpenRouterAccount(
+  openrouterKey: string,
+  managementKey?: string | null
+): Promise<OpenRouterAccountResponse> {
+  const headers: Record<string, string> = {
+    'X-OpenRouter-Key': openrouterKey,
+  };
+  
+  if (managementKey) {
+    headers['X-OpenRouter-Management-Key'] = managementKey;
+  }
+  
   const response = await fetch(`${API_URL}/openrouter/account`, {
     method: 'GET',
-    headers: {
-      'X-OpenRouter-Key': openrouterKey,
-    },
+    headers,
   });
   
   if (!response.ok) {
@@ -800,5 +813,50 @@ export async function updateWorkspaceModels(
     throw new Error(`Failed to update workspace models: ${response.statusText} - ${errorText}`);
   }
   
+  return response.json();
+}
+
+// ============================================================================
+// Presence & Typing (TICKET-14)
+// ============================================================================
+
+export interface PresenceResponse {
+  event_id: string;
+  debate_id: string;
+  event_type: string;
+  sequence_number: number;
+  created_at: string;
+}
+
+export async function joinPresence(debateId: string, participantId?: string, metadata: any = {}): Promise<PresenceResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/presence/join`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ participant_id: participantId, metadata })
+  });
+  if (!response.ok) throw new Error(`Failed to join presence: ${response.statusText}`);
+  return response.json();
+}
+
+export async function leavePresence(debateId: string, participantId?: string): Promise<PresenceResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/presence/leave`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ participant_id: participantId })
+  });
+  if (!response.ok) throw new Error(`Failed to leave presence: ${response.statusText}`);
+  return response.json();
+}
+
+export async function signalTyping(debateId: string, participantId?: string, targetParticipantId?: string): Promise<PresenceResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/typing`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ participant_id: participantId, target_participant_id: targetParticipantId })
+  });
+  if (!response.ok) throw new Error(`Failed to signal typing: ${response.statusText}`);
   return response.json();
 }

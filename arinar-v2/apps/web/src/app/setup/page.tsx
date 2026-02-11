@@ -232,13 +232,22 @@ export default function SetupPage() {
         </div>
 
         <div className={styles.navigation}>
-          {step > 1 && step !== 5 && (
+          {step > 1 && (
             <button 
-              onClick={() => setStep(step - 1)} 
+              onClick={() => {
+                // Allow going back to edit earlier steps
+                if (step === 5 || step === 6) {
+                  // From Preflight/Review, go back to Memory Import
+                  setStep(4);
+                } else {
+                  setStep(step - 1);
+                }
+              }} 
               disabled={isLoading}
-              className={styles.btnSecondary}
+              className={styles.btnPrevious}
             >
-              ← Previous
+              <span className={styles.btnIcon}>←</span>
+              <span>Previous</span>
             </button>
           )}
           
@@ -248,9 +257,10 @@ export default function SetupPage() {
             <button
               onClick={() => setStep(step + 1)}
               disabled={!canGoNext() || isLoading}
-              className={styles.btnPrimary}
+              className={styles.btnNext}
             >
-              {isLoading ? 'Loading...' : 'Next →'}
+              <span>{isLoading ? 'Loading...' : 'Next'}</span>
+              <span className={styles.btnIcon}>→</span>
             </button>
           )}
           
@@ -258,9 +268,10 @@ export default function SetupPage() {
             <button
               onClick={handleCreateDebate}
               disabled={!canGoNext() || isLoading}
-              className={styles.btnPrimary}
+              className={styles.btnNext}
             >
-              {isLoading ? 'Creating...' : 'Create & Prepare →'}
+              <span>{isLoading ? 'Creating...' : 'Create & Prepare'}</span>
+              <span className={styles.btnIcon}>→</span>
             </button>
           )}
           
@@ -271,7 +282,8 @@ export default function SetupPage() {
               className={styles.btnLaunch}
               title={!canEnterRoom ? 'Complete agent preparation first' : ''}
             >
-              {isLoading ? 'Loading...' : 'Enter Room'}
+              <span className={styles.launchIcon}>🚀</span>
+              <span>{isLoading ? 'Loading...' : 'Launch Meeting'}</span>
             </button>
           )}
         </div>
