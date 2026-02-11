@@ -218,27 +218,22 @@ def start_preflight(
         
         conn.commit()
         
-        # Try to enqueue Celery task, fallback to synchronous execution
+        # Import the implementation function
+        from src.tasks.preflight import orchestrate_preflight_impl
+        
+        # Always run inline for V1 (Celery setup deferred to production)
+        print(f"🔄 Running preflight inline (will block request ~5-10s)")
         try:
-            orchestrate_preflight.delay(run_id, debate_id)
-            print(f"✅ Preflight task enqueued for run_id={run_id}")
-        except Exception as celery_error:
-            print(f"⚠️  Celery unavailable, running preflight synchronously: {celery_error}")
-            # Fallback: run synchronously (blocks request, but ensures it runs)
-            try:
-                orchestrate_preflight(run_id, debate_id)
-                print(f"✅ Preflight completed synchronously for run_id={run_id}")
-            except Exception as sync_error:
-                print(f"❌ Synchronous preflight failed: {sync_error}")
-                # Update run status to failed
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE preflight_runs
-                    SET status = 'failed', error = %s
-                    WHERE run_id = %s
-                """, (str(sync_error), run_id))
-                conn.commit()
-                cursor.close()
+            orchestrate_preflight_impl(run_id, debate_id)
+            print(f"✅ Preflight completed inline: run_id={run_id}")
+        except Exception as e:
+            print(f"❌ Preflight failed: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Preflight execution failed: {str(e)}"
+            )
         
         return PreflightStartResponse(
             run_id=run_id,

@@ -9,19 +9,32 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from psycopg2.extras import Json
 
-from src.celery_app import celery_app
 from src.config import settings
 from src.services.memory_retrieval import retrieve_allowed_chunks
-from src.openrouter_client import OpenRouterClient
+
+# Try to import Celery, but make it optional
+try:
+    from src.celery_app import celery_app
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+    celery_app = None
+
+# Try to import OpenRouterClient
+try:
+    from src.openrouter_client import OpenRouterClient
+except ImportError:
+    OpenRouterClient = None
 
 
-@celery_app.task(name='tasks.preflight.orchestrate_preflight')
-def orchestrate_preflight(run_id: str, debate_id: str):
+def orchestrate_preflight_impl(run_id: str, debate_id: str):
     """
     Main orchestrator task for preflight preparation
     
     Fans out to prepare_participant_preflight for each participant
     """
+    print(f"🚀 Starting preflight orchestration: run_id={run_id}, debate_id={debate_id}")
+    
     conn = psycopg2.connect(settings.database_url)
     cursor = conn.cursor()
     
@@ -33,6 +46,7 @@ def orchestrate_preflight(run_id: str, debate_id: str):
             WHERE run_id = %s
         """, (run_id,))
         conn.commit()
+        print(f"✅ Updated preflight run status to 'running'")
         
         # Get all participants for this run
         cursor.execute("""
@@ -55,15 +69,20 @@ def orchestrate_preflight(run_id: str, debate_id: str):
         
         # Process each participant synchronously (V1 simplicity)
         # Later: can use Celery group/chord for parallel execution
+        print(f"📋 Processing {len(participant_runs)} participants...")
         for participant_run_id, participant_id in participant_runs:
             try:
+                print(f"  → Processing participant {participant_id}...")
                 prepare_participant_preflight(
                     participant_run_id=participant_run_id,
                     participant_id=participant_id,
                     debate_id=debate_id
                 )
+                print(f"  ✅ Participant {participant_id} prepared successfully")
             except Exception as e:
-                print(f"Error preparing participant {participant_id}: {e}")
+                print(f"  ❌ Error preparing participant {participant_id}: {e}")
+                import traceback
+                traceback.print_exc()
                 # Continue with other participants
         
         # Check if all participants completed
@@ -75,12 +94,15 @@ def orchestrate_preflight(run_id: str, debate_id: str):
         """, (run_id,))
         
         status_counts = dict(cursor.fetchall())
+        print(f"📊 Participant status summary: {status_counts}")
         
         # Determine overall run status
         if status_counts.get('failed', 0) > 0 or status_counts.get('running', 0) > 0:
             final_status = 'failed' if status_counts.get('failed', 0) > 0 else 'running'
         else:
             final_status = 'completed'
+        
+        print(f"🏁 Preflight orchestration complete: status={final_status}")
         
         cursor.execute("""
             UPDATE preflight_runs
@@ -112,6 +134,8 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
     3. Generate prep pack via OpenRouter
     4. Persist as agent_knowledge_units
     """
+    print(f"    🔄 Preparing participant: run_id={participant_run_id}, participant={participant_id}")
+    
     conn = psycopg2.connect(settings.database_url)
     cursor = conn.cursor()
     
@@ -123,6 +147,7 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
             WHERE participant_run_id = %s
         """, (participant_run_id,))
         conn.commit()
+        print(f"    ✓ Status updated to 'running'")
         
         # 1. Get participant details and resolve agent
         cursor.execute("""
@@ -139,13 +164,49 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         agent_config, debate_title, policy_config = result
         
         # Extract agent details
+        # agent_id can be None for inline agents (created from templates)
         agent_id = agent_config.get('agent_id') if agent_config else None
         model_id = agent_config.get('model_id', 'anthropic/claude-3.5-sonnet')
         system_prompt = agent_config.get('system_prompt', '')
         model_config = agent_config.get('model_config', {})
+        agent_name = agent_config.get('name', 'Participant')
         
+        # For inline agents (no agent_id), create a temporary agent record
+        # This is needed because agent_knowledge_units has a NOT NULL FK to agents table
         if not agent_id:
-            raise ValueError(f"Participant {participant_id} has no agent_id in agent_config")
+            # Check if agent already exists for this participant
+            cursor.execute("""
+                SELECT agent_id FROM agents WHERE agent_id = %s
+            """, (participant_id,))
+            
+            existing_agent = cursor.fetchone()
+            
+            if not existing_agent:
+                # Create agent record using participant_id
+                # Get workspace_id from debate
+                cursor.execute("""
+                    SELECT workspace_id FROM debates WHERE debate_id = %s
+                """, (debate_id,))
+                workspace_id = cursor.fetchone()[0]
+                
+                cursor.execute("""
+                    INSERT INTO agents (agent_id, workspace_id, name, system_prompt, model_id, model_config, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                """, (
+                    participant_id,
+                    workspace_id,
+                    f"{agent_name} (Inline)",
+                    system_prompt,
+                    model_id,
+                    Json(model_config) if model_config else None
+                ))
+                conn.commit()
+                print(f"    ✓ Created temporary agent record for inline participant")
+            
+            agent_id = participant_id
+        
+        effective_agent_id = agent_id
+        print(f"    ✓ Agent identity: id={effective_agent_id}")
         
         # Update participant run with agent_id
         cursor.execute("""
@@ -156,6 +217,7 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         conn.commit()
         
         # 2. Gather context using semantic retrieval (TICKET-13C, TICKET-13C.1)
+        print(f"    🔍 Gathering context...")
         problem_statement = policy_config.get('problem_statement', '') if policy_config else ''
         
         # Get pre-computed query embedding from participant_run metadata (BYOK-safe)
@@ -186,8 +248,9 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
             all_chunks = memory_retrieval_result.chunks
             grant_ids_used = memory_retrieval_result.grant_ids_used
             retrieval_method = memory_retrieval_result.retrieval_method
+            print(f"    ✓ Retrieved {len(all_chunks)} chunks via {retrieval_method}")
         except Exception as e:
-            print(f"Memory retrieval failed for {participant_id}: {e}")
+            print(f"    ⚠️  Memory retrieval failed: {e}")
             all_chunks = []
             grant_ids_used = []
             retrieval_method = 'error'
@@ -240,6 +303,7 @@ Be specific and cite information where possible."""
         
         if not openrouter_key:
             # For V1, create a placeholder prep pack (no real OpenRouter call)
+            print(f"    📝 Generating placeholder prep pack (no OpenRouter key)")
             prep_pack_content = f"""**Preparation Memo**
 
 **Role**: {system_prompt[:100] if system_prompt else 'Strategic advisor'}
@@ -258,6 +322,7 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
 
 **Status**: Generated successfully with {len(material_chunks)} material chunks and {len(imported_chunks)} imported memory chunks."""
         else:
+            print(f"    🤖 Calling OpenRouter for prep pack generation...")
             # Real OpenRouter call
             try:
                 client = OpenRouterClient(api_key=openrouter_key)
@@ -278,6 +343,7 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
         material_chunk_ids = [str(chunk.chunk_id) for chunk in material_chunks]
         imported_chunk_ids = [str(chunk.chunk_id) for chunk in imported_chunks]
         
+        # Use effective_agent_id for knowledge persistence
         cursor.execute("""
             INSERT INTO agent_knowledge_units (
                 knowledge_id, agent_id, source_debate_id, knowledge_type, content, metadata, created_at
@@ -286,12 +352,14 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
             )
             RETURNING knowledge_id
         """, (
-            agent_id,
+            effective_agent_id,
             debate_id,
             prep_pack_content,
             Json({
                 'created_by': 'preflight',
                 'participant_id': participant_id,
+                'participant_name': agent_name,
+                'is_inline_agent': agent_id is None,
                 'material_chunks_count': len(material_chunks),
                 'imported_chunks_count': len(imported_chunks),
                 'grant_ids_used': grant_ids_used,
@@ -305,6 +373,7 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
         ))
         
         prep_pack_knowledge_id = cursor.fetchone()[0]
+        print(f"    ✓ Prep pack persisted: knowledge_id={prep_pack_knowledge_id}")
         
         # 6. Update participant run to success (TICKET-13C: include retrieval metadata)
         cursor.execute("""
@@ -327,16 +396,30 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
             participant_run_id
         ))
         conn.commit()
+        print(f"    ✅ Participant preparation complete!")
         
     except Exception as e:
+        # Rollback any failed transaction first
+        conn.rollback()
         # Update participant run to failed
-        cursor.execute("""
-            UPDATE preflight_participant_runs
-            SET status = 'failed', error = %s, completed_at = NOW()
-            WHERE participant_run_id = %s
-        """, (str(e), participant_run_id))
-        conn.commit()
+        try:
+            cursor.execute("""
+                UPDATE preflight_participant_runs
+                SET status = 'failed', error = %s, completed_at = NOW()
+                WHERE participant_run_id = %s
+            """, (str(e), participant_run_id))
+            conn.commit()
+        except Exception as update_error:
+            print(f"    ⚠️  Failed to update participant status: {update_error}")
         raise
     finally:
         cursor.close()
         conn.close()
+
+
+# Create Celery task wrapper if Celery is available
+if CELERY_AVAILABLE and celery_app:
+    orchestrate_preflight = celery_app.task(name='tasks.preflight.orchestrate_preflight')(orchestrate_preflight_impl)
+else:
+    # No Celery - use implementation directly
+    orchestrate_preflight = orchestrate_preflight_impl
