@@ -11,7 +11,7 @@ export interface UsePreflightResult {
   isPolling: boolean;
   error: string | null;
   
-  startPreflight: (debateId: string) => Promise<void>;
+  startPreflight: (debateId: string, openrouterKey?: string | null) => Promise<void>;
   retryParticipant: (debateId: string, participantId: string) => Promise<void>;
   skipParticipant: (debateId: string, participantId: string, reason: string) => Promise<void>;
   refreshStatus: (debateId: string) => Promise<void>;

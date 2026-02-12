@@ -88,23 +88,56 @@ class TurnOrchestrator:
             model_id = agent_config.get('model_id', 'openai/gpt-4o-mini')
             system_prompt = agent_config.get('system_prompt', '')
             
+            # Get prep pack for this agent
+            cursor.execute("""
+                SELECT content, metadata
+                FROM agent_knowledge_units
+                WHERE agent_id = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (next_participant['participant_id'],))
+            
+            prep_pack_row = cursor.fetchone()
+            prep_pack = prep_pack_row['content'] if prep_pack_row else None
+            
+            # Get agenda and desired outcomes
+            agenda = policy_config.get('agenda', [])
+            desired_outcomes = policy_config.get('desired_outcomes', [])
+            
             # Build prompt
             messages = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             
+            # Context message with topic, agenda, outcomes
+            context_parts = [f"Debate Topic: {debate['title'] or 'Untitled Debate'}"]
+            if debate['description']:
+                context_parts.append(f"Problem: {debate['description']}")
+            if agenda:
+                context_parts.append(f"Agenda:\n" + "\n".join(f"  - {item}" for item in agenda))
+            if desired_outcomes:
+                context_parts.append(f"Desired Outcomes:\n" + "\n".join(f"  - {item}" for item in desired_outcomes))
+            
             messages.append({
                 "role": "system",
-                "content": f"Debate Topic: {debate['title'] or 'Untitled Debate'}\nProblem: {debate['description'] or 'No description'}"
+                "content": "\n\n".join(context_parts)
             })
+            
+            # Add prep pack if available and valid
+            if prep_pack and not prep_pack.startswith("Error"):
+                messages.append({
+                    "role": "system",
+                    "content": f"Your preparation notes:\n{prep_pack}"
+                })
             
             # Add conversation history
             messages.extend(conversation_history)
             
-            # Add turn instruction
+            # Add turn instruction with persona/role context
+            role_context = agent_config.get('description', f"You are {agent_name}")
             messages.append({
                 "role": "user",
-                "content": f"You are {agent_name}. It's your turn to contribute to the discussion. Share your perspective, insights, or respond to previous points. Keep it concise (2-3 paragraphs)."
+                "content": f"{role_context}\n\nIt's your turn to contribute to the discussion. Share your unique perspective, respond to previous points, or advance the conversation. Keep it concise (2-3 paragraphs) and stay in character."
             })
             
             # Call OpenRouter

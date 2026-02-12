@@ -339,8 +339,10 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                     ],
                     **model_config
                 )
-                prep_pack_content = response.get('choices', [{}])[0].get('message', {}).get('content', 'Error generating prep pack')
+                prep_pack_content = response.get('content', 'Error generating prep pack')
+                print(f"    ✅ Generated prep pack: {len(prep_pack_content)} chars")
             except Exception as e:
+                print(f"    ❌ OpenRouter error: {str(e)}")
                 prep_pack_content = f"Error calling OpenRouter: {str(e)}\n\nFallback prep pack with {len(material_chunks)} materials and {len(imported_chunks)} imported chunks."
         
         # 5. Persist prep pack as agent_knowledge_units (TICKET-13C: include retrieval metadata)

@@ -23,6 +23,47 @@ interface PreflightStepProps {
   desiredOutcomes?: string[];
 }
 
+// Animated status component for running agents
+function AnimatedStatus({ participantRunId }: { participantRunId: string }) {
+  const [detailState, setDetailState] = useState(0);
+  
+  useEffect(() => {
+    const stages = [
+      '📖 Reading topic and goals',
+      '🔍 Analyzing materials',
+      '🧠 Researching context',
+      '✍️ Generating insights',
+    ];
+    
+    let currentStage = 0;
+    const interval = setInterval(() => {
+      currentStage = (currentStage + 1) % stages.length;
+      setDetailState(currentStage);
+    }, 3000); // Change every 3 seconds
+    
+    return () => clearInterval(interval);
+  }, [participantRunId]);
+  
+  const stages = [
+    '📖 Reading topic and goals',
+    '🔍 Analyzing materials',
+    '🧠 Researching context',
+    '✍️ Generating insights',
+  ];
+  
+  return (
+    <div style={{ 
+      fontSize: '0.875rem', 
+      color: 'var(--text-muted)', 
+      marginTop: '0.5rem',
+      fontStyle: 'italic',
+      animation: 'pulse 2s ease-in-out infinite'
+    }}>
+      {stages[detailState]}
+    </div>
+  );
+}
+
 export function PreflightStep({
   debateId,
   participants,
@@ -55,6 +96,7 @@ export function PreflightStep({
   const [prepPackDialogOpen, setPrepPackDialogOpen] = useState(false);
   const [prepPackContent, setPrepPackContent] = useState<string | null>(null);
   const [prepPackParticipantId, setPrepPackParticipantId] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   // Notify parent when readiness changes
   useEffect(() => {
@@ -74,10 +116,12 @@ export function PreflightStep({
       return;
     }
     
+    setIsStarting(true);
     try {
       await startPreflight(debateId, apiKey);
-      } catch (err: any) {
+    } catch (err: any) {
       console.error('Failed to start preflight:', err);
+      setIsStarting(false);
     }
   };
 
@@ -139,7 +183,7 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
   const getParticipantRole = (participantId: string): string => {
     const index = participantIds.indexOf(participantId);
     if (index !== -1 && index < participants.length) {
-      return participants[index].role || participants[index].role_description || 'Agent';
+      return participants[index].role_description || 'Agent';
     }
     return 'Agent';
   };
@@ -153,13 +197,13 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
       .slice(0, 2);
   };
 
-  const getStatusPill = (status: string) => {
+  const getStatusPill = (status: string, participantRunId?: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
-      queued: { label: 'Queued', className: styles.statusQueued },
-      running: { label: 'Preparing...', className: styles.statusRunning },
-      success: { label: 'Ready', className: styles.statusSuccess },
-      failed: { label: 'Failed', className: styles.statusFailed },
-      skipped: { label: 'Skipped', className: styles.statusSkipped },
+      queued: { label: '⏳ Waiting...', className: styles.statusQueued },
+      running: { label: '🚀 Preparing...', className: styles.statusRunning },
+      success: { label: '✅ Ready for debate', className: styles.statusSuccess },
+      failed: { label: '❌ Failed', className: styles.statusFailed },
+      skipped: { label: '⏭️ Skipped', className: styles.statusSkipped },
     };
     
     const config = statusMap[status] || { label: status, className: '' };
@@ -195,7 +239,7 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
         </div>
       )}
 
-      {!isStarted && (
+      {!isStarted && !isStarting && (
         <div style={{ marginTop: '2rem' }}>
           <button
             onClick={handleStartPreflight}
@@ -206,6 +250,16 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
           </button>
           <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
             This will gather context and prepare each agent. Takes ~5-15 seconds per agent.
+          </p>
+        </div>
+      )}
+
+      {isStarting && !isStarted && (
+        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🚀</div>
+          <p style={{ fontSize: '1rem', fontWeight: 500 }}>Initializing agent preparation...</p>
+          <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            Setting up context and materials
           </p>
         </div>
       )}
@@ -236,7 +290,10 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
                   </div>
                   <div className={styles.participantInfo}>
                     <div className={styles.participantName}>{name}</div>
-                    {getStatusPill(participantRun.status)}
+                    {getStatusPill(participantRun.status, participantRun.participant_run_id)}
+                    {participantRun.status === 'running' && (
+                      <AnimatedStatus participantRunId={participantRun.participant_run_id} />
+                    )}
                   </div>
                   <div className={styles.participantActions}>
                     {participantRun.status === 'failed' && (

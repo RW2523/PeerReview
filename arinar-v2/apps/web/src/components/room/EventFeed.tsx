@@ -67,25 +67,31 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
               return;
             }
 
-            // Filter out keepalive events
+            // Filter out keepalive and internal system events
             if (event.event_type === 'keepalive') {
               return;
             }
 
-            // Handle presence_update events
-            if (event.event_type === 'presence_update' && onPresenceUpdate) {
-              const payload = event.payload || event.content;
-              if (payload?.participant_id && payload?.action) {
-                onPresenceUpdate(payload.participant_id, payload.action);
+            // Handle presence_update events (but don't show in feed)
+            if (event.event_type === 'presence_update') {
+              if (onPresenceUpdate) {
+                const payload = event.payload || event.content;
+                if (payload?.participant_id && payload?.action) {
+                  onPresenceUpdate(payload.participant_id, payload.action);
+                }
               }
+              return; // Don't add to feed
             }
 
-            // Handle typing events
-            if (event.event_type === 'typing' && onTyping) {
-              const payload = event.payload || event.content;
-              if (payload?.participant_id) {
-                onTyping(payload.participant_id);
+            // Handle typing events (but don't show in feed)
+            if (event.event_type === 'typing') {
+              if (onTyping) {
+                const payload = event.payload || event.content;
+                if (payload?.participant_id) {
+                  onTyping(payload.participant_id);
+                }
               }
+              return; // Don't add to feed
             }
 
             // Ensure event has an ID (generate one if missing)
@@ -94,7 +100,14 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
               console.warn('Event missing event_id, generated temporary ID:', event.event_id);
             }
 
-            setEvents((prev) => [...prev, event]);
+            // Only add if not already in state (prevent duplicates)
+            setEvents((prev) => {
+              const exists = prev.some(e => e.event_id === event.event_id);
+              if (exists) {
+                return prev;
+              }
+              return [...prev, event];
+            });
             
             // Auto-scroll to bottom if user hasn't scrolled up
             if (autoScroll && feedRef.current) {
