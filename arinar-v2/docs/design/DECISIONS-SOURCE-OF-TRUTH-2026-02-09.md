@@ -22,6 +22,7 @@ Create a new decisions doc with a new date and explicitly call out what changed 
 - Design specs:
   - `arinar-v2/docs/design/AGENT-PREPARATION-ARCHITECTURE.md`
   - `arinar-v2/docs/design/CUSTOM-AGENTS-UI-SPEC.md`
+  - `arinar-v2/docs/design/WEBSOCKET-ROOM-AND-LIVE-BOARD-PLAN.md`
 
 ## Non-Negotiables
 1. OpenRouter-only (BYOK).
@@ -74,6 +75,17 @@ Explicit V2 features (not required for V1):
   - artifact can be generated immediately from owned sections
   - coherence pass runs asynchronously and produces a "polished" version
   - user can accept/reject coherence output
+
+### Realtime Transport (Room + Artifacts)
+- Decision: WebSocket-first for all realtime room and artifact collaboration.
+- Scope:
+  - room feed and state updates
+  - presence/typing
+  - host controls
+  - artifact drafting deltas and quality events
+- REST remains for setup/history/settings/materials.
+- SSE is compatibility-only and must not be the primary path for `/room` or live artifact collaboration.
+- Reference: `arinar-v2/docs/design/WEBSOCKET-ROOM-AND-LIVE-BOARD-PLAN.md`.
 
 ### Memory Import
 - Decision: Ship in V1 (enterprise requirement).
@@ -147,7 +159,7 @@ Reuse and extend:
 - `meeting_materials`: material metadata + processing status
 - `memory_chunks`: all chunks (materials, artifacts, etc.) with provenance in metadata
 - `agent_knowledge_units`: durable prep packs, imported knowledge, finalized artifact commits
-- `events`: immutable event ledger (including streaming deltas)
+- `events`: immutable event ledger (including WebSocket-streamed deltas)
 - `memory_access_log`: audit retrieval
 
 Avoid:
@@ -155,6 +167,6 @@ Avoid:
 - `agent_briefings`
 
 ## Open Items (Must Be Spec’d Before Coding Those Areas)
-1. Live artifacts technical spec (events, API contracts, SSE deltas, coherence workflow).
+1. Live artifacts technical spec (events, API contracts, WebSocket deltas, coherence workflow).
 2. Memory import UX spec (import preview, allowlist editing, “what is shared” clarity).
 3. Cost analysis update including artifact generation (documentation only; not a blocker for early pipeline work).

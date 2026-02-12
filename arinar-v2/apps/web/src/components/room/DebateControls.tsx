@@ -4,14 +4,16 @@ import { useState } from 'react';
 import styles from './DebateControls.module.css';
 import * as api from '@/lib/api';
 import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
+import { WSCommandType, WSAckMessage } from '@/lib/wsClient';
 
 interface DebateControlsProps {
   debateId: string;
   currentState: string;
   onStateChange: (newState: string) => void;
+  sendCommand?: (command: WSCommandType, payload?: Record<string, any>) => Promise<WSAckMessage>;
 }
 
-export default function DebateControls({ debateId, currentState, onStateChange }: DebateControlsProps) {
+export default function DebateControls({ debateId, currentState, onStateChange, sendCommand }: DebateControlsProps) {
   const { apiKey } = useOpenRouterKey();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +37,13 @@ export default function DebateControls({ debateId, currentState, onStateChange }
     setLoading(true);
     setError(null);
     try {
-      const result = await api.pauseDebate(debateId);
-      onStateChange(result.state);
+      if (sendCommand) {
+        await sendCommand('control.pause');
+        onStateChange('paused');
+      } else {
+        const result = await api.pauseDebate(debateId);
+        onStateChange(result.state);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to pause debate');
     } finally {
@@ -48,8 +55,13 @@ export default function DebateControls({ debateId, currentState, onStateChange }
     setLoading(true);
     setError(null);
     try {
-      const result = await api.resumeDebate(debateId);
-      onStateChange(result.state);
+      if (sendCommand) {
+        await sendCommand('control.resume');
+        onStateChange('running');
+      } else {
+        const result = await api.resumeDebate(debateId);
+        onStateChange(result.state);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resume debate');
     } finally {
@@ -62,8 +74,13 @@ export default function DebateControls({ debateId, currentState, onStateChange }
     setLoading(true);
     setError(null);
     try {
-      const result = await api.endDebate(debateId);
-      onStateChange(result.state);
+      if (sendCommand) {
+        await sendCommand('control.end');
+        onStateChange('ended');
+      } else {
+        const result = await api.endDebate(debateId);
+        onStateChange(result.state);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to end debate');
     } finally {
@@ -80,8 +97,12 @@ export default function DebateControls({ debateId, currentState, onStateChange }
     setTriggeringTurn(true);
     setError(null);
     try {
-      await api.triggerNextTurn(debateId, apiKey);
-      // Success! The event will appear in the feed via SSE
+      if (sendCommand) {
+        await sendCommand('control.next_turn', { openrouter_key: apiKey });
+      } else {
+        await api.triggerNextTurn(debateId, apiKey);
+      }
+      // Success! The event will appear in the feed
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to trigger agent turn');
     } finally {

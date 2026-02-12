@@ -64,7 +64,7 @@ export function ParticipantsStep({
     return participants.some(p => 
       p.name && templates.find(t => 
         t.template_id === templateId && 
-        t.name === p.name
+        t.label === p.name
       )
     );
   };

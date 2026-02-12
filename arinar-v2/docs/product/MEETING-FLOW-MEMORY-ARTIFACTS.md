@@ -19,6 +19,23 @@ Non-negotiables:
 - Provenance-first: anything the system "knows" must be traceable to a source (material, prior artifact, meeting event, or approved web citation).
 - Long-context quality: we will not “stuff everything into one prompt”. We use an RLM-style multi-pass approach (plan -> retrieve slices -> draft -> verify/merge) for prep packs, artifacts, and summaries. See: `arinar-v2/docs/design/RLM-APPLICATION-TO-ARINAR.md`.
 
+## Realtime Transport Decision (Authoritative)
+For all room and live artifact collaboration features, Arinar uses **WebSockets** as the primary realtime transport.
+
+Scope:
+- Debate room live feed
+- Presence and typing
+- Host controls (pause/resume/next/end)
+- Live artifact deltas (including charts/diagrams blocks)
+
+Rules:
+- REST stays for setup/history/settings/materials.
+- SSE may remain temporarily for backward compatibility only, but `/room` and live artifact UX must be WebSocket-first.
+- Realtime messages must use one shared event envelope and ordered sequence numbers per debate.
+
+Implementation reference:
+- `arinar-v2/docs/design/WEBSOCKET-ROOM-AND-LIVE-BOARD-PLAN.md`
+
 ## Core Concepts
 ### A. Agents (Reusable Profiles)
 Agents are reusable "people-like" profiles stored in a workspace.
@@ -299,7 +316,7 @@ Block model (recommended):
 V1 can be "single-writer per section" with server-authoritative section text.
 V2 can adopt CRDT (e.g., Yjs) for true collaborative editing with humans.
 For AI-only coauthoring, streaming patch events are sufficient:
-- `artifact_section_delta` events via SSE
+- `artifact_section_delta` events via WebSocket
 - `artifact_section_committed` events when an agent finishes a chunk
 
 ## Export / Download (PDF + Word) (V1)
@@ -346,11 +363,13 @@ Host can require approval for live research:
    - agent prep pack format
    - storage and retrieval
 4. Live artifact engine:
-   - templates, assignment, streaming deltas, coherence pass
+   - templates, assignment, WebSocket streaming deltas, coherence pass
 5. Policies:
    - internet mode
    - tool calling (future MCP)
    - citation strictness
+6. Realtime transport implementation details:
+   - `arinar-v2/docs/design/WEBSOCKET-ROOM-AND-LIVE-BOARD-PLAN.md`
 
 ## Acceptance Criteria (Product)
 The system is "working" when a non-technical user can:

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AppNav from '@/components/layout/AppNav';
 import DebateSelector from '@/components/room/DebateSelector';
@@ -9,6 +9,7 @@ import DebateControls from '@/components/room/DebateControls';
 import AgendaPanel from '@/components/room/AgendaPanel';
 import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
+import { useDebateRoom } from '@/hooks/useDebateRoom';
 import * as api from '@/lib/api';
 import styles from './room.module.css';
 
@@ -17,13 +18,13 @@ import styles from './room.module.css';
  * 
  * Data Isolation: All components receive debateId prop and only fetch/display
  * data for that specific debate. No cross-debate data leakage.
- * - EventFeed: filters events by debateId via SSE stream
+ * - EventFeed: filters events by debateId via WebSocket stream
  * - DebateControls: actions scoped to debateId
  * - InterveneComposer: interventions sent to debateId
  * - SummaryReport: summary generated for debateId
  * - AgendaPanel: localStorage keyed by debateId
  */
-export default function RoomPage() {
+function RoomPageContent() {
   const searchParams = useSearchParams();
   const [debateId, setDebateId] = useState<string | null>(null);
   const [debateTitle, setDebateTitle] = useState<string>('');
@@ -54,22 +55,28 @@ export default function RoomPage() {
     }
   }, [searchParams, debateId]);
 
-  // Presence join/leave (TICKET-14B)
-  useEffect(() => {
-    if (!debateId) return;
+  // WebSocket connection for realtime room transport
+  const { sendCommand, connectionStatus } = useDebateRoom({
+    debateId: debateId || '',
+    enabled: !!debateId && debateState !== 'ended',
+  });
 
-    // Join presence
-    api.joinPresence(debateId).catch(err => {
+  // Presence join/leave via WebSocket
+  useEffect(() => {
+    if (!debateId || !sendCommand || connectionStatus !== 'connected') return;
+
+    // Join presence via WebSocket
+    sendCommand('join_presence').catch(err => {
       console.error('Failed to join presence:', err);
     });
 
     // Leave presence on unmount
     return () => {
-      api.leavePresence(debateId).catch(err => {
+      sendCommand('leave_presence').catch(err => {
         console.error('Failed to leave presence:', err);
       });
     };
-  }, [debateId]);
+  }, [debateId, sendCommand, connectionStatus]);
 
   // Handle presence updates from EventFeed
   const handlePresenceUpdate = (participantId: string, action: 'join' | 'leave') => {
@@ -209,6 +216,7 @@ export default function RoomPage() {
               debateId={debateId}
               currentState={debateState}
               onStateChange={(newState) => setDebateState(newState)}
+              sendCommand={sendCommand}
             />
             
             <AgendaPanel debateId={debateId} />
@@ -221,5 +229,13 @@ export default function RoomPage() {
       </aside>
       </div>
     </>
+  );
+}
+
+export default function RoomPage() {
+  return (
+    <Suspense fallback={<div>Loading room...</div>}>
+      <RoomPageContent />
+    </Suspense>
   );
 }

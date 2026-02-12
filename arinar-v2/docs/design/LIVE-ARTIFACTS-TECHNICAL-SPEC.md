@@ -4,6 +4,7 @@
 **Status:** Draft (Ready for Engineering Review)  
 **Authority:** `/docs/design/DECISIONS-SOURCE-OF-TRUTH-2026-02-09.md`  
 **Related:** `/docs/product/MEETING-FLOW-MEMORY-ARTIFACTS.md`
+**Realtime Plan:** `arinar-v2/docs/design/WEBSOCKET-ROOM-AND-LIVE-BOARD-PLAN.md`
 
 ---
 
@@ -16,7 +17,7 @@ Long-context note: artifact drafting is implemented as an **RLM-style** multi-pa
 **V1 Scope** (This Spec):
 - ✅ Templates with section definitions
 - ✅ Section ownership and assignment
-- ✅ Streaming drafts via SSE (agents "type" live)
+- ✅ Streaming drafts via WebSocket (agents "type" live)
 - ✅ Coherence pass (LLM + deterministic checks, non-blocking)
 - ✅ Versioning (draft auto-save + user-marked final versions)
 - ✅ User interventions (comment, request rewrite, lock section)
@@ -28,7 +29,7 @@ Long-context note: artifact drafting is implemented as an **RLM-style** multi-pa
 
 1. [Data Model](#data-model)
 2. [API Contracts](#api-contracts)
-3. [SSE Event Types](#sse-event-types)
+3. [WebSocket Event Types](#websocket-event-types)
 4. [Block Types & Rendering](#block-types--rendering)
 5. [Quality Checks](#quality-checks)
 6. [Coherence Pass Workflow](#coherence-pass-workflow)
@@ -279,7 +280,7 @@ Agent commits a section draft.
 
 **Behavior**:
 - Creates `agent_knowledge_units` row with section content
-- Emits `artifact_section_committed` SSE event
+- Emits `artifact_section_committed` WebSocket event
 - Updates artifact `updated_at` timestamp
 
 ---
@@ -435,10 +436,14 @@ Export artifact to PDF or DOCX.
 
 ---
 
-## SSE Event Types
+## WebSocket Event Types
 
 ### **artifact_section_delta**
 Streamed as agent drafts section content.
+
+Transport envelope:
+- Event payloads are sent over `/ws/debates/{debate_id}`.
+- Every event must include debate-scoped ordering (`sequence_number`) and an `event_id`.
 
 **JSON Schema** (to be added to `packages/contracts/schemas/events/`):
 ```json
@@ -1259,7 +1264,7 @@ Shorter, action-focused.
 ## Implementation Notes
 
 ### Phase 1: Static Artifact (Optional Simplification)
-If streaming proves complex, V1.0 can ship with:
+If WebSocket streaming proves complex, V1.0 can ship with:
 - Sections are drafted by agents (backend)
 - UI polls for updates every 5 seconds
 - Once all sections committed, show full artifact
@@ -1291,7 +1296,7 @@ class ArtifactService:
         section_id: str,
         owner_participant_id: str
     ):
-        """Agent streams section content via SSE"""
+        """Agent streams section content via WebSocket"""
         pass
     
     async def commit_section(

@@ -67,14 +67,14 @@ export function AccountInfoCard({
             <div className={styles.metric}>
               <h3>Credits Balance</h3>
               <div className={styles.metricValue} style={{ color: 'var(--success)', fontSize: '2rem' }}>
-                ${accountInfo.credits.balance.toFixed(2)}
+                ${(accountInfo.credits.balance || 0).toFixed(2)}
               </div>
               <div className={styles.metricDetails}>
-                {accountInfo.credits.total_credits !== null && (
-                  <span>Total Purchased: ${accountInfo.credits.total_credits.toFixed(2)}</span>
+                {accountInfo.credits.total_credits !== null && accountInfo.credits.total_credits !== undefined && (
+                  <span>Total Purchased: ${(accountInfo.credits.total_credits || 0).toFixed(2)}</span>
                 )}
-                {accountInfo.credits.total_usage !== null && (
-                  <span>Total Used: ${accountInfo.credits.total_usage.toFixed(2)}</span>
+                {accountInfo.credits.total_usage !== null && accountInfo.credits.total_usage !== undefined && (
+                  <span>Total Used: ${(accountInfo.credits.total_usage || 0).toFixed(2)}</span>
                 )}
               </div>
             </div>

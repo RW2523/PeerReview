@@ -356,13 +356,18 @@ export interface OpenRouterAccountResponse {
   note?: string | null;
 }
 
+export interface OpenRouterModel {
+  id: string;
+  name: string;
+  context_length?: number;
+  pricing?: {
+    prompt: string;
+    completion: string;
+  };
+}
+
 export interface OpenRouterModelListResponse {
-  models: Array<{
-    id: string;
-    name: string;
-    context_length?: number;
-    pricing?: any;
-  }>;
+  models: OpenRouterModel[];
 }
 
 export async function listOpenRouterModels(openrouterKey: string): Promise<OpenRouterModelListResponse> {

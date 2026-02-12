@@ -359,7 +359,7 @@ Your premium requirement: at the end of a debate, agents produce a collaborative
 This requires:
 - Artifact template (sections)
 - Section assignment (owner agent/participant)
-- Streaming section deltas (SSE events) so the UI can show live drafting
+- Streaming section deltas (WebSocket events) so the UI can show live drafting
 - A “coherence pass” step by a host/moderator agent to unify tone and remove contradictions
 
 Data storage should reuse:

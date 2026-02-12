@@ -5,6 +5,43 @@ from fastapi import HTTPException, status, Header
 from .config import settings
 
 
+async def get_current_user_ws(token: str) -> Dict[str, Any]:
+    """
+    Get current user from WebSocket auth token.
+    Normalizes user shape to match HTTP auth behavior.
+    
+    Args:
+        token: JWT token from query param
+    
+    Returns:
+        User info dict with sub, workspace_id, tenant_id
+    
+    Raises:
+        HTTPException: 401 if invalid
+    """
+    try:
+        payload = decode_jwt(token)
+        
+        # Ensure workspace_id is present (resolve from user_workspaces if needed)
+        if 'workspace_id' not in payload or not payload['workspace_id']:
+            user_id = payload.get('sub')
+            if user_id:
+                workspace_id = get_workspace_for_user(user_id)
+                if workspace_id:
+                    payload['workspace_id'] = workspace_id
+        
+        # Validate required claims
+        if not payload.get('sub'):
+            raise AuthError("Token missing 'sub' claim")
+        
+        return payload
+    except AuthError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
+
+
 class AuthError(Exception):
     """Authentication/authorization error"""
     pass

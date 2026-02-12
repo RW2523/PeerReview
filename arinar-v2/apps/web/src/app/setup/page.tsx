@@ -92,7 +92,7 @@ export default function SetupPage() {
     timeboxMinutes,
     participants,
     materials,
-    selectedMemorySources: memoryImport.selectedSources,
+    selectedMemorySources: memoryImport.source_debate_ids,
   });
   const steps = [
     { id: 1, label: 'Basic Info' },
