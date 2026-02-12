@@ -32,6 +32,7 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
     if (!debateId) return;
 
     let mounted = true;
+    console.log('[EventFeed] MOUNTING for debate:', debateId, 'at', new Date().toISOString());
 
     const connect = async () => {
       const streamUrl = api.getStreamUrl(debateId);
@@ -61,36 +62,57 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
           try {
             const event = JSON.parse(msg.data);
             
+            // DEBUG: Log every received event
+            const filterList = ['keepalive', 'heartbeat', 'presence_update', 'typing', 'system_message', 'state_update', 'stream_end'];
+            const willBeFiltered = filterList.includes(event.event_type) || filterList.includes(msg.event);
+            
+            console.log('[EventFeed] SSE message received:', {
+              sseEventType: msg.event,
+              eventType: event.event_type,
+              eventId: event.event_id,
+              sequenceNumber: event.sequence_number,
+              actor: event.payload?.agent_name || event.payload?.actor || 'NONE',
+              hasEventType: !!event.event_type,
+              hasAgentName: !!event.payload?.agent_name,
+              willBeFiltered: willBeFiltered,
+              filterReason: willBeFiltered ? (filterList.includes(event.event_type) ? 'event_type' : 'sse_event') : 'none',
+              timestamp: new Date().toISOString()
+            });
+            
             // Validate event has minimum required fields
             if (!event || typeof event !== 'object') {
               console.warn('Invalid event received:', event);
               return;
             }
 
-            // Filter out keepalive and internal system events
-            if (event.event_type === 'keepalive') {
-              return;
-            }
-
-            // Handle presence_update events (but don't show in feed)
-            if (event.event_type === 'presence_update') {
-              if (onPresenceUpdate) {
+            // Filter out internal system events and noise
+            const shouldFilterOut = [
+              'keepalive',
+              'heartbeat',
+              'presence_update',
+              'typing',
+              'system_message',  // Hide all system state changes (started, paused, etc.)
+              'state_update',    // SSE control event (state changes)
+              'stream_end',      // SSE control event (stream termination)
+            ];
+            
+            // Also check the SSE event type (msg.event) for control events
+            if (shouldFilterOut.includes(event.event_type) || shouldFilterOut.includes(msg.event)) {
+              // Still handle presence/typing callbacks
+              if (event.event_type === 'presence_update' && onPresenceUpdate) {
                 const payload = event.payload || event.content;
                 if (payload?.participant_id && payload?.action) {
                   onPresenceUpdate(payload.participant_id, payload.action);
                 }
               }
-              return; // Don't add to feed
-            }
-
-            // Handle typing events (but don't show in feed)
-            if (event.event_type === 'typing') {
-              if (onTyping) {
+              
+              if (event.event_type === 'typing' && onTyping) {
                 const payload = event.payload || event.content;
                 if (payload?.participant_id) {
                   onTyping(payload.participant_id);
                 }
               }
+              
               return; // Don't add to feed
             }
 
@@ -104,8 +126,10 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
             setEvents((prev) => {
               const exists = prev.some(e => e.event_id === event.event_id);
               if (exists) {
+                console.log('[EventFeed] DUPLICATE event ignored:', event.event_id);
                 return prev;
               }
+              console.log('[EventFeed] Adding event to feed:', event.event_id, event.event_type);
               return [...prev, event];
             });
             
@@ -139,6 +163,7 @@ export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: Even
 
     return () => {
       mounted = false;
+      console.log('[EventFeed] UNMOUNTING for debate:', debateId, 'at', new Date().toISOString());
       if (sseClientRef.current) {
         sseClientRef.current.disconnect();
         sseClientRef.current = null;

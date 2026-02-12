@@ -92,18 +92,27 @@ def join_presence(
     cursor = conn.cursor()
     
     try:
+        # Get next sequence number (scoped to this debate)
+        cursor.execute("""
+            SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_seq
+            FROM events
+            WHERE debate_id = %s
+        """, (debate_id,))
+        next_seq = cursor.fetchone()[0]
+        
         # Insert presence event
         cursor.execute("""
             INSERT INTO events (
                 event_id, debate_id, event_type, sender_type, sender_id,
-                content, created_at
+                sequence_number, content, created_at
             ) VALUES (
                 gen_random_uuid(), %s, 'presence_update', 'system', NULL,
-                %s, NOW()
+                %s, %s, NOW()
             )
             RETURNING event_id, debate_id, event_type, sequence_number, created_at
         """, (
             debate_id,
+            next_seq,
             Json({
                 'action': 'join',
                 'participant_id': request.participant_id,
@@ -147,18 +156,27 @@ def leave_presence(
     cursor = conn.cursor()
     
     try:
+        # Get next sequence number (scoped to this debate)
+        cursor.execute("""
+            SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_seq
+            FROM events
+            WHERE debate_id = %s
+        """, (debate_id,))
+        next_seq = cursor.fetchone()[0]
+        
         # Insert presence event
         cursor.execute("""
             INSERT INTO events (
                 event_id, debate_id, event_type, sender_type, sender_id,
-                content, created_at
+                sequence_number, content, created_at
             ) VALUES (
                 gen_random_uuid(), %s, 'presence_update', 'system', NULL,
-                %s, NOW()
+                %s, %s, NOW()
             )
             RETURNING event_id, debate_id, event_type, sequence_number, created_at
         """, (
             debate_id,
+            next_seq,
             Json({
                 'action': 'leave',
                 'participant_id': request.participant_id
@@ -202,18 +220,27 @@ def signal_typing(
     cursor = conn.cursor()
     
     try:
+        # Get next sequence number (scoped to this debate)
+        cursor.execute("""
+            SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_seq
+            FROM events
+            WHERE debate_id = %s
+        """, (debate_id,))
+        next_seq = cursor.fetchone()[0]
+        
         # Insert typing event
         cursor.execute("""
             INSERT INTO events (
                 event_id, debate_id, event_type, sender_type, sender_id,
-                content, created_at
+                sequence_number, content, created_at
             ) VALUES (
                 gen_random_uuid(), %s, 'typing', 'system', NULL,
-                %s, NOW()
+                %s, %s, NOW()
             )
             RETURNING event_id, debate_id, event_type, sequence_number, created_at
         """, (
             debate_id,
+            next_seq,
             Json({
                 'participant_id': request.participant_id,
                 'target_participant_id': request.target_participant_id

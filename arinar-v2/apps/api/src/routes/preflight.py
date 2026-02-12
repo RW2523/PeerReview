@@ -232,63 +232,33 @@ def start_preflight(
         
         conn.commit()
         
-        # Import the implementation function
+        # Import threading to run preflight in background
+        import threading
         from src.tasks.preflight import orchestrate_preflight_impl
         
-        # Always run inline for V1 (Celery setup deferred to production)
-        print(f"🔄 Running preflight inline (will block request ~5-10s)")
-        try:
-            orchestrate_preflight_impl(run_id, debate_id)
-            print(f"✅ Preflight completed inline: run_id={run_id}")
-        except Exception as e:
-            print(f"❌ Preflight failed: {e}")
-            import traceback
-            traceback.print_exc()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Preflight execution failed: {str(e)}"
-            )
+        # Start preflight in background thread (non-blocking)
+        def run_preflight_background():
+            try:
+                print(f"🔄 Starting preflight in background: run_id={run_id}, debate_id={debate_id}")
+                orchestrate_preflight_impl(run_id, debate_id)
+                print(f"✅ Preflight completed: run_id={run_id}")
+            except Exception as e:
+                print(f"❌ Background preflight failed: {e}")
+                import traceback
+                traceback.print_exc()
         
-        # Fetch actual status after inline execution
-        cursor.execute("""
-            SELECT status FROM preflight_runs WHERE run_id = %s
-        """, (run_id,))
+        # Launch background thread
+        thread = threading.Thread(target=run_preflight_background, daemon=True)
+        thread.start()
+        print(f"✅ Preflight started in background thread, returning immediately")
         
-        final_run = cursor.fetchone()
-        actual_status = final_run['status'] if final_run else 'unknown'
-        
-        # Refresh participant statuses
-        cursor.execute("""
-            SELECT participant_run_id, participant_id, agent_id, status,
-                   started_at, completed_at, error, skip_reason,
-                   prep_pack_knowledge_id, metadata
-            FROM preflight_participant_runs
-            WHERE run_id = %s
-            ORDER BY started_at ASC NULLS LAST
-        """, (run_id,))
-        
-        updated_participant_runs = [
-            {
-                'participant_run_id': r['participant_run_id'],
-                'participant_id': r['participant_id'],
-                'agent_id': r['agent_id'],
-                'status': r['status'],
-                'started_at': r['started_at'].isoformat() if r['started_at'] else None,
-                'completed_at': r['completed_at'].isoformat() if r['completed_at'] else None,
-                'error': r['error'],
-                'skip_reason': r['skip_reason'],
-                'prep_pack_knowledge_id': r['prep_pack_knowledge_id'],
-                'metadata': r['metadata']
-            }
-            for r in cursor.fetchall()
-        ]
-        
+        # Return immediately with initial status (frontend will poll for updates)
         return PreflightStartResponse(
             run_id=run_id,
             debate_id=debate_id,
-            status=actual_status,
-            participant_count=len(updated_participant_runs),
-            participant_runs=updated_participant_runs
+            status='running',  # Set to running since background thread started
+            participant_count=len(participant_runs),
+            participant_runs=participant_runs
         )
     
     except HTTPException:

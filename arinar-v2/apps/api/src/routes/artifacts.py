@@ -278,16 +278,18 @@ def init_artifact(
         event_id = str(uuid.uuid4())
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO events (
-                    event_id, debate_id, event_type, sender_type, sender_id, content, created_at
-                )
-                VALUES (%s, %s, 'artifact_init', 'system', NULL, %s, NOW())
+            INSERT INTO events (
+                event_id, debate_id, event_type, sender_type, sender_id, sequence_number, content, created_at
+            )
+            SELECT %s, %s, 'artifact_init', 'system', NULL, 
+                   COALESCE(MAX(sequence_number), 0) + 1, %s, NOW()
+            FROM events WHERE debate_id = %s
             """, (event_id, debate_id, psycopg2.extras.Json({
-                'artifact_id': artifact_id,
-                'template_id': request.template_id,
-                'title': title,
-                'section_count': len(created_sections)
-            })))
+            'artifact_id': artifact_id,
+            'template_id': request.template_id,
+            'title': title,
+            'section_count': len(created_sections)
+            }), debate_id))
         
         conn.commit()
         
@@ -461,10 +463,12 @@ def create_section_event(
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO events (
-                    event_id, debate_id, event_type, sender_type, sender_id, content, created_at
+                    event_id, debate_id, event_type, sender_type, sender_id, sequence_number, content, created_at
                 )
-                VALUES (%s, %s, 'artifact_section_delta', 'participant', %s, %s, NOW())
-            """, (event_id, debate_id, actor_participant_id, psycopg2.extras.Json(event_data)))
+                SELECT %s, %s, 'artifact_section_delta', 'participant', %s,
+                       COALESCE(MAX(sequence_number), 0) + 1, %s, NOW()
+                FROM events WHERE debate_id = %s
+            """, (event_id, debate_id, actor_participant_id, psycopg2.extras.Json(event_data), debate_id))
         
         conn.commit()
         

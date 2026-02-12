@@ -150,7 +150,7 @@ class TurnOrchestrator:
             
             agent_message = response['content']
             
-            # Get next sequence number
+            # Get next sequence number (scoped to this debate)
             cursor.execute("""
                 SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_seq
                 FROM events

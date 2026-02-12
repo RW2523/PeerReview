@@ -105,6 +105,13 @@ export function PreflightStep({
     }
   }, [canContinue, onCanContinueChange]);
 
+  // Clear "initializing" state when preflight actually starts
+  useEffect(() => {
+    if (isStarted) {
+      setIsStarting(false);
+    }
+  }, [isStarted]);
+
   const handleStartPreflight = async () => {
     if (!debateId) {
       alert('Debate not created yet. Please go back and complete previous steps.');
@@ -119,6 +126,9 @@ export function PreflightStep({
     setIsStarting(true);
     try {
       await startPreflight(debateId, apiKey);
+      // Success - isStarting will be cleared when isStarted becomes true
+      // But we need to reset it in case of edge cases
+      setTimeout(() => setIsStarting(false), 2000);
     } catch (err: any) {
       console.error('Failed to start preflight:', err);
       setIsStarting(false);

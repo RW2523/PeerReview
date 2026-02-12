@@ -1,5 +1,6 @@
 """Event streaming service for SSE"""
 import json
+import asyncio
 from typing import AsyncGenerator, Optional, Dict, Any
 from datetime import datetime, timezone
 from .database import get_db_connection, get_cursor
@@ -41,10 +42,15 @@ class StreamService:
             
             state = debate['state']
             
-            # Stream historical events first
+            # Stream historical events first (filter out noisy types)
             events = self._get_events(debate_id, since_sequence or 0)
             
             for event in events:
+                # Skip noisy event types that clutter the UI
+                evt_type = event.get('event_type')
+                if not evt_type or evt_type in ['system_message', 'presence_update', 'typing', 'heartbeat', 'keepalive']:
+                    continue
+                
                 event_data = {
                     'event_id': event['event_id'],
                     'debate_id': event['debate_id'],
@@ -55,7 +61,7 @@ class StreamService:
                 }
                 yield f"event: debate_event\ndata: {json.dumps(event_data)}\n\n"
             
-            # Send state update
+            # Send initial state update
             state_data = {
                 'debate_id': debate_id,
                 'state': state,
@@ -68,9 +74,58 @@ class StreamService:
                 yield f"event: stream_end\ndata: {json.dumps({'reason': 'debate_ended'})}\n\n"
                 return
             
-            # Send keepalive (for demo/testing purposes)
-            # In production, this would poll for new events
-            yield f": keepalive\n\n"
+            # Poll for new events (keep connection alive)
+            last_sequence = since_sequence or (events[-1]['sequence_number'] if events else 0)
+            poll_count = 0
+            max_polls = 300  # 5 minutes (300 * 1 second)
+            
+            while poll_count < max_polls:
+                await asyncio.sleep(1)  # Poll every 1 second
+                poll_count += 1
+                
+                # Check for new events
+                new_events = self._get_events(debate_id, last_sequence)
+                
+                for event in new_events:
+                    # Skip noisy event types that clutter the UI (including NULL event_types)
+                    evt_type = event.get('event_type')
+                    if not evt_type or evt_type in ['system_message', 'presence_update', 'typing', 'heartbeat', 'keepalive']:
+                        last_sequence = event['sequence_number']
+                        continue
+                    
+                    event_data = {
+                        'event_id': event['event_id'],
+                        'debate_id': event['debate_id'],
+                        'event_type': event['event_type'],
+                        'sequence_number': event['sequence_number'],
+                        'occurred_at': event['occurred_at'].isoformat(),
+                        'payload': event['payload']
+                    }
+                    yield f"event: debate_event\ndata: {json.dumps(event_data)}\n\n"
+                    last_sequence = event['sequence_number']
+                
+                # Check if debate state changed
+                debate = self._get_debate(debate_id)
+                if debate and debate['state'] != state:
+                    state = debate['state']
+                    state_data = {
+                        'debate_id': debate_id,
+                        'state': state,
+                        'updated_at': datetime.now(timezone.utc).isoformat()
+                    }
+                    yield f"event: state_update\ndata: {json.dumps(state_data)}\n\n"
+                    
+                    # If ended, close stream
+                    if state == DebateState.ENDED.value:
+                        yield f"event: stream_end\ndata: {json.dumps({'reason': 'debate_ended'})}\n\n"
+                        return
+                
+                # Send keepalive every 30 seconds
+                if poll_count % 30 == 0:
+                    yield f": keepalive\n\n"
+            
+            # Max duration reached
+            yield f"event: stream_end\ndata: {json.dumps({'reason': 'max_duration_reached'})}\n\n"
             
         except Exception as e:
             error_data = {'error': f'Stream error: {str(e)}'}

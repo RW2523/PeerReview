@@ -33,9 +33,11 @@ export class SSEClient {
 
   connect(): void {
     if (this.controller) {
+      console.log('[SSEClient] Already connected to:', this.url);
       return; // Already connected
     }
 
+    console.log('[SSEClient] Connecting to:', this.url, 'at', new Date().toISOString());
     this.controller = new AbortController();
     
     fetch(this.url, {
@@ -56,6 +58,7 @@ export class SSEClient {
           throw new Error('Response body is null');
         }
 
+        console.log('[SSEClient] Connected successfully to:', this.url);
         this.options.onOpen?.();
         this.reconnectDelay = 1000; // Reset on successful connection
 
@@ -127,15 +130,18 @@ export class SSEClient {
       })
       .catch((error) => {
         if (error.name === 'AbortError') {
+          console.log('[SSEClient] Disconnected (intentional):', this.url);
           return; // Intentional disconnect
         }
 
+        console.error('[SSEClient] Error:', error.message, 'URL:', this.url);
         this.options.onError?.(error);
         this.scheduleReconnect();
       });
   }
 
   disconnect(): void {
+    console.log('[SSEClient] Disconnecting from:', this.url);
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -149,13 +155,16 @@ export class SSEClient {
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer) {
+      console.log('[SSEClient] Reconnect already scheduled');
       return;
     }
 
+    console.log('[SSEClient] Scheduling reconnect in', this.reconnectDelay, 'ms');
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.controller = null;
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+      console.log('[SSEClient] Reconnecting now...');
       this.connect();
     }, this.reconnectDelay);
   }
