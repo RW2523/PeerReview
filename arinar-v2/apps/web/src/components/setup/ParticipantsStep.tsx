@@ -7,6 +7,10 @@ interface ParticipantsStepProps {
   participants: api.SetupParticipant[];
   templates: api.AgentTemplate[];
   agents: api.Agent[];
+  enableHost: boolean;
+  hostModelId?: string;
+  onEnableHostChange: (enabled: boolean) => void;
+  onHostModelChange: (modelId: string) => void;
   onAddFromTemplate: (template: api.AgentTemplate) => void;
   onAddExisting: (agent: api.Agent) => void;
   onUpdate: (idx: number, updates: Partial<api.SetupParticipant>) => void;
@@ -18,6 +22,10 @@ export function ParticipantsStep({
   participants,
   templates,
   agents,
+  enableHost,
+  hostModelId,
+  onEnableHostChange,
+  onHostModelChange,
   onAddFromTemplate,
   onAddExisting,
   onUpdate,
@@ -81,6 +89,45 @@ export function ParticipantsStep({
         Select AI experts with diverse perspectives. Mix roles, seniority, and thinking styles for richer debates.
         <strong> Min 2, Max 8 participants.</strong>
       </p>
+
+      {/* Ultimate Host Configuration */}
+      <div className={styles.hostConfig}>
+        <div className={styles.hostHeader}>
+          <div className={styles.hostToggle}>
+            <input
+              type="checkbox"
+              id="enable-host"
+              checked={enableHost}
+              onChange={(e) => onEnableHostChange(e.target.checked)}
+            />
+            <label htmlFor="enable-host">
+              <strong>🏛️ Enable Ultimate Host</strong>
+              <span className={styles.hostDescription}>
+                Neutral moderator that synthesizes all viewpoints and provides a final decision based on majority consensus
+              </span>
+            </label>
+          </div>
+        </div>
+        
+        {enableHost && (
+          <div className={styles.hostSettings}>
+            <label>Host AI Model</label>
+            <select
+              value={hostModelId || 'openai/gpt-4o-mini'}
+              onChange={(e) => onHostModelChange(e.target.value)}
+              className={styles.modelSelect}
+            >
+              <option value="openai/gpt-4o-mini">GPT-4o Mini (Fast & Cost-effective)</option>
+              <option value="openai/gpt-4o">GPT-4o (Balanced)</option>
+              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Premium)</option>
+              <option value="google/gemini-pro-1.5">Gemini Pro 1.5 (Advanced)</option>
+            </select>
+            <p className={styles.helpText}>
+              The host will speak last after all rounds are complete to provide a neutral, fact-based conclusion.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className={styles.twoColumnLayout}>
         {/* LEFT: Selection Panel */}

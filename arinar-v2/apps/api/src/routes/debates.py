@@ -15,6 +15,7 @@ from ..schemas.debates import (
     InterventionResponse,
     DebateListResponse,
     DebateListItem,
+    ExtendDebateRequest,
 )
 
 router = APIRouter()
@@ -179,6 +180,7 @@ async def get_debate(
         workspace_id=debate['workspace_id'],
         title=debate['title'],
         state=debate['state'],
+        policy_config=debate.get('policy_config'),
         created_at=debate['created_at'].isoformat(),
         participants=participant_list
     )
@@ -505,6 +507,79 @@ async def end_debate(
             detail=f"Internal server error: {str(e)}"
         )
 
+
+
+@router.patch("/debates/{debate_id}/extend")
+async def extend_debate(
+    debate_id: str,
+    request: ExtendDebateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Extend debate rounds or time during an active debate
+    
+    This allows extending the discussion when more time is needed.
+    Can extend rounds (for rounds-based meetings) or add time (for time-based meetings).
+    
+    Raises:
+        401: Unauthorized
+        403: Forbidden (workspace access denied)
+        404: Debate not found
+        400: Invalid request (can't extend both rounds and time, or neither)
+    """
+    if not request.extend_rounds and not request.extend_minutes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must specify either extend_rounds or extend_minutes"
+        )
+    
+    if request.extend_rounds and request.extend_minutes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot extend both rounds and time in the same request"
+        )
+    
+    service = DebateService()
+    debate = service.get_debate(debate_id)
+    
+    if not debate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Debate {debate_id} not found"
+        )
+    
+    check_workspace_access(current_user, debate['workspace_id'])
+    
+    try:
+        policy_config = debate.get('policy_config') or {}
+        policy_updates = {}
+        
+        if request.extend_rounds:
+            current_rounds = policy_config.get('max_rounds', 3)
+            policy_updates['max_rounds'] = current_rounds + request.extend_rounds
+        
+        if request.extend_minutes:
+            current_minutes = policy_config.get('timebox_minutes', 30)
+            policy_updates['timebox_minutes'] = current_minutes + request.extend_minutes
+        
+        updated = service.update_policy_config(debate_id, policy_updates)
+        
+        return {
+            "debate_id": debate_id,
+            "policy_config": updated['policy_config'],
+            "message": f"Extended by {request.extend_rounds or 0} rounds and {request.extend_minutes or 0} minutes"
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 # NOTE: Additional endpoints have been extracted for maintainability:

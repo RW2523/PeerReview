@@ -9,16 +9,19 @@ import { WSCommandType, WSAckMessage } from '@/lib/wsClient';
 interface DebateControlsProps {
   debateId: string;
   currentState: string;
+  policyConfig?: any;
+  onPolicyUpdate?: () => void;
   onStateChange: (newState: string) => void;
   sendCommand?: (command: WSCommandType, payload?: Record<string, any>) => Promise<WSAckMessage>;
 }
 
-export default function DebateControls({ debateId, currentState, onStateChange, sendCommand }: DebateControlsProps) {
+export default function DebateControls({ debateId, currentState, policyConfig, onPolicyUpdate, onStateChange, sendCommand }: DebateControlsProps) {
   const { apiKey } = useOpenRouterKey();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [triggeringTurn, setTriggeringTurn] = useState(false);
+  const [extending, setExtending] = useState(false);
 
   const handleStart = async () => {
     setLoading(true);
@@ -110,11 +113,38 @@ export default function DebateControls({ debateId, currentState, onStateChange, 
     }
   };
 
+  const handleExtend = async () => {
+    setExtending(true);
+    setError(null);
+    try {
+      const hasRounds = policyConfig?.max_rounds;
+      const hasTime = policyConfig?.timebox_minutes;
+      
+      if (hasRounds) {
+        // Extend by 2 more rounds
+        await api.extendDebate(debateId, 2, undefined);
+      } else if (hasTime) {
+        // Add 15 more minutes
+        await api.extendDebate(debateId, undefined, 15);
+      }
+      
+      // Refresh policy config
+      if (onPolicyUpdate) {
+        onPolicyUpdate();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to extend debate');
+    } finally {
+      setExtending(false);
+    }
+  };
+
   const canStart = currentState === 'pending';
   const canPause = currentState === 'running';
   const canResume = currentState === 'paused';
   const canEnd = currentState === 'running' || currentState === 'paused';
   const canTriggerTurn = currentState === 'running' && apiKey;
+  const canExtend = (currentState === 'running' || currentState === 'paused') && policyConfig && (policyConfig.max_rounds || policyConfig.timebox_minutes);
 
   return (
     <div className={styles.controls}>
@@ -159,6 +189,17 @@ export default function DebateControls({ debateId, currentState, onStateChange, 
         >
           {triggeringTurn ? 'Agent thinking...' : '▶ Next Turn'}
         </button>
+
+        {canExtend && (
+          <button
+            onClick={handleExtend}
+            disabled={extending}
+            className={styles.btnExtend}
+            title={policyConfig?.max_rounds ? 'Add 2 more rounds' : 'Add 15 more minutes'}
+          >
+            {extending ? 'Extending...' : policyConfig?.max_rounds ? '⏱️ +2 Rounds' : '⏱️ +15 Min'}
+          </button>
+        )}
 
         <button
           onClick={() => setShowEndConfirm(true)}

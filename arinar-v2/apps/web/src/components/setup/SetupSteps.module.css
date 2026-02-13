@@ -1448,3 +1448,83 @@
     opacity: 0.6;
   }
 }
+
+/* Host Configuration Styles */
+.hostConfig {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.hostHeader {
+  margin-bottom: 0;
+}
+
+.hostToggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hostToggle input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.hostToggle label {
+  flex: 1;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hostToggle label strong {
+  font-size: 16px;
+  color: var(--text-0);
+}
+
+.hostDescription {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.hostSettings {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hostSettings label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-1);
+  margin-bottom: 8px;
+}
+
+.modelSelect {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--text-0);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.modelSelect:hover {
+  border-color: var(--accent);
+}
+
+.modelSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}

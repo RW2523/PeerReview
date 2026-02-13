@@ -42,6 +42,7 @@ class DebateResponse(BaseModel):
     workspace_id: str
     title: str
     state: str
+    policy_config: Optional[Dict[str, Any]] = Field(default=None, description="Policy configuration (rounds, time limits, etc.)")
     created_at: str
     participants: List[ParticipantInfo] = Field(default_factory=list, description="Debate participants")
 
@@ -76,3 +77,9 @@ class DebateListResponse(BaseModel):
     """Response for listing debates"""
     items: List[DebateListItem]
     next_cursor: Optional[str] = None
+
+
+class ExtendDebateRequest(BaseModel):
+    """Request to extend debate rounds or time"""
+    extend_rounds: Optional[int] = Field(default=None, description="Additional rounds to add", ge=1, le=10)
+    extend_minutes: Optional[int] = Field(default=None, description="Additional minutes to add", ge=5, le=120)

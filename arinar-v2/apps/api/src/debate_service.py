@@ -60,6 +60,31 @@ class DebateService:
             row = cursor.fetchone()
             return dict(row)
     
+    def update_policy_config(self, debate_id: str, policy_updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update policy_config for a debate (e.g., extend rounds or time)"""
+        debate = self.get_debate(debate_id)
+        if not debate:
+            raise ValueError(f"Debate {debate_id} not found")
+        
+        # Merge updates with existing policy_config
+        current_policy = debate.get('policy_config') or {}
+        updated_policy = {**current_policy, **policy_updates}
+        
+        with get_db_connection() as conn:
+            cursor = get_cursor(conn)
+            cursor.execute("""
+                UPDATE debates
+                SET policy_config = %s, updated_at = NOW()
+                WHERE debate_id = %s
+                RETURNING debate_id, policy_config
+            """, (
+                psycopg2.extras.Json(updated_policy),
+                debate_id
+            ))
+            
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
     def start_debate(self, debate_id: str) -> Dict[str, Any]:
         """Start debate (pending -> running)"""
         debate = self.get_debate(debate_id)

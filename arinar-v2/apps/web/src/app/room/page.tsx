@@ -287,6 +287,13 @@ function RoomPageContent() {
             <DebateControls
               debateId={debateId}
               currentState={debateState}
+              policyConfig={policyConfig}
+              onPolicyUpdate={() => {
+                // Refetch policy config when extended
+                api.getDebate(debateId).then(debate => {
+                  setPolicyConfig(debate.policy_config || {});
+                }).catch(err => console.error('Failed to refresh policy:', err));
+              }}
               onStateChange={(newState) => setDebateState(newState)}
               sendCommand={sendCommand}
             />

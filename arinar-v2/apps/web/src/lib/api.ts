@@ -110,6 +110,29 @@ export async function resumeDebate(debateId: string): Promise<DebateResponse> {
   return response.json();
 }
 
+export async function extendDebate(
+  debateId: string,
+  extendRounds?: number,
+  extendMinutes?: number
+): Promise<{ debate_id: string; policy_config: any; message: string }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/extend`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({
+      extend_rounds: extendRounds,
+      extend_minutes: extendMinutes,
+    }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Failed to extend debate: ${error.detail || response.statusText}`);
+  }
+  
+  return response.json();
+}
+
 export async function endDebate(debateId: string): Promise<DebateResponse> {
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_URL}/debates/${debateId}/end`, {
