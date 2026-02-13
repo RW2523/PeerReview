@@ -32,6 +32,10 @@ export default function SetupPage() {
   const [desiredOutcomes, setDesiredOutcomes] = useState<string[]>([]);
   const [timeboxMinutes, setTimeboxMinutes] = useState<number | undefined>(30);
   const [maxRounds, setMaxRounds] = useState<number | undefined>(undefined);
+  
+  // Host Configuration
+  const [enableHost, setEnableHost] = useState(false);
+  const [hostModelId, setHostModelId] = useState('openai/gpt-4o-mini');
 
   // Pre-fill from draft if coming from home page
   useEffect(() => {
@@ -92,6 +96,8 @@ export default function SetupPage() {
     desiredOutcomes,
     timeboxMinutes,
     maxRounds,
+    enableHost,
+    hostModelId,
     participants,
     materials,
     selectedMemorySources: memoryImport.source_debate_ids,
@@ -218,6 +224,10 @@ export default function SetupPage() {
               participants={participants}
               templates={templates}
               agents={agents}
+              enableHost={enableHost}
+              hostModelId={hostModelId}
+              onEnableHostChange={setEnableHost}
+              onHostModelChange={setHostModelId}
               onAddFromTemplate={handleAddParticipantFromTemplate}
               onAddExisting={handleAddExistingAgent}
               onUpdate={handleUpdateParticipant}

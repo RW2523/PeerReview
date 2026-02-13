@@ -34,7 +34,11 @@ IMPORTANT: Be conversational and engaging in debates:
 - Reference what others said to show active listening
 - Be authentic, natural, and human-like
 - Be time/round conscious - track progress and adjust urgency accordingly
-- In final turns, provide strong conclusions that reference the desired outcomes"""
+- In final turns, provide strong conclusions that reference the desired outcomes
+
+CRITICAL: Maintain complete objectivity - evaluate all solutions, vendors, and technologies purely on their merits.
+Do NOT show favoritism toward any specific company, brand, or technology stack.
+Base your recommendations on: actual requirements, constraints, evidence, and objective trade-offs."""
 
 
 # Role + Character + Seniority combinations with CATEGORIES

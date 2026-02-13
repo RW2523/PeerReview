@@ -1,9 +1,11 @@
 """Turn orchestration endpoints"""
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends, Header
 from typing import Dict, Any
 from ..auth import get_current_user, check_workspace_access
 from ..debate_service import DebateService
 from ..turn_orchestrator import TurnOrchestrator
+from ..host_orchestrator import HostOrchestrator
 from ..openrouter_client import OpenRouterAuthError
 
 router = APIRouter()
@@ -85,4 +87,98 @@ async def trigger_next_turn(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to execute turn: {error_detail}"
+        )
+
+
+@router.post("/debates/{debate_id}/conclude")
+async def conclude_debate_with_host(
+    debate_id: str,
+    x_openrouter_key: str = Header(..., alias="X-OpenRouter-Key"),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Trigger Ultimate Host to provide final conclusion
+    
+    Called after all regular rounds are complete when host is enabled.
+    Host synthesizes all viewpoints and provides neutral recommendation.
+    
+    Protected: Requires valid JWT and workspace access
+    
+    Headers:
+        X-OpenRouter-Key: OpenRouter API key (BYOK)
+    
+    Returns:
+        Host conclusion event details
+    
+    Raises:
+        400: Host not enabled or debate state invalid
+        401: Unauthorized
+        403: Forbidden
+        404: Debate not found
+    """
+    service = DebateService()
+    debate = service.get_debate(debate_id)
+    
+    if not debate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Debate {debate_id} not found"
+        )
+    
+    check_workspace_access(current_user, debate['workspace_id'])
+    
+    try:
+        orchestrator = HostOrchestrator(x_openrouter_key)
+        result = orchestrator.trigger_conclusion(debate_id)
+        
+        # Broadcast host conclusion via WebSocket to all clients in the room
+        from src.websocket_service import ws_service
+        
+        event_envelope = {
+            'type': 'agent_message',
+            'debate_id': debate_id,
+            'event_id': result['event_id'],
+            'sequence_number': result['sequence_number'],
+            'occurred_at': datetime.utcnow().isoformat() + 'Z',
+            'sender_type': 'system',
+            'sender_id': None,
+            'payload': {
+                'agent_name': 'Ultimate Host',
+                'text': result['message'],
+                'is_host_conclusion': True
+            }
+        }
+        
+        await ws_service.manager.broadcast_to_debate(debate_id, event_envelope)
+        
+        return {
+            "event_id": result['event_id'],
+            "message": result['message'],
+            "participant_name": result['participant_name'],
+            "sequence_number": result['sequence_number'],
+            "is_conclusion": True
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except OpenRouterAuthError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"OpenRouter authentication failed: {str(e)}"
+        )
+    except Exception as e:
+        import traceback
+        error_detail = str(e)
+        
+        if "OpenRouter API error" in error_detail:
+            if "502" in error_detail or "Clerk" in error_detail:
+                error_detail = "OpenRouter API authentication failed. Please check your API key."
+        
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger host conclusion: {error_detail}"
         )

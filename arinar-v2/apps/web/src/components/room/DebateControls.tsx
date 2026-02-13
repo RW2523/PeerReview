@@ -10,12 +10,14 @@ interface DebateControlsProps {
   debateId: string;
   currentState: string;
   policyConfig?: any;
+  totalTurns?: number;
+  participantCount?: number;
   onPolicyUpdate?: () => void;
   onStateChange: (newState: string) => void;
   sendCommand?: (command: WSCommandType, payload?: Record<string, any>) => Promise<WSAckMessage>;
 }
 
-export default function DebateControls({ debateId, currentState, policyConfig, onPolicyUpdate, onStateChange, sendCommand }: DebateControlsProps) {
+export default function DebateControls({ debateId, currentState, policyConfig, totalTurns = 0, participantCount = 0, onPolicyUpdate, onStateChange, sendCommand }: DebateControlsProps) {
   const { apiKey } = useOpenRouterKey();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,10 +102,17 @@ export default function DebateControls({ debateId, currentState, policyConfig, o
     setTriggeringTurn(true);
     setError(null);
     try {
-      if (sendCommand) {
-        await sendCommand('control.next_turn', { openrouter_key: apiKey });
+      // Check if this should be a conclusion instead
+      if (shouldConclude) {
+        // Call conclude endpoint for host
+        await api.concludeDebate(debateId, apiKey);
       } else {
-        await api.triggerNextTurn(debateId, apiKey);
+        // Regular turn
+        if (sendCommand) {
+          await sendCommand('control.next_turn', { openrouter_key: apiKey });
+        } else {
+          await api.triggerNextTurn(debateId, apiKey);
+        }
       }
       // Success! The event will appear in the feed
     } catch (err) {
@@ -139,6 +148,12 @@ export default function DebateControls({ debateId, currentState, policyConfig, o
     }
   };
 
+  // Check if all rounds complete (should conclude)
+  const maxTotalTurns = policyConfig?.max_rounds && participantCount > 0 
+    ? policyConfig.max_rounds * participantCount
+    : null;
+  const shouldConclude = maxTotalTurns && totalTurns >= maxTotalTurns && policyConfig?.enable_host;
+  
   const canStart = currentState === 'pending';
   const canPause = currentState === 'running';
   const canResume = currentState === 'paused';
@@ -184,10 +199,10 @@ export default function DebateControls({ debateId, currentState, policyConfig, o
         <button
           onClick={handleNextTurn}
           disabled={!canTriggerTurn || triggeringTurn}
-          className={canTriggerTurn ? styles.btnPrimary : ''}
-          title={!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak'}
+          className={shouldConclude ? styles.btnConclude : (canTriggerTurn ? styles.btnPrimary : '')}
+          title={shouldConclude ? 'Host will provide final conclusion' : (!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak')}
         >
-          {triggeringTurn ? 'Agent thinking...' : '▶ Next Turn'}
+          {triggeringTurn ? 'Agent thinking...' : shouldConclude ? '🏁 Conclude Meeting' : '▶ Next Turn'}
         </button>
 
         {canExtend && (

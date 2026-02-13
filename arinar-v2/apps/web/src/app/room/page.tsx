@@ -156,10 +156,15 @@ function RoomPageContent() {
     api.getDebate(debateId)
       .then((data) => {
         if (data.participants) {
-          const participantList = data.participants.map((p: any) => ({
-            id: p.participant_id,
-            name: p.agent_config?.name || p.role_name || 'Unknown Agent',
-          }));
+          const participantList = data.participants
+            .filter((p: any) => {
+              const name = p.agent_config?.name || p.role_name || '';
+              return name !== 'Ultimate Host';
+            })
+            .map((p: any) => ({
+              id: p.participant_id,
+              name: p.agent_config?.name || p.role_name || 'Unknown Agent',
+            }));
           setParticipants(participantList);
           console.log('👥 Participants loaded:', participantList.length);
         }
@@ -288,6 +293,8 @@ function RoomPageContent() {
               debateId={debateId}
               currentState={debateState}
               policyConfig={policyConfig}
+              totalTurns={policyConfig?.total_turns_taken || 0}
+              participantCount={participants.length}
               onPolicyUpdate={() => {
                 // Refetch policy config when extended
                 api.getDebate(debateId).then(debate => {

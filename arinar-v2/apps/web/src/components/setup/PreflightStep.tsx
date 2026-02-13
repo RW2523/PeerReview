@@ -23,33 +23,37 @@ interface PreflightStepProps {
   desiredOutcomes?: string[];
 }
 
-// Animated status component for running agents
-function AnimatedStatus({ participantRunId }: { participantRunId: string }) {
-  const [detailState, setDetailState] = useState(0);
+// Real-time status component for running agents
+function AnimatedStatus({ 
+  participantRunId, 
+  participantId 
+}: { 
+  participantRunId: string;
+  participantId: string;
+}) {
+  const [progressMessage, setProgressMessage] = useState('⏳ Waiting to start...');
   
   useEffect(() => {
-    const stages = [
-      '📖 Reading topic and goals',
-      '🔍 Analyzing materials',
-      '🧠 Researching context',
-      '✍️ Generating insights',
-    ];
+    // Listen for WebSocket preflight progress events
+    const handlePreflightProgress = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'preflight_progress' && data.participant_id === participantId) {
+          setProgressMessage(data.message || 'Processing...');
+        }
+      } catch (err) {
+        // Ignore parse errors
+      }
+    };
     
-    let currentStage = 0;
-    const interval = setInterval(() => {
-      currentStage = (currentStage + 1) % stages.length;
-      setDetailState(currentStage);
-    }, 3000); // Change every 3 seconds
+    // Try to attach to existing WebSocket connection
+    // Note: This is a simplified version - in production you'd use a proper WebSocket hook
+    window.addEventListener('message', handlePreflightProgress);
     
-    return () => clearInterval(interval);
-  }, [participantRunId]);
-  
-  const stages = [
-    '📖 Reading topic and goals',
-    '🔍 Analyzing materials',
-    '🧠 Researching context',
-    '✍️ Generating insights',
-  ];
+    return () => {
+      window.removeEventListener('message', handlePreflightProgress);
+    };
+  }, [participantId]);
   
   return (
     <div style={{ 
@@ -59,7 +63,7 @@ function AnimatedStatus({ participantRunId }: { participantRunId: string }) {
       fontStyle: 'italic',
       animation: 'pulse 2s ease-in-out infinite'
     }}>
-      {stages[detailState]}
+      {progressMessage}
     </div>
   );
 }
@@ -302,7 +306,10 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
                     <div className={styles.participantName}>{name}</div>
                     {getStatusPill(participantRun.status, participantRun.participant_run_id)}
                     {participantRun.status === 'running' && (
-                      <AnimatedStatus participantRunId={participantRun.participant_run_id} />
+                      <AnimatedStatus 
+                        participantRunId={participantRun.participant_run_id}
+                        participantId={participantRun.participant_id}
+                      />
                     )}
                   </div>
                   <div className={styles.participantActions}>

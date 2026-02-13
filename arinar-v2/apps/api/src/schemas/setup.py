@@ -21,6 +21,8 @@ class DebateSetupRequest(BaseModel):
     desired_outcomes: Optional[List[str]] = Field(default=None, description="Desired meeting outcomes")
     timebox_minutes: Optional[int] = None
     max_rounds: Optional[int] = Field(default=None, description="Number of rounds (each participant speaks once per round)")
+    enable_host: Optional[bool] = Field(default=False, description="Enable Ultimate Host for final conclusion")
+    host_model_id: Optional[str] = Field(default=None, description="AI model for host (only if enable_host=true)")
     participants: List[SetupParticipant]
     materials: Optional[List[SetupMaterial]] = Field(default_factory=list)
 

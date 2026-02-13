@@ -5,6 +5,7 @@ Prepares agents before debate starts by generating prep packs
 
 import psycopg2
 import json
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from psycopg2.extras import Json
@@ -151,6 +152,9 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         """, (participant_run_id,))
         conn.commit()
         print(f"    ✓ Status updated to 'running'")
+        
+        # Broadcast progress event via WebSocket
+        _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Reading materials and context')
         
         # 1. Get participant details and resolve agent
         cursor.execute("""
@@ -306,6 +310,9 @@ Be specific and cite information where possible."""
         # Get OpenRouter key from policy_config (if exists) or use test mode
         openrouter_key = policy_config.get('openrouter_key') if policy_config else None
         
+        # Broadcast progress: Generating insights
+        _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Generating strategic insights')
+        
         if not openrouter_key:
             # For V1, create a placeholder prep pack (no real OpenRouter call)
             print(f"    📝 Generating placeholder prep pack (no OpenRouter key)")
@@ -405,6 +412,9 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
         conn.commit()
         print(f"    ✅ Participant preparation complete!")
         
+        # Broadcast completion event
+        _broadcast_preflight_progress(debate_id, participant_id, 'success', 'Preparation complete')
+        
     except Exception as e:
         # Rollback any failed transaction first
         conn.rollback()
@@ -416,12 +426,40 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                 WHERE participant_run_id = %s
             """, (str(e), participant_run_id))
             conn.commit()
+            
+            # Broadcast failure event
+            _broadcast_preflight_progress(debate_id, participant_id, 'failed', f'Error: {str(e)[:100]}')
         except Exception as update_error:
             print(f"    ⚠️  Failed to update participant status: {update_error}")
         raise
     finally:
         cursor.close()
         conn.close()
+
+
+def _broadcast_preflight_progress(debate_id: str, participant_id: str, status: str, message: str):
+    """Helper to broadcast preflight progress events via WebSocket"""
+    try:
+        from src.websocket_service import websocket_manager
+        
+        # Create progress event envelope
+        event = {
+            'type': 'preflight_progress',
+            'debate_id': debate_id,
+            'participant_id': participant_id,
+            'status': status,
+            'message': message,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Broadcast asynchronously
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(websocket_manager.broadcast_to_debate(debate_id, event))
+        else:
+            loop.run_until_complete(websocket_manager.broadcast_to_debate(debate_id, event))
+    except Exception as e:
+        print(f"    ⚠️  Failed to broadcast progress: {e}")
 
 
 # Create Celery task wrapper if Celery is available

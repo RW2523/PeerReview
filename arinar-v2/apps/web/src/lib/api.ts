@@ -163,6 +163,23 @@ export async function triggerNextTurn(debateId: string, openrouterKey: string): 
   return response.json();
 }
 
+export async function concludeDebate(debateId: string, openrouterKey: string): Promise<any> {
+  const headers = await getAuthHeaders() as Record<string, string>;
+  headers['X-OpenRouter-Key'] = openrouterKey;
+  
+  const response = await fetch(`${API_URL}/debates/${debateId}/conclude`, {
+    method: 'POST',
+    headers,
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Failed to conclude debate: ${error.detail || response.statusText}`);
+  }
+  
+  return response.json();
+}
+
 export async function intervene(debateId: string, request: InterventionRequest): Promise<any> {
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_URL}/debates/${debateId}/intervene`, {
@@ -299,6 +316,9 @@ export interface DebateSetupRequest {
   agenda?: string[];
   desired_outcomes?: string[];
   timebox_minutes?: number;
+  max_rounds?: number;
+  enable_host?: boolean;
+  host_model_id?: string;
   participants: SetupParticipant[];
   materials?: SetupMaterial[];
 }

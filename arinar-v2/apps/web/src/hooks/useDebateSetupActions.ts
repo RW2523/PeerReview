@@ -16,6 +16,8 @@ interface UseDebateSetupActionsOptions {
   desiredOutcomes?: string[];
   timeboxMinutes?: number;
   maxRounds?: number;
+  enableHost?: boolean;
+  hostModelId?: string;
   participants: SetupParticipant[];
   materials: SetupMaterial[];
   selectedMemorySources: string[];
@@ -46,6 +48,8 @@ export function useDebateSetupActions(
       desiredOutcomes,
       timeboxMinutes,
       maxRounds,
+      enableHost,
+      hostModelId,
       participants,
       materials,
       selectedMemorySources,
@@ -59,6 +63,7 @@ export function useDebateSetupActions(
     setIsLoading(true);
     try {
       // 1. Create debate (returns participant_ids)
+      // Host is NOT a participant - it's stored in policy_config
       const setupResponse = await api.setupDebate({
         workspace_id: workspaceId,
         title,
@@ -67,7 +72,9 @@ export function useDebateSetupActions(
         desired_outcomes: desiredOutcomes && desiredOutcomes.length > 0 ? desiredOutcomes : undefined,
         timebox_minutes: timeboxMinutes || 30,
         max_rounds: maxRounds,
-        participants,
+        enable_host: enableHost || false,
+        host_model_id: enableHost ? (hostModelId || 'openai/gpt-4o-mini') : undefined,
+        participants: participants,
         materials: materials && materials.length > 0 ? materials : undefined,
       });
 
@@ -117,6 +124,16 @@ export function useDebateSetupActions(
     if (!apiKey) {
       alert(
         '⚠️ OpenRouter API Key Required\n\nYou need to add your OpenRouter API key in Settings before starting the debate.\n\nThe AI agents need this key to participate in the discussion.'
+      );
+      return;
+    }
+
+    // Test API key validity by making a quick validation call
+    try {
+      await api.getOpenRouterAccount(apiKey);
+    } catch (err: any) {
+      alert(
+        `⚠️ Invalid OpenRouter API Key\n\nYour API key failed validation: ${err.message}\n\nPlease update your API key in Settings before launching the debate.`
       );
       return;
     }

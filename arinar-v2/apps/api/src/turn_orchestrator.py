@@ -45,6 +45,11 @@ class TurnOrchestrator:
             if debate['state'] != 'running':
                 raise ValueError(f"Debate must be in 'running' state, current state: {debate['state']}")
             
+            # Check if we've reached max rounds - prevent regular turns after max
+            policy_config = debate['policy_config'] or {}
+            max_rounds = policy_config.get('max_rounds')
+            total_turns = policy_config.get('total_turns_taken', 0)
+            
             # Get participants in turn order (by creation time)
             cursor.execute("""
                 SELECT participant_id, participant_type, role_name, agent_config, created_at
@@ -57,14 +62,38 @@ class TurnOrchestrator:
             if not participants:
                 raise ValueError(f"No participants found for debate {debate_id}")
             
+            # Check if max rounds exceeded
+            if max_rounds:
+                max_total_turns = max_rounds * len(participants)
+                if total_turns >= max_total_turns:
+                    enable_host = policy_config.get('enable_host', False)
+                    if enable_host:
+                        raise ValueError("All rounds complete. Please use the /conclude endpoint to trigger host summary.")
+                    else:
+                        raise ValueError("All rounds complete. Please end the meeting.")
+            
             # Get current turn index from policy_config
-            policy_config = debate['policy_config'] or {}
             current_turn_index = policy_config.get('current_turn_index', 0)
-            total_turns = policy_config.get('total_turns_taken', 0)
             
             # Determine next participant (round-robin)
             next_participant_idx = current_turn_index % len(participants)
             next_participant = participants[next_participant_idx]
+            
+            # Debug logging for turn selection
+            participant_names_debug = [
+                (p['agent_config'] or {}).get('name') or p['role_name']
+                for p in participants
+            ]
+            selected_name = (next_participant['agent_config'] or {}).get('name') or next_participant['role_name']
+            
+            print(f"\n🎯 TURN SELECTION DEBUG:")
+            print(f"   Debate ID: {debate_id}")
+            print(f"   Total participants: {len(participants)}")
+            print(f"   Participant order: {participant_names_debug}")
+            print(f"   Current turn index: {current_turn_index}")
+            print(f"   Selected participant index: {next_participant_idx}")
+            print(f"   Selected participant: {selected_name}")
+            print(f"   Total turns taken: {total_turns}\n")
             
             # Get debate history for context
             cursor.execute("""
@@ -87,6 +116,14 @@ class TurnOrchestrator:
             agent_name = agent_config.get('name') or next_participant['role_name']
             model_id = agent_config.get('model_id', 'openai/gpt-4o-mini')
             system_prompt = agent_config.get('system_prompt', '')
+            
+            # Debug: Print agent name extraction
+            print(f"🔍 AGENT NAME DEBUG:")
+            print(f"   Participant ID: {next_participant['participant_id']}")
+            print(f"   Role name from DB: {next_participant['role_name']}")
+            print(f"   Agent config keys: {list(agent_config.keys())}")
+            print(f"   Agent config 'name': {agent_config.get('name')}")
+            print(f"   FINAL agent_name variable: {agent_name}\n")
             
             # Get prep pack for this agent
             cursor.execute("""
@@ -133,13 +170,36 @@ class TurnOrchestrator:
             # Add conversation history
             messages.extend(conversation_history)
             
-            # Build list of other participants for @mentions
-            other_participants = [
-                p['agent_config'].get('name', p['role_name']) 
-                for p in participants 
-                if p['participant_id'] != next_participant['participant_id']
-            ]
-            participant_list = ", ".join([f"@{name}" for name in other_participants])
+            # Build list of participants who have already spoken (for @mentions)
+            agents_who_spoke = set()
+            for event in history_events:
+                if event['event_type'] == 'agent_message':
+                    content = event.get('content') or {}
+                    spoken_agent_name = content.get('agent_name')
+                    if spoken_agent_name:
+                        agents_who_spoke.add(spoken_agent_name)
+            
+            # Build participant list - only @mention those who have spoken
+            current_agent_name = (next_participant['agent_config'] or {}).get('name') or next_participant['role_name']
+            participants_spoken = []
+            participants_upcoming = []
+            
+            for p in participants:
+                name = (p['agent_config'] or {}).get('name') or p['role_name']
+                if name == current_agent_name:
+                    continue  # Skip self
+                if name in agents_who_spoke:
+                    participants_spoken.append(f"@{name}")
+                else:
+                    participants_upcoming.append(name)
+            
+            # Format participant list
+            if participants_spoken:
+                participant_list = f"Active: {', '.join(participants_spoken)}"
+                if participants_upcoming:
+                    participant_list += f" | Upcoming: {', '.join(participants_upcoming)}"
+            else:
+                participant_list = f"You're speaking first! Others will respond: {', '.join(participants_upcoming) if participants_upcoming else 'None'}"
             
             # Calculate progress and urgency
             max_rounds = policy_config.get('max_rounds')
@@ -160,20 +220,26 @@ class TurnOrchestrator:
             # Determine urgency level and response length
             if max_rounds:
                 if is_final_turn:
-                    urgency = "🔴 YOUR FINAL TURN"
-                    length_instruction = f"""This is YOUR LAST OPPORTUNITY to speak.
+                    urgency = "🔴 YOUR FINAL TURN - NO MORE CHANCES TO SPEAK"
+                    outcomes_str = f"the desired outcomes: {', '.join(desired_outcomes)}" if desired_outcomes else "the goals of this discussion"
+                    length_instruction = f"""⚠️ THIS IS YOUR ABSOLUTE LAST TURN. You will NOT speak again unless the host extends the debate.
 
-**CRITICAL - Give your final conclusion:**
-- Be VERY brief (3-4 sentences maximum)
-- State your final position clearly
-- Reference the desired outcomes: {', '.join(desired_outcomes) if desired_outcomes else 'the goals of this discussion'}
-- End with a strong, memorable statement"""
+**YOU MUST START YOUR MESSAGE WITH:**
+"Given this is my final turn, I'll conclude by saying..."
+
+**THEN provide your final conclusion (3-4 sentences max):**
+- State your final position CLEARLY and DECISIVELY
+- Explicitly reference {outcomes_str}
+- End with a strong, memorable final statement that summarizes your stance
+- Make it clear this is your CONCLUDING remark
+
+Example opening: "Given this is my final turn before the host's conclusion, let me be direct: [your final position]" """
                 elif rounds_remaining <= 1:
-                    urgency = f"⚡ FINAL ROUND ({current_round}/{max_rounds})"
-                    length_instruction = "Final round! Keep it brief (3-4 sentences). Start moving toward conclusion."
+                    urgency = f"⚡ FINAL ROUND ({current_round}/{max_rounds}) - Next turn is your LAST"
+                    length_instruction = "You're in the final round! Next time you speak will be your last turn. Keep it brief (3-4 sentences). Start pivoting toward your conclusion."
                 elif rounds_remaining <= 2:
-                    urgency = f"⏰ {rounds_remaining} rounds left ({current_round}/{max_rounds})"
-                    length_instruction = "Time is running short. Keep it concise (3-4 sentences). Be direct and actionable."
+                    urgency = f"⏰ Only {rounds_remaining} rounds left ({current_round}/{max_rounds})"
+                    length_instruction = "Time is running out! Express urgency. Be concise (3-4 sentences). Focus on what matters most for the final decision."
                 else:
                     urgency = f"Round {current_round}/{max_rounds}"
                     length_instruction = "Keep it short and crisp (4-5 sentences). Only expand if making a critical point."
@@ -248,9 +314,17 @@ class TurnOrchestrator:
             ))
             
             # Update turn index in policy_config
-            policy_config['current_turn_index'] = current_turn_index + 1
-            policy_config['total_turns_taken'] = total_turns + 1
+            new_turn_index = current_turn_index + 1
+            new_total_turns = total_turns + 1
+            
+            policy_config['current_turn_index'] = new_turn_index
+            policy_config['total_turns_taken'] = new_total_turns
             policy_config['last_participant_id'] = next_participant['participant_id']
+            
+            print(f"📝 UPDATING POLICY CONFIG:")
+            print(f"   Old turn index: {current_turn_index} -> New: {new_turn_index}")
+            print(f"   Old total turns: {total_turns} -> New: {new_total_turns}")
+            print(f"   Last participant: {next_participant['participant_id']}\n")
             
             cursor.execute("""
                 UPDATE debates
@@ -262,7 +336,9 @@ class TurnOrchestrator:
                 debate_id
             ))
             
+            print(f"✅ Database UPDATE executed, committing transaction...\n")
             conn.commit()
+            print(f"✅ Transaction committed successfully!\n")
             
             return {
                 'event_id': event_id,

@@ -273,3 +273,6 @@ class WebSocketService:
 
 # Global manager instance
 ws_service = WebSocketService()
+
+# Export websocket manager for use in other modules (like preflight tasks)
+websocket_manager = ws_service.manager
