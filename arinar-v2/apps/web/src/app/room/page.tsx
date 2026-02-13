@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AppNav from '@/components/layout/AppNav';
 import DebateSelector from '@/components/room/DebateSelector';
@@ -32,7 +32,7 @@ function RoomPageContent() {
   const [participants, setParticipants] = useState<{ name: string; id: string }[]>([]);
   const [onlineParticipants, setOnlineParticipants] = useState<Set<string>>(new Set());
   const [typingParticipants, setTypingParticipants] = useState<Set<string>>(new Set());
-  const typingTimersRef = useState<Map<string, NodeJS.Timeout>>(new Map())[0];
+  const typingTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
@@ -76,10 +76,11 @@ function RoomPageContent() {
         console.error('Failed to leave presence:', err);
       });
     };
-  }, [debateId, sendCommand, connectionStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debateId, connectionStatus]); // sendCommand is stable (useCallback with empty deps), exclude from deps to prevent infinite loop
 
   // Handle presence updates from EventFeed
-  const handlePresenceUpdate = (participantId: string, action: 'join' | 'leave') => {
+  const handlePresenceUpdate = useCallback((participantId: string, action: 'join' | 'leave') => {
     setOnlineParticipants(prev => {
       const next = new Set(prev);
       if (action === 'join') {
@@ -89,15 +90,15 @@ function RoomPageContent() {
       }
       return next;
     });
-  };
+  }, []);
 
   // Handle typing signals from EventFeed
-  const handleTyping = (participantId: string) => {
+  const handleTyping = useCallback((participantId: string) => {
     // Add to typing set
     setTypingParticipants(prev => new Set(prev).add(participantId));
 
     // Clear existing timer
-    const existing = typingTimersRef.get(participantId);
+    const existing = typingTimersRef.current.get(participantId);
     if (existing) {
       clearTimeout(existing);
     }
@@ -109,11 +110,11 @@ function RoomPageContent() {
         next.delete(participantId);
         return next;
       });
-      typingTimersRef.delete(participantId);
+      typingTimersRef.current.delete(participantId);
     }, 3000);
 
-    typingTimersRef.set(participantId, timer);
-  };
+    typingTimersRef.current.set(participantId, timer);
+  }, []); // typingTimersRef is stable, exclude from deps
 
   // Load agenda data from localStorage
   const getAgendaData = () => {
