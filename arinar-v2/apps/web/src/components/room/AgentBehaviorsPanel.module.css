@@ -115,6 +115,16 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
 }
 
+/* Rivalry specific styling */
+.rivalryCard {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.08) 100%);
+}
+
+.rivalryCard:hover {
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
 .coalitionHeader {
   display: flex;
   justify-content: space-between;
@@ -130,6 +140,11 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+/* Rivalry badge styling */
+.rivalryBadge {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
 .coalitionTime {

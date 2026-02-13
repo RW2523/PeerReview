@@ -106,9 +106,21 @@ export default function DebateControls({ debateId, currentState, policyConfig, t
       if (shouldConclude) {
         // Call conclude endpoint for host (if enabled) or just end the meeting
         if (policyConfig?.enable_host) {
-          await api.concludeDebate(debateId, apiKey);
+          console.log('🏁 Triggering host conclusion...');
+          try {
+            const result = await api.concludeDebate(debateId, apiKey);
+            console.log('✅ Host conclusion triggered:', result);
+            // Don't change state - wait for host message via WebSocket
+            // The host will speak, and THEN we can end the meeting
+          } catch (error: any) {
+            console.error('❌ Host conclusion failed:', error);
+            alert(`Failed to conclude debate: ${error.message || 'Unknown error'}`);
+            setTriggeringTurn(false);
+            return;
+          }
         } else {
           // No host - just end the meeting
+          console.log('🏁 No host enabled - ending meeting directly');
           if (sendCommand) {
             await sendCommand('control.end');
             onStateChange('ended');

@@ -304,12 +304,14 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 **Your Response:**
 {length_instruction}
 
-**Communication Style:**
-- Use @mentions to directly address others
-- Explicitly agree/disagree with specific points
-- Ask questions to invite responses
-- Reference what others said
-- BE OPEN-MINDED: Don't come with pre-determined conclusions unless it's your final turn
+**Communication Style - BE CONVERSATIONAL AND ORGANIC:**
+- **BUILD ON others**: If @FirstPrinciplesThinker said "time is of essence", don't repeat that phrase. Instead say "@FirstPrinciplesThinker makes a great point about urgency..." or "I agree we need to act quickly, and I'd add..."
+- **NO ROBOTIC REPETITION**: Avoid copying exact phrases. Each agent should have their own voice and phrasing.
+- **USE @mentions**: Directly address who you're responding to (e.g., "@EmpatheticVoice, your point about...")
+- **REACT genuinely**: Agree/disagree with SPECIFIC points, not generic statements
+- **ASK FOLLOW-UP questions**: "What do you think about X?" or "How would you address Y?"
+- **VARY your language**: If someone says "crucial", you might say "vital" or "essential" - don't parrot the same words
+- **BE OPEN-MINDED**: Don't come with pre-determined conclusions unless it's your final turn
 
 **Desired Outcomes to Keep in Mind:**
 {chr(10).join(f'- {outcome}' for outcome in desired_outcomes) if desired_outcomes else 'No specific outcomes defined'}"""
@@ -398,8 +400,8 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 'sequence_number': next_seq
             }
             
-            # Post-turn autonomous behaviors (25% chance, token-efficient)
-            should_trigger_autonomy = random.random() < 0.25 and total_turns > 1
+            # Post-turn autonomous behaviors (50% chance, more visible)
+            should_trigger_autonomy = random.random() < 0.50 and total_turns > 1
             if should_trigger_autonomy:
                 print(f"    🎭 Triggering autonomous behaviors for {agent_name}...")
                 try:
@@ -479,6 +481,7 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                         'payload': {
                             'members': coalition['members'],
                             'strategy': coalition.get('strategy'),
+                            'type': coalition.get('type', 'alliance'),
                             'formed_by': agent_name
                         }
                     }

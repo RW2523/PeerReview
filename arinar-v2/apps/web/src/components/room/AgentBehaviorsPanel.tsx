@@ -8,6 +8,7 @@ interface Coalition {
   members: string[];
   formed_at: string;
   strategy?: string;
+  type?: 'alliance' | 'rivalry';
 }
 
 interface PrivateMessage {
@@ -49,7 +50,8 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
           id: event.event_id,
           members: event.payload?.members || [],
           formed_at: event.occurred_at,
-          strategy: event.payload?.strategy
+          strategy: event.payload?.strategy,
+          type: event.payload?.type || 'alliance'
         });
       } else if (event.type === 'private_message') {
         newMessages.push({
@@ -114,9 +116,14 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
               </div>
             ) : (
               coalitions.map(coalition => (
-                <div key={coalition.id} className={styles.coalitionCard}>
+                <div 
+                  key={coalition.id} 
+                  className={`${styles.coalitionCard} ${coalition.type === 'rivalry' ? styles.rivalryCard : ''}`}
+                >
                   <div className={styles.coalitionHeader}>
-                    <span className={styles.coalitionBadge}>Coalition</span>
+                    <span className={`${styles.coalitionBadge} ${coalition.type === 'rivalry' ? styles.rivalryBadge : ''}`}>
+                      {coalition.type === 'rivalry' ? '⚔️ Rivalry' : '🤝 Alliance'}
+                    </span>
                     <span className={styles.coalitionTime}>
                       {new Date(coalition.formed_at).toLocaleTimeString()}
                     </span>
@@ -128,7 +135,7 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
                   </div>
                   {coalition.strategy && (
                     <div className={styles.coalitionStrategy}>
-                      <strong>Strategy:</strong> {coalition.strategy}
+                      <strong>{coalition.type === 'rivalry' ? 'Opposition:' : 'Strategy:'}</strong> {coalition.strategy}
                     </div>
                   )}
                 </div>

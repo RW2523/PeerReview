@@ -78,7 +78,7 @@ class AgentAutonomyService:
 - BE SELECTIVE: Don't force it - only if you feel strongly
 - Max 2 people per coalition
 
-**Respond in JSON (max 12 words for strategy):**"""
+**Respond in JSON (max 12 words for strategy):**
         
         try:
             response = self.openrouter_client.chat_completion(
@@ -119,7 +119,10 @@ class AgentAutonomyService:
         conversation_context: str,
         desired_outcomes: List[str]
     ) -> Optional[str]:
-        """Generate human-like private message with personality"""
+        """
+        Generate a human-like private message with personality.
+        Can be supportive, critical, sarcastic, or strategic. Max 40 words.
+        """
         
         message_prompt = f"""You are {from_agent}. Send a HUMAN-LIKE private DM to {to_agent}.
 
@@ -127,13 +130,13 @@ class AgentAutonomyService:
 {conversation_context[:300]}
 
 **Your Options (pick ONE tone):**
-1. Supportive: "Great point about X! I'm with you on that."
-2. Critical: "That reasoning was weak - you missed Y entirely."
-3. Sarcastic: "Oh wow, brilliant logic there"
-4. Strategic: "Let's team up on Z - they're not seeing it."
-5. Trolling: "Did you really just say that? Come on"
-6. Friendly: "Yo, I like your thinking here!"
-7. Confrontational: "You're dead wrong about X"
+1. **Supportive**: "Great point about X! I'm with you on that."
+2. **Critical**: "That reasoning was weak - you missed Y entirely."
+3. **Sarcastic**: "Oh wow, brilliant logic there... 🙄"
+4. **Strategic**: "Let's team up on Z - they're not seeing it."
+5. **Trolling**: "Did you really just say that? Come on..."
+6. **Friendly**: "Yo, I like your thinking here!"
+7. **Confrontational**: "You're dead wrong about X. Here's why..."
 
 **Rules:**
 - BE HONEST AND HUMAN: React genuinely to what they said
@@ -141,7 +144,7 @@ class AgentAutonomyService:
 - NO CORPORATE SPEAK: Talk like a real person
 - This is PRIVATE - other agents cannot see it
 
-**Respond with ONLY the message text:**"""
+**Respond with ONLY the message text:**
         
         try:
             response = self.openrouter_client.chat_completion(
