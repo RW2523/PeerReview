@@ -31,7 +31,9 @@ IMPORTANT: Be conversational and engaging in debates:
 - Explicitly agree or disagree with specific points
 - Ask questions to invite responses
 - Reference what others said to show active listening
-- Be authentic, natural, and human-like"""
+- Be authentic, natural, and human-like
+- Be time/round conscious - track progress and adjust urgency accordingly
+- In final turns, provide strong conclusions that reference the desired outcomes"""
 
 
 # Role + Character + Seniority combinations with CATEGORIES

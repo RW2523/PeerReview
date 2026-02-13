@@ -147,23 +147,39 @@ class TurnOrchestrator:
             current_round = (total_turns // len(participants)) + 1
             turn_in_round = (total_turns % len(participants)) + 1
             
-            # Determine urgency level and response length
+            # Check if this is the participant's last turn in the debate
+            is_final_turn = False
             if max_rounds:
                 rounds_remaining = max_rounds - current_round + 1
-                progress_pct = (current_round / max_rounds) * 100
-                
-                if rounds_remaining <= 1:
-                    urgency = "FINAL ROUND"
-                    length_instruction = "Keep it VERY brief (2-3 sentences). Focus on your final recommendation or key takeaway."
+                is_last_round = (current_round == max_rounds)
+                # Check if this participant will speak again after this turn
+                turns_left_in_debate = (max_rounds * len(participants)) - total_turns - 1
+                participant_turns_remaining = turns_left_in_debate // len(participants)
+                is_final_turn = is_last_round and participant_turns_remaining == 0
+            
+            # Determine urgency level and response length
+            if max_rounds:
+                if is_final_turn:
+                    urgency = "🔴 YOUR FINAL TURN"
+                    length_instruction = f"""This is YOUR LAST OPPORTUNITY to speak.
+
+**CRITICAL - Give your final conclusion:**
+- Be VERY brief (3-4 sentences maximum)
+- State your final position clearly
+- Reference the desired outcomes: {', '.join(desired_outcomes) if desired_outcomes else 'the goals of this discussion'}
+- End with a strong, memorable statement"""
+                elif rounds_remaining <= 1:
+                    urgency = f"⚡ FINAL ROUND ({current_round}/{max_rounds})"
+                    length_instruction = "Final round! Keep it brief (3-4 sentences). Start moving toward conclusion."
                 elif rounds_remaining <= 2:
-                    urgency = f"Only {rounds_remaining} rounds left"
-                    length_instruction = "Keep it concise (3-4 sentences). Be direct and actionable."
+                    urgency = f"⏰ {rounds_remaining} rounds left ({current_round}/{max_rounds})"
+                    length_instruction = "Time is running short. Keep it concise (3-4 sentences). Be direct and actionable."
                 else:
                     urgency = f"Round {current_round}/{max_rounds}"
-                    length_instruction = "Keep it short and crisp (4-5 sentences). Only expand into a paragraph if making a critical point."
+                    length_instruction = "Keep it short and crisp (4-5 sentences). Only expand if making a critical point."
             else:
                 urgency = f"Turn {total_turns + 1}"
-                length_instruction = "Keep it short and crisp (4-5 sentences). Only expand into a paragraph if making a critical point."
+                length_instruction = "Keep it short and crisp (4-5 sentences). Only expand if making a critical point."
             
             # Add turn instruction with conversational guidance
             role_context = agent_config.get('description', f"You are {agent_name}")

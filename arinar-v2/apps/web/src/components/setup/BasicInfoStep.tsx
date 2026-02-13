@@ -7,11 +7,13 @@ interface BasicInfoStepProps {
   agenda: string[];
   desiredOutcomes: string[];
   timeboxMinutes?: number;
+  maxRounds?: number;
   onTitleChange: (value: string) => void;
   onProblemChange: (value: string) => void;
   onAgendaChange: (value: string[]) => void;
   onDesiredOutcomesChange: (value: string[]) => void;
   onTimeboxChange: (value: number | undefined) => void;
+  onMaxRoundsChange: (value: number | undefined) => void;
   isLoading: boolean;
 }
 
@@ -21,15 +23,18 @@ export function BasicInfoStep({
   agenda,
   desiredOutcomes,
   timeboxMinutes,
+  maxRounds,
   onTitleChange,
   onProblemChange,
   onAgendaChange,
   onDesiredOutcomesChange,
   onTimeboxChange,
+  onMaxRoundsChange,
   isLoading,
 }: BasicInfoStepProps) {
   const [agendaInput, setAgendaInput] = useState('');
   const [outcomeInput, setOutcomeInput] = useState('');
+  const [meetingType, setMeetingType] = useState<'rounds' | 'time'>(maxRounds ? 'rounds' : 'time');
 
   const handleAddAgendaItem = () => {
     if (agendaInput.trim()) {
@@ -159,16 +164,68 @@ export function BasicInfoStep({
         </ul>
       )}
 
-      <label>Meeting Duration (minutes, optional)</label>
-      <input
-        type="number"
-        value={timeboxMinutes || ''}
-        onChange={(e) => onTimeboxChange(e.target.value ? parseInt(e.target.value) : undefined)}
-        placeholder="30"
-        disabled={isLoading}
-        min="5"
-        max="240"
-      />
+      <label>Meeting Limit</label>
+      <div className={styles.radioGroup}>
+        <label className={styles.radioLabel}>
+          <input
+            type="radio"
+            checked={meetingType === 'rounds'}
+            onChange={() => {
+              setMeetingType('rounds');
+              onTimeboxChange(undefined);
+              onMaxRoundsChange(3); // default to 3 rounds
+            }}
+            disabled={isLoading}
+          />
+          <span>Rounds-based (each participant speaks once per round)</span>
+        </label>
+        <label className={styles.radioLabel}>
+          <input
+            type="radio"
+            checked={meetingType === 'time'}
+            onChange={() => {
+              setMeetingType('time');
+              onMaxRoundsChange(undefined);
+              onTimeboxChange(30); // default to 30 minutes
+            }}
+            disabled={isLoading}
+          />
+          <span>Time-based (unlimited rounds within time limit)</span>
+        </label>
+      </div>
+
+      {meetingType === 'rounds' && (
+        <>
+          <label>Number of Rounds *</label>
+          <input
+            type="number"
+            value={maxRounds || ''}
+            onChange={(e) => onMaxRoundsChange(e.target.value ? parseInt(e.target.value) : undefined)}
+            placeholder="3"
+            disabled={isLoading}
+            min="1"
+            max="10"
+          />
+          <p className={styles.helpText}>
+            Example: With 5 agents and 3 rounds, each agent will speak 3 times (15 total turns)
+          </p>
+        </>
+      )}
+
+      {meetingType === 'time' && (
+        <>
+          <label>Meeting Duration (minutes) *</label>
+          <input
+            type="number"
+            value={timeboxMinutes || ''}
+            onChange={(e) => onTimeboxChange(e.target.value ? parseInt(e.target.value) : undefined)}
+            placeholder="30"
+            disabled={isLoading}
+            min="5"
+            max="240"
+          />
+        </>
+      )}
     </div>
   );
 }

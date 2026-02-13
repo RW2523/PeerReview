@@ -31,6 +31,7 @@ async def setup_debate(
             problem_statement=request.problem_statement,
             agenda=request.agenda,
             desired_outcomes=request.desired_outcomes,
+            max_rounds=request.max_rounds,
             timebox_minutes=request.timebox_minutes,
             participants=[
                 p.model_dump(exclude_none=True, by_alias=True) for p in request.participants

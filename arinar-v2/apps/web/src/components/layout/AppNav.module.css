@@ -25,22 +25,48 @@
 
 .logo {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 12px;
   text-decoration: none;
-  transition: opacity 150ms;
+  transition: all 200ms;
 }
 
 .logo:hover {
-  opacity: 0.8;
+  transform: translateY(-1px);
+}
+
+.logo:hover .wordmark {
+  color: var(--accent);
+}
+
+.logoIcon {
+  font-size: 28px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.3));
+  transition: transform 200ms;
+}
+
+.logo:hover .logoIcon {
+  transform: scale(1.1);
+}
+
+.logoText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .wordmark {
   font-family: var(--font-display, sans-serif);
   font-size: 20px;
-  font-weight: 500;
+  font-weight: 700;
   color: var(--text-0);
   letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--text-0) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  transition: all 200ms;
 }
 
 .tagline {
@@ -48,6 +74,7 @@
   color: var(--text-2);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  font-weight: 500;
 }
 
 .links {

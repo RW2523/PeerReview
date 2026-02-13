@@ -15,6 +15,7 @@ interface UseDebateSetupActionsOptions {
   agenda?: string[];
   desiredOutcomes?: string[];
   timeboxMinutes?: number;
+  maxRounds?: number;
   participants: SetupParticipant[];
   materials: SetupMaterial[];
   selectedMemorySources: string[];
@@ -44,6 +45,7 @@ export function useDebateSetupActions(
       agenda,
       desiredOutcomes,
       timeboxMinutes,
+      maxRounds,
       participants,
       materials,
       selectedMemorySources,
@@ -64,6 +66,7 @@ export function useDebateSetupActions(
         agenda: agenda && agenda.length > 0 ? agenda : undefined,
         desired_outcomes: desiredOutcomes && desiredOutcomes.length > 0 ? desiredOutcomes : undefined,
         timebox_minutes: timeboxMinutes || 30,
+        max_rounds: maxRounds,
         participants,
         materials: materials && materials.length > 0 ? materials : undefined,
       });

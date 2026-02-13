@@ -32,20 +32,6 @@
   gap: 32px;
 }
 
-.branding h2 {
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--text-0);
-  margin-bottom: 4px;
-}
-
-.subtitle {
-  font-size: 12px;
-  color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 .keyVaultBtn {
   display: flex;
   align-items: center;
@@ -112,6 +98,49 @@
 .state-ended {
   background: var(--surface-0);
   color: var(--text-2);
+}
+
+/* Progress Indicator */
+.progressIndicator {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+
+.progressLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.progressValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, rgba(147, 51, 234, 0.9) 100%);
+  border-radius: 4px;
+  transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
 }
 
 .section {

@@ -20,6 +20,7 @@ class DebateSetupRequest(BaseModel):
     agenda: Optional[List[str]] = Field(default=None, description="Meeting agenda items")
     desired_outcomes: Optional[List[str]] = Field(default=None, description="Desired meeting outcomes")
     timebox_minutes: Optional[int] = None
+    max_rounds: Optional[int] = Field(default=None, description="Number of rounds (each participant speaks once per round)")
     participants: List[SetupParticipant]
     materials: Optional[List[SetupMaterial]] = Field(default_factory=list)
 

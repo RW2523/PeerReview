@@ -15,8 +15,8 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'Arinar',
-  description: 'AI-Native Decision Room',
+  title: 'Boardroom AI',
+  description: 'Intelligent Debate Platform - AI-Powered Group Decision Making',
 }
 
 export default function RootLayout({

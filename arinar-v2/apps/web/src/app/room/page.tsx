@@ -33,11 +33,13 @@ function RoomPageContent() {
   const [onlineParticipants, setOnlineParticipants] = useState<Set<string>>(new Set());
   const [typingParticipants, setTypingParticipants] = useState<Set<string>>(new Set());
   const typingTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const [policyConfig, setPolicyConfig] = useState<any>(null);
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
     setDebateTitle(title);
-    setDebateState(state);
+    setDebateState(state.toLowerCase()); // Normalize to lowercase
+    console.log('🎯 Debate loaded:', { id, title, state: state.toLowerCase() });
   };
 
   // Auto-load debate from URL params (e.g., from setup flow)
@@ -48,6 +50,8 @@ function RoomPageContent() {
       api.getDebate(debateIdFromUrl)
         .then(debate => {
           handleDebateLoaded(debate.debate_id, debate.title || 'Untitled', debate.state);
+          setPolicyConfig(debate.policy_config || {});
+          console.log('📊 Policy Config loaded:', debate.policy_config);
         })
         .catch(err => {
           console.error('Failed to auto-load debate:', err);
@@ -60,6 +64,22 @@ function RoomPageContent() {
     debateId: debateId || '',
     enabled: !!debateId && debateState !== 'ended',
   });
+
+  // Update policy config when new agent messages arrive (to update progress indicator)
+  useEffect(() => {
+    if (!debateId) return;
+    
+    const hasNewAgentMessage = events.some(e => e.type === 'agent_message');
+    if (hasNewAgentMessage) {
+      api.getDebate(debateId)
+        .then(debate => {
+          setPolicyConfig(debate.policy_config || {});
+        })
+        .catch(err => {
+          console.error('Failed to refresh debate policy:', err);
+        });
+    }
+  }, [events.length, debateId]); // Only when events array length changes
 
   // Presence join/leave via WebSocket
   useEffect(() => {
@@ -141,6 +161,7 @@ function RoomPageContent() {
             name: p.agent_config?.name || p.role_name || 'Unknown Agent',
           }));
           setParticipants(participantList);
+          console.log('👥 Participants loaded:', participantList.length);
         }
       })
       .catch((err) => console.error('Failed to fetch participants:', err));
@@ -153,19 +174,60 @@ function RoomPageContent() {
       {/* Left Rail: Meeting Info */}
       <aside className={styles.leftRail}>
         <div className={styles.meetingInfo}>
-          <div className={styles.branding}>
-            <h2>Arinar</h2>
-            <span className={styles.subtitle}>Decision Room</span>
-          </div>
-          
           {debateId && (
             <>
               <div className={styles.debateHeader}>
                 <h1 className={styles.debateTitle}>{debateTitle || 'Untitled'}</h1>
                 <div className={`${styles.stateBadge} ${styles[`state-${debateState}`]}`}>
-                  {debateState}
+                  {debateState?.toUpperCase()}
                 </div>
               </div>
+              
+              {(() => {
+                const shouldShow = policyConfig && debateState?.toLowerCase() === 'running' && participants.length > 0;
+                console.log('🎯 Progress Indicator Check:', {
+                  policyConfig: !!policyConfig,
+                  debateState: debateState?.toLowerCase(),
+                  participantsCount: participants.length,
+                  shouldShow,
+                  maxRounds: policyConfig?.max_rounds,
+                  timeboxMinutes: policyConfig?.timebox_minutes
+                });
+                return shouldShow;
+              })() && (
+                <div className={styles.progressIndicator}>
+                  {policyConfig.max_rounds && (
+                    <>
+                      <div className={styles.progressLabel}>🎯 Round Progress</div>
+                      <div className={styles.progressValue}>
+                        Round {Math.floor(((policyConfig.total_turns_taken || 0) / participants.length)) + 1} / {policyConfig.max_rounds}
+                      </div>
+                      <div className={styles.progressBar}>
+                        <div 
+                          className={styles.progressFill} 
+                          style={{
+                            width: `${Math.min(100, ((Math.floor(((policyConfig.total_turns_taken || 0) / participants.length)) + 1) / policyConfig.max_rounds) * 100)}%`
+                          }}
+                        />
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '8px' }}>
+                        {policyConfig.total_turns_taken || 0} / {policyConfig.max_rounds * participants.length} total turns
+                      </div>
+                    </>
+                  )}
+                  {policyConfig.timebox_minutes && !policyConfig.max_rounds && (
+                    <>
+                      <div className={styles.progressLabel}>⏱️ Time Limit</div>
+                      <div className={styles.progressValue}>
+                        {policyConfig.timebox_minutes} minutes
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
+                        Debate will auto-end after time limit
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               
               <section className={styles.section}>
                 <h3>Participants</h3>

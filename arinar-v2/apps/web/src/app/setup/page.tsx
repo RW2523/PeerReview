@@ -31,6 +31,7 @@ export default function SetupPage() {
   const [agenda, setAgenda] = useState<string[]>([]);
   const [desiredOutcomes, setDesiredOutcomes] = useState<string[]>([]);
   const [timeboxMinutes, setTimeboxMinutes] = useState<number | undefined>(30);
+  const [maxRounds, setMaxRounds] = useState<number | undefined>(undefined);
 
   // Pre-fill from draft if coming from home page
   useEffect(() => {
@@ -90,6 +91,7 @@ export default function SetupPage() {
     agenda,
     desiredOutcomes,
     timeboxMinutes,
+    maxRounds,
     participants,
     materials,
     selectedMemorySources: memoryImport.source_debate_ids,
@@ -191,11 +193,13 @@ export default function SetupPage() {
               agenda={agenda}
               desiredOutcomes={desiredOutcomes}
               timeboxMinutes={timeboxMinutes}
+              maxRounds={maxRounds}
               onTitleChange={setTitle}
               onProblemChange={setProblemStatement}
               onAgendaChange={setAgenda}
               onDesiredOutcomesChange={setDesiredOutcomes}
               onTimeboxChange={setTimeboxMinutes}
+              onMaxRoundsChange={setMaxRounds}
               isLoading={isLoading}
             />
           )}

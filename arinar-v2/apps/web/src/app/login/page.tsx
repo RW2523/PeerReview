@@ -47,8 +47,11 @@ export default function LoginPage() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <h1>Arinar Login</h1>
-        <p className={styles.subtitle}>Sign in to access the operator dashboard</p>
+        <div className={styles.loginHeader}>
+          <span className={styles.loginIcon}>🏛️</span>
+          <h1>Boardroom AI</h1>
+        </div>
+        <p className={styles.subtitle}>Sign in to access the debate platform</p>
 
         <div className={styles.toggle}>
           <button

@@ -17,8 +17,11 @@ export default function AppNav() {
     <nav className={styles.nav}>
       <div className={styles.container}>
         <Link href="/" className={styles.logo}>
-          <span className={styles.wordmark}>Arinar</span>
-          <span className={styles.tagline}>Decision Room</span>
+          <span className={styles.logoIcon}>🏛️</span>
+          <div className={styles.logoText}>
+            <span className={styles.wordmark}>Boardroom AI</span>
+            <span className={styles.tagline}>Intelligent Debate Platform</span>
+          </div>
         </Link>
 
         <div className={styles.navRight}>

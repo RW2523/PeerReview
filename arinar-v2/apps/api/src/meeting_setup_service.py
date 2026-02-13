@@ -35,6 +35,7 @@ class MeetingSetupService:
         agenda: Optional[List[str]] = None,
         desired_outcomes: Optional[List[str]] = None,
         timebox_minutes: Optional[int] = None,
+        max_rounds: Optional[int] = None,
     ) -> Tuple[str, List[str], List[str]]:
         """
         Returns: (debate_id, participant_ids, material_ids)
@@ -55,6 +56,8 @@ class MeetingSetupService:
             policy_config["desired_outcomes"] = desired_outcomes
         if timebox_minutes is not None:
             policy_config["timebox_minutes"] = timebox_minutes
+        if max_rounds is not None:
+            policy_config["max_rounds"] = max_rounds
 
         debate = self._debates.create_debate(
             workspace_id=workspace_id, title=title, policy_config=policy_config
