@@ -104,8 +104,19 @@ export default function DebateControls({ debateId, currentState, policyConfig, t
     try {
       // Check if this should be a conclusion instead
       if (shouldConclude) {
-        // Call conclude endpoint for host
-        await api.concludeDebate(debateId, apiKey);
+        // Call conclude endpoint for host (if enabled) or just end the meeting
+        if (policyConfig?.enable_host) {
+          await api.concludeDebate(debateId, apiKey);
+        } else {
+          // No host - just end the meeting
+          if (sendCommand) {
+            await sendCommand('control.end');
+            onStateChange('ended');
+          } else {
+            await api.endDebate(debateId);
+            onStateChange('ended');
+          }
+        }
       } else {
         // Regular turn
         if (sendCommand) {
@@ -152,7 +163,10 @@ export default function DebateControls({ debateId, currentState, policyConfig, t
   const maxTotalTurns = policyConfig?.max_rounds && participantCount > 0 
     ? policyConfig.max_rounds * participantCount
     : null;
-  const shouldConclude = maxTotalTurns && totalTurns >= maxTotalTurns && policyConfig?.enable_host;
+  
+  // Show conclude button if max rounds reached, regardless of host setting
+  // If host is enabled, it will provide conclusion; otherwise just mark meeting as complete
+  const shouldConclude = maxTotalTurns && totalTurns >= maxTotalTurns;
   
   const canStart = currentState === 'pending';
   const canPause = currentState === 'running';
@@ -200,7 +214,7 @@ export default function DebateControls({ debateId, currentState, policyConfig, t
           onClick={handleNextTurn}
           disabled={!canTriggerTurn || triggeringTurn}
           className={shouldConclude ? styles.btnConclude : (canTriggerTurn ? styles.btnPrimary : '')}
-          title={shouldConclude ? 'Host will provide final conclusion' : (!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak')}
+          title={shouldConclude ? (policyConfig?.enable_host ? 'Host will provide final conclusion' : 'All rounds complete - End meeting') : (!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak')}
         >
           {triggeringTurn ? 'Agent thinking...' : shouldConclude ? '🏁 Conclude Meeting' : '▶ Next Turn'}
         </button>

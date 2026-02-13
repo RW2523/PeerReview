@@ -222,27 +222,37 @@ class TurnOrchestrator:
                 if is_final_turn:
                     urgency = "🔴 YOUR FINAL TURN - NO MORE CHANCES TO SPEAK"
                     outcomes_str = f"the desired outcomes: {', '.join(desired_outcomes)}" if desired_outcomes else "the goals of this discussion"
-                    length_instruction = f"""⚠️ THIS IS YOUR ABSOLUTE LAST TURN. You will NOT speak again unless the host extends the debate.
+                    length_instruction = f"""⚠️ THIS IS YOUR ABSOLUTE LAST TURN. You will NOT speak again unless the host extends.
 
-**YOU MUST START YOUR MESSAGE WITH:**
-"Given this is my final turn, I'll conclude by saying..."
+**MANDATORY FORMAT - START WITH:**
+"Given this is my final turn (Round {max_rounds}/{max_rounds}), I'll conclude by stating my decision: [CLEAR YES/NO or SPECIFIC CHOICE]"
 
-**THEN provide your final conclusion (3-4 sentences max):**
-- State your final position CLEARLY and DECISIVELY
-- Explicitly reference {outcomes_str}
-- End with a strong, memorable final statement that summarizes your stance
-- Make it clear this is your CONCLUDING remark
+**THEN provide your reasoning (2-3 sentences):**
+- Explain WHY you made this decision based on the discussion
+- Reference {outcomes_str}
+- Show you LISTENED to others and synthesized their points
+- Make it ACTIONABLE and DECISIVE
 
-Example opening: "Given this is my final turn before the host's conclusion, let me be direct: [your final position]" """
+**CRITICAL: You MUST declare a CONCRETE RESULT after considering the full debate:**
+✅ GOOD: "After hearing everyone's perspectives, my final decision: Coffee is superior because..."
+✅ GOOD: "Having weighed all arguments, I recommend Option A: The data clearly shows..."
+✅ GOOD: "Considering what @ExpertAnalyst and @Critic said, my stance: Legacy should be primary..."
+❌ BAD: "I conclude by saying both have merit..." (TOO VAGUE)
+❌ BAD: "In conclusion, there are many factors..." (NO DECISION)
+
+**Your decision should reflect that you've progressed through {max_rounds} rounds of discussion.**"""
                 elif rounds_remaining <= 1:
                     urgency = f"⚡ FINAL ROUND ({current_round}/{max_rounds}) - Next turn is your LAST"
-                    length_instruction = "You're in the final round! Next time you speak will be your last turn. Keep it brief (3-4 sentences). Start pivoting toward your conclusion."
+                    length_instruction = f"You're in the final round! Next turn will be your last opportunity to speak. Keep it brief (3-4 sentences). Start converging toward a position based on what you've heard in previous {current_round - 1} rounds."
                 elif rounds_remaining <= 2:
                     urgency = f"⏰ Only {rounds_remaining} rounds left ({current_round}/{max_rounds})"
-                    length_instruction = "Time is running out! Express urgency. Be concise (3-4 sentences). Focus on what matters most for the final decision."
+                    length_instruction = f"Time is running out! Express urgency. Be concise (3-4 sentences). Focus on what matters most. Show that you've listened to others in rounds 1-{current_round - 1}."
+                elif current_round == 1:
+                    urgency = f"Round {current_round}/{max_rounds} - OPENING"
+                    length_instruction = f"This is the first of {max_rounds} rounds. Focus on EXPLORING the topic, ASKING QUESTIONS, and sharing initial observations. Don't rush to conclusions - you have {max_rounds - 1} more rounds to develop your stance. Listen and engage with others."
                 else:
                     urgency = f"Round {current_round}/{max_rounds}"
-                    length_instruction = "Keep it short and crisp (4-5 sentences). Only expand if making a critical point."
+                    length_instruction = f"You're in round {current_round} of {max_rounds}. Build on what others said in previous rounds. Challenge or support their points. Keep it short (4-5 sentences). Save your final decision for round {max_rounds}."
             else:
                 urgency = f"Turn {total_turns + 1}"
                 length_instruction = "Keep it short and crisp (4-5 sentences). Only expand if making a critical point."
@@ -250,7 +260,41 @@ Example opening: "Given this is my final turn before the host's conclusion, let 
             # Add turn instruction with conversational guidance
             role_context = agent_config.get('description', f"You are {agent_name}")
             
+            # Build strategic context about debate structure
+            if max_rounds:
+                # Adapt strategy guidance based on total rounds
+                if max_rounds == 2:
+                    strategy_guide = f"""
+**DEBATE STRUCTURE:**
+Total Rounds: {max_rounds} | Current: Round {current_round}/{max_rounds}
+
+**YOUR STRATEGY FOR THIS 2-ROUND DEBATE:**
+Round 1: Explore the topic, share initial thoughts, ask questions. Be open to others' perspectives.
+Round 2 (FINAL): Synthesize what you heard, make your decision with clear reasoning based on the discussion."""
+                elif max_rounds == 3:
+                    strategy_guide = f"""
+**DEBATE STRUCTURE:**
+Total Rounds: {max_rounds} | Current: Round {current_round}/{max_rounds}
+
+**YOUR STRATEGY FOR THIS 3-ROUND DEBATE:**
+Round 1: Explore, listen, ask clarifying questions, share initial observations
+Round 2: Engage with others' points, challenge/build on ideas, develop your position
+Round 3 (FINAL): Converge, synthesize discussion, make your final call with clear reasoning"""
+                else:
+                    strategy_guide = f"""
+**DEBATE STRUCTURE:**
+Total Rounds: {max_rounds} | Current: Round {current_round}/{max_rounds}
+
+**YOUR STRATEGY FOR THIS {max_rounds}-ROUND DEBATE:**
+Early Rounds (1-2): Explore and listen, ask questions, share initial thoughts
+Middle Rounds: Engage deeply, challenge/build on ideas, develop position
+Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
+            else:
+                strategy_guide = ""
+            
             conversational_instruction = f"""{role_context}
+
+{strategy_guide}
 
 **Context:** {urgency} | Turn {turn_in_round}/{len(participants)} in this round
 **Other Participants:** {participant_list}
@@ -263,7 +307,10 @@ Example opening: "Given this is my final turn before the host's conclusion, let 
 - Explicitly agree/disagree with specific points
 - Ask questions to invite responses
 - Reference what others said
-- Be authentic and human-like"""
+- BE OPEN-MINDED: Don't come with pre-determined conclusions unless it's your final turn
+
+**Desired Outcomes to Keep in Mind:**
+{chr(10).join(f'- {outcome}' for outcome in desired_outcomes) if desired_outcomes else 'No specific outcomes defined'}"""
             
             messages.append({
                 "role": "user",
