@@ -6,7 +6,7 @@ import AppNav from '@/components/layout/AppNav';
 import DebateSelector from '@/components/room/DebateSelector';
 import EventFeed from '@/components/room/EventFeed';
 import DebateControls from '@/components/room/DebateControls';
-import AgendaPanel from '@/components/room/AgendaPanel';
+import AgentBehaviorsPanel from '@/components/room/AgentBehaviorsPanel';
 import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
 import { useDebateRoom } from '@/hooks/useDebateRoom';
@@ -305,7 +305,7 @@ function RoomPageContent() {
               sendCommand={sendCommand}
             />
             
-            <AgendaPanel debateId={debateId} />
+            <AgentBehaviorsPanel debateId={debateId} events={events} />
           </>
         ) : (
           <div className={styles.hint}>

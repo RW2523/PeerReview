@@ -56,7 +56,10 @@ export function SkipDialog({
   );
 }
 
-interface PrepPackDialogProps {
+// Legacy prep pack dialog - kept for backwards compatibility but not used
+// New PrepPackDialog is in PrepPackDialog.tsx
+
+interface LegacyPrepPackDialogProps {
   isOpen: boolean;
   content: string | null;
   participantName: string;
@@ -70,7 +73,7 @@ interface PrepPackDialogProps {
   onClose: () => void;
 }
 
-export function PrepPackDialog({ 
+export function LegacyPrepPackDialog({ 
   isOpen, 
   content, 
   participantName,
@@ -82,7 +85,7 @@ export function PrepPackDialog({
   materialsCount = 0,
   memoryChunksCount = 0,
   onClose 
-}: PrepPackDialogProps) {
+}: LegacyPrepPackDialogProps) {
   if (!isOpen || !content) return null;
 
   // Parse prep pack content to extract structure

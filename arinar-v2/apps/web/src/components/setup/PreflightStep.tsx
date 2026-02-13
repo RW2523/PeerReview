@@ -8,7 +8,8 @@
 import { useState, useEffect } from 'react';
 import * as api from '@/lib/api';
 import { usePreflight } from '@/hooks/usePreflight';
-import { SkipDialog, PrepPackDialog } from './PreflightDialogs';
+import { SkipDialog } from './PreflightDialogs';
+import { PrepPackDialog } from './PrepPackDialog';
 import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import styles from './SetupSteps.module.css';
 
@@ -99,8 +100,10 @@ export function PreflightStep({
   const [skipReason, setSkipReason] = useState('');
   const [prepPackDialogOpen, setPrepPackDialogOpen] = useState(false);
   const [prepPackContent, setPrepPackContent] = useState<string | null>(null);
+  const [prepPackMetadata, setPrepPackMetadata] = useState<Record<string, any> | null>(null);
   const [prepPackParticipantId, setPrepPackParticipantId] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [loadingPrepPack, setLoadingPrepPack] = useState(false);
 
   // Notify parent when readiness changes
   useEffect(() => {
@@ -171,19 +174,22 @@ export function PreflightStep({
   const handleViewPrepPack = async (participantRun: api.ParticipantRunStatus) => {
     if (!participantRun.prep_pack_knowledge_id) return;
     
-    // For V1, show a simple preview from metadata
-    // In production, you'd fetch the actual prep pack content from agent_knowledge_units
-    const preview = `Prep Pack for ${getParticipantName(participantRun.participant_id)}
-
-Status: Ready ✅
-Materials reviewed: ${participantRun.metadata?.chunks_processed || 0} chunks
-Grants used: ${participantRun.metadata?.grants_used || 0}
-
-[Full prep pack content would be fetched from backend in production]`;
+    setLoadingPrepPack(true);
     
-    setPrepPackContent(preview);
-    setPrepPackParticipantId(participantRun.participant_id);
-    setPrepPackDialogOpen(true);
+    try {
+      // Fetch the actual prep pack from backend
+      const knowledgeUnit = await api.getAgentKnowledgeUnit(participantRun.prep_pack_knowledge_id);
+      
+      setPrepPackContent(knowledgeUnit.content || 'No content available');
+      setPrepPackMetadata(knowledgeUnit.metadata || {});
+      setPrepPackParticipantId(participantRun.participant_id);
+      setPrepPackDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to load prep pack:', error);
+      alert('Failed to load prep pack. Please try again.');
+    } finally {
+      setLoadingPrepPack(false);
+    }
   };
 
   const getParticipantName = (participantId: string): string => {
@@ -336,10 +342,22 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
                     {participantRun.status === 'success' && participantRun.prep_pack_knowledge_id && (
                       <button
                         onClick={() => handleViewPrepPack(participantRun)}
-                        className={styles.btnSecondary}
-                        style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+                        disabled={loadingPrepPack}
+                        className={styles.btnPrimary}
+                        style={{ 
+                          fontSize: '0.875rem', 
+                          padding: '0.625rem 1.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontWeight: 600
+                        }}
                       >
-                        View prep pack
+                        {loadingPrepPack ? (
+                          <>⏳ Loading...</>
+                        ) : (
+                          <>📊 View Prep Pack</>
+                        )}
                       </button>
                     )}
                     {participantRun.status === 'skipped' && participantRun.skip_reason && (
@@ -388,23 +406,20 @@ Grants used: ${participantRun.metadata?.grants_used || 0}
       <PrepPackDialog
         isOpen={prepPackDialogOpen}
         content={prepPackContent}
+        metadata={prepPackMetadata}
         participantName={prepPackParticipantId ? getParticipantName(prepPackParticipantId) : 'Unknown'}
         participantRole={prepPackParticipantId ? getParticipantRole(prepPackParticipantId) : 'Unknown'}
         meetingTitle={meetingTitle}
         meetingPurpose={meetingPurpose}
         meetingAgenda={meetingAgenda}
         desiredOutcomes={desiredOutcomes}
-        materialsCount={prepPackParticipantId && status ? 
-          status.participant_runs.find(r => r.participant_id === prepPackParticipantId)?.metadata?.chunks_processed || 0 
-          : 0
-        }
-        memoryChunksCount={prepPackParticipantId && status ?
-          status.participant_runs.find(r => r.participant_id === prepPackParticipantId)?.metadata?.memory_chunks_used || 0
-          : 0
-        }
+        materialsCount={prepPackMetadata?.material_chunks_count || 0}
+        memoryChunksCount={prepPackMetadata?.imported_chunks_count || 0}
         onClose={() => {
           setPrepPackDialogOpen(false);
           setPrepPackParticipantId(null);
+          setPrepPackContent(null);
+          setPrepPackMetadata(null);
         }}
       />
     </div>

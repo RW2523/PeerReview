@@ -1,5 +1,7 @@
 """Turn-based debate orchestration for M2+"""
 import uuid
+import random
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import psycopg2.extras
@@ -387,7 +389,7 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             conn.commit()
             print(f"✅ Transaction committed successfully!\n")
             
-            return {
+            result = {
                 'event_id': event_id,
                 'participant_id': next_participant['participant_id'],
                 'participant_name': agent_name,
@@ -395,6 +397,25 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 'turn_number': total_turns + 1,
                 'sequence_number': next_seq
             }
+            
+            # Post-turn autonomous behaviors (25% chance, token-efficient)
+            should_trigger_autonomy = random.random() < 0.25 and total_turns > 1
+            if should_trigger_autonomy:
+                print(f"    🎭 Triggering autonomous behaviors for {agent_name}...")
+                try:
+                    # Fire and forget - don't block the turn response
+                    loop = asyncio.get_event_loop()
+                    if loop and loop.is_running():
+                        asyncio.create_task(
+                            self._async_autonomous_behaviors(
+                                debate_id, agent_name, participants, history_events, 
+                                desired_outcomes, next_seq
+                            )
+                        )
+                except Exception as e:
+                    print(f"    ⚠️ Failed to start autonomous behaviors: {e}")
+            
+            return result
     
     def _build_conversation_history(
         self,
@@ -423,4 +444,75 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 })
         
         # Limit history to last 10 messages to avoid context overflow
-        return history[-10:]
+            return history
+    
+    async def _async_autonomous_behaviors(
+        self,
+        debate_id: str,
+        agent_name: str,
+        participants: List[Dict[str, Any]],
+        history_events: List[Dict[str, Any]],
+        desired_outcomes: List[str],
+        current_seq: int
+    ):
+        """
+        Async autonomous behaviors - runs in background, doesn't block turn response
+        """
+        try:
+            from .websocket_service import websocket_manager
+            autonomy_service = AgentAutonomyService(self.openrouter_client.api_key)
+            
+            # Coalition formation (50% of 25% = 12.5% overall)
+            if random.random() < 0.5:
+                coalition = autonomy_service.analyze_and_form_coalitions(
+                    debate_id, agent_name, participants, history_events, desired_outcomes
+                )
+                
+                if coalition:
+                    event = {
+                        'type': 'coalition_formed',
+                        'debate_id': debate_id,
+                        'event_id': str(uuid.uuid4()),
+                        'sequence_number': current_seq + 1,
+                        'occurred_at': datetime.utcnow().isoformat() + 'Z',
+                        'sender_type': 'system',
+                        'payload': {
+                            'members': coalition['members'],
+                            'strategy': coalition.get('strategy'),
+                            'formed_by': agent_name
+                        }
+                    }
+                    await websocket_manager.broadcast_to_debate(debate_id, event)
+            
+            # Private messaging (30% of 25% = 7.5% overall)
+            if random.random() < 0.3 and len(participants) >= 2:
+                other_agents = [
+                    (p.get('agent_config') or {}).get('name') or p.get('role_name')
+                    for p in participants
+                    if ((p.get('agent_config') or {}).get('name') or p.get('role_name')) != agent_name
+                ]
+                
+                if other_agents:
+                    target = random.choice(other_agents)
+                    context = "\n".join([
+                        f"{e.get('content', {}).get('agent_name')}: {e.get('content', {}).get('text', '')[:80]}"
+                        for e in history_events[-3:] if e.get('event_type') == 'agent_message'
+                    ])
+                    
+                    message = autonomy_service.generate_private_message(
+                        debate_id, agent_name, target, context, desired_outcomes
+                    )
+                    
+                    if message:
+                        event = {
+                            'type': 'private_message',
+                            'debate_id': debate_id,
+                            'event_id': str(uuid.uuid4()),
+                            'sequence_number': current_seq + 2,
+                            'occurred_at': datetime.utcnow().isoformat() + 'Z',
+                            'sender_type': 'system',
+                            'payload': {'from': agent_name, 'to': target, 'message': message}
+                        }
+                        await websocket_manager.broadcast_to_debate(debate_id, event)
+        except Exception as e:
+            print(f"⚠️ Autonomous behaviors error: {e}")

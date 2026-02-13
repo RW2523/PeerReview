@@ -972,3 +972,21 @@ export async function signalTyping(debateId: string, participantId?: string, tar
   if (!response.ok) throw new Error(`Failed to signal typing: ${response.statusText}`);
   return response.json();
 }
+
+/**
+ * Fetch agent knowledge unit (prep pack) with full content and metadata
+ */
+export async function getAgentKnowledgeUnit(knowledgeId: string) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/agent-knowledge/${knowledgeId}`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to fetch knowledge unit: ${error}`);
+  }
+  
+  return response.json();
+}

@@ -1,0 +1,298 @@
+.panel {
+  background: var(--bg-1);
+  border-left: 1px solid var(--border-soft);
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  padding: 24px 24px 20px 24px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-1);
+}
+
+.header h3 {
+  margin: 0 0 6px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+  font-weight: 400;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 16px 24px 0 24px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.tab {
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.2s;
+  border-radius: 6px 6px 0 0;
+}
+
+.tab:hover {
+  color: var(--text-0);
+  background: var(--surface-1);
+}
+
+.tabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--surface-1);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty {
+  text-align: center;
+  padding: 60px 32px;
+  color: var(--text-2);
+}
+
+.emptyIcon {
+  font-size: 56px;
+  display: block;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+.empty p {
+  margin: 6px 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.emptyHint {
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.7;
+  margin-top: 8px;
+}
+
+/* Coalition Cards */
+.coalitionCard {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 18px;
+  animation: slideIn 0.3s ease-out;
+  transition: all 0.2s;
+}
+
+.coalitionCard:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.coalitionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.coalitionBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.coalitionTime {
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.coalitionMembers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.memberBadge {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.coalitionStrategy {
+  font-size: 14px;
+  color: var(--text-1);
+  padding: 12px;
+  background: var(--surface-1);
+  border-radius: 8px;
+  margin-top: 10px;
+  line-height: 1.5;
+  border-left: 3px solid #667eea;
+}
+
+/* Message Cards */
+.messageCard {
+  background: linear-gradient(135deg, rgba(240, 147, 251, 0.08) 0%, rgba(245, 87, 108, 0.08) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 18px;
+  animation: slideIn 0.3s ease-out;
+  transition: all 0.2s;
+}
+
+.messageCard:hover {
+  border-color: #f093fb;
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.1);
+}
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.messagePath {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-0);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.messagePath::before {
+  content: '🔒';
+  font-size: 14px;
+}
+
+.messageTime {
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.messageContent {
+  font-size: 14px;
+  color: var(--text-1);
+  line-height: 1.6;
+  padding: 12px;
+  background: var(--surface-1);
+  border-radius: 8px;
+  border-left: 3px solid #f093fb;
+}
+
+/* Task Cards */
+.taskCard {
+  background: linear-gradient(135deg, rgba(79, 172, 254, 0.08) 0%, rgba(0, 242, 254, 0.08) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 18px;
+  animation: slideIn 0.3s ease-out;
+  transition: all 0.2s;
+}
+
+.taskCard:hover {
+  border-color: #4facfe;
+  box-shadow: 0 4px 12px rgba(79, 172, 254, 0.1);
+}
+
+.taskHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.taskAgent {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.taskStatus {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.status-planning {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.status-executing {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.status-completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.taskContent {
+  font-size: 14px;
+  color: var(--text-1);
+  margin-bottom: 10px;
+  line-height: 1.5;
+  padding: 12px;
+  background: var(--surface-1);
+  border-radius: 8px;
+  border-left: 3px solid #4facfe;
+}
+
+.taskTime {
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

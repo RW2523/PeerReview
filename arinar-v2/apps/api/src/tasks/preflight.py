@@ -14,6 +14,14 @@ from src.config import settings
 from src.database import get_cursor
 from src.services.memory_retrieval import retrieve_allowed_chunks
 
+# Try to import web search
+try:
+    from duckduckgo_search import DDGS
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    WEB_SEARCH_AVAILABLE = False
+    DDGS = None
+
 # Try to import Celery, but make it optional
 try:
     from src.celery_app import celery_app
@@ -278,7 +286,38 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
             for i, chunk in enumerate(imported_chunks)
         ])
         
-        # 3. Build prep prompt
+        # 3. Perform web research (if available and debate is recent/current topic)
+        web_research_results = ""
+        if WEB_SEARCH_AVAILABLE and problem_statement:
+            try:
+                # Broadcast progress: Researching online
+                _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Researching topic online')
+                
+                print(f"    🔍 Performing web search for: {problem_statement[:100]}")
+                
+                # Generate focused search query (keep it short for better results)
+                search_query = problem_statement[:100]  # Limit query length
+                
+                with DDGS() as ddgs:
+                    # Search for max 5 results to keep it token-efficient
+                    results = list(ddgs.text(search_query, max_results=5))
+                    
+                    if results:
+                        web_research_results = "\n**Web Research Results:**\n"
+                        for i, result in enumerate(results[:3], 1):  # Only use top 3 to save tokens
+                            title = result.get('title', 'N/A')
+                            snippet = result.get('body', '')[:200]  # Limit snippet length
+                            link = result.get('href', '')
+                            web_research_results += f"{i}. {title}\n   {snippet}...\n   Source: {link}\n\n"
+                        
+                        print(f"    ✅ Found {len(results)} research results, using top 3")
+                    else:
+                        print(f"    ℹ️ No web search results found")
+            except Exception as e:
+                print(f"    ⚠️ Web search failed: {e}")
+                web_research_results = ""
+        
+        # 3b. Build prep prompt
         prep_prompt = f"""You are preparing for an important strategic discussion.
 
 **Discussion Title**: {debate_title}
@@ -294,13 +333,15 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
 **Imported Context from Prior Meetings**:
 {imported_context if imported_context else 'No prior context imported.'}
 
-**Task**: Generate a concise preparation memo (200-400 words) covering:
-1. Key facts and insights relevant to the problem
-2. Potential risks or concerns
-3. Open questions to explore
-4. Your initial stance or recommendation
+{web_research_results}
 
-Be specific and cite information where possible."""
+**Task**: Generate a concise preparation memo (250-400 words) covering:
+1. Key facts and insights (reference web research if provided)
+2. Potential risks or concerns
+3. Open questions to explore during the discussion
+4. Your initial thoughts (but remain open-minded for the actual debate)
+
+**IMPORTANT**: If web research was provided, cite those sources. Keep the memo concise and focused."""
         
         # 4. Call OpenRouter to generate prep pack
         # For V1, use a simple synchronous call (no streaming)
@@ -358,6 +399,9 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
         imported_chunk_ids = [str(chunk.chunk_id) for chunk in imported_chunks]
         
         # Use effective_agent_id for knowledge persistence
+        # Track whether web research was performed
+        web_research_performed = bool(web_research_results and WEB_SEARCH_AVAILABLE)
+        
         cursor.execute("""
             INSERT INTO agent_knowledge_units (
                 knowledge_id, agent_id, source_debate_id, knowledge_type, content, metadata, created_at
@@ -382,6 +426,8 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                 'material_chunk_ids': material_chunk_ids,
                 'imported_chunk_ids': imported_chunk_ids,
                 'semantic_query_used': semantic_query[:200],
+                'web_research_performed': web_research_performed,
+                'web_research_query': problem_statement[:100] if web_research_performed else None,
                 'generated_at': datetime.utcnow().isoformat()
             })
         ))
