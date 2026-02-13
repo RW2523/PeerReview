@@ -133,11 +133,59 @@ class TurnOrchestrator:
             # Add conversation history
             messages.extend(conversation_history)
             
-            # Add turn instruction with persona/role context
+            # Build list of other participants for @mentions
+            other_participants = [
+                p['agent_config'].get('name', p['role_name']) 
+                for p in participants 
+                if p['participant_id'] != next_participant['participant_id']
+            ]
+            participant_list = ", ".join([f"@{name}" for name in other_participants])
+            
+            # Calculate progress and urgency
+            max_rounds = policy_config.get('max_rounds')
+            timebox_minutes = policy_config.get('timebox_minutes')
+            current_round = (total_turns // len(participants)) + 1
+            turn_in_round = (total_turns % len(participants)) + 1
+            
+            # Determine urgency level and response length
+            if max_rounds:
+                rounds_remaining = max_rounds - current_round + 1
+                progress_pct = (current_round / max_rounds) * 100
+                
+                if rounds_remaining <= 1:
+                    urgency = "FINAL ROUND"
+                    length_instruction = "Keep it VERY brief (2-3 sentences). Focus on your final recommendation or key takeaway."
+                elif rounds_remaining <= 2:
+                    urgency = f"Only {rounds_remaining} rounds left"
+                    length_instruction = "Keep it concise (3-4 sentences). Be direct and actionable."
+                else:
+                    urgency = f"Round {current_round}/{max_rounds}"
+                    length_instruction = "Keep it short and crisp (4-5 sentences). Only expand into a paragraph if making a critical point."
+            else:
+                urgency = f"Turn {total_turns + 1}"
+                length_instruction = "Keep it short and crisp (4-5 sentences). Only expand into a paragraph if making a critical point."
+            
+            # Add turn instruction with conversational guidance
             role_context = agent_config.get('description', f"You are {agent_name}")
+            
+            conversational_instruction = f"""{role_context}
+
+**Context:** {urgency} | Turn {turn_in_round}/{len(participants)} in this round
+**Other Participants:** {participant_list}
+
+**Your Response:**
+{length_instruction}
+
+**Communication Style:**
+- Use @mentions to directly address others
+- Explicitly agree/disagree with specific points
+- Ask questions to invite responses
+- Reference what others said
+- Be authentic and human-like"""
+            
             messages.append({
                 "role": "user",
-                "content": f"{role_context}\n\nIt's your turn to contribute to the discussion. Share your unique perspective, respond to previous points, or advance the conversation. Keep it concise (2-3 paragraphs) and stay in character."
+                "content": conversational_instruction
             })
             
             # Call OpenRouter
