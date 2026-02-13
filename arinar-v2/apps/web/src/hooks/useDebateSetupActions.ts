@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import * as api from '@/lib/api';
 import type { SetupParticipant, SetupMaterial } from '@/lib/api';
+import { getAccessToken } from '@/lib/supabase';
 
 interface UseDebateSetupActionsOptions {
   workspaceId: string;
@@ -95,6 +96,20 @@ export function useDebateSetupActions(
   };
 
   const handleLaunchDebate = async (debateId: string, apiKey: string | null) => {
+    // Validate auth token before launching (required for WebSocket connection)
+    try {
+      const authToken = await getAccessToken();
+      if (!authToken) {
+        alert(
+          '⚠️ Authentication Required\n\nNo auth token available. This should not happen in development mode.\n\nPlease check your .env.local file has NEXT_PUBLIC_AUTH_MODE=development and NEXT_PUBLIC_TEST_TOKEN configured.'
+        );
+        return;
+      }
+    } catch (err: any) {
+      alert(`⚠️ Authentication Error\n\nFailed to get auth token: ${err.message}`);
+      return;
+    }
+
     // Validate API key before launching
     if (!apiKey) {
       alert(

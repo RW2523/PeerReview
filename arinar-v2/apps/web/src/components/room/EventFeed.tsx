@@ -2,17 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react';
 import styles from './EventFeed.module.css';
-import { useDebateRoom } from '@/hooks/useDebateRoom';
-import { WSEventEnvelope } from '@/lib/wsClient';
+import { WSEventEnvelope, ConnectionStatus } from '@/lib/wsClient';
 
 interface EventFeedProps {
-  debateId: string;
+  events: WSEventEnvelope[];
+  connectionStatus: ConnectionStatus;
   onPresenceUpdate?: (participantId: string, action: 'join' | 'leave') => void;
   onTyping?: (participantId: string) => void;
 }
 
-export default function EventFeed({ debateId, onPresenceUpdate, onTyping }: EventFeedProps) {
-  const { events: wsEvents, connectionStatus } = useDebateRoom({ debateId });
+export default function EventFeed({ events: wsEvents, connectionStatus, onPresenceUpdate, onTyping }: EventFeedProps) {
   const [displayEvents, setDisplayEvents] = useState<WSEventEnvelope[]>([]);
   const feedRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);

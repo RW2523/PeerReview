@@ -1,6 +1,7 @@
 """
 WebSocket Service - Production Debate Room Transport
 Handles authenticated WS connections, command processing, and event broadcast.
+Refactored for file size compliance (command handlers in websocket_handlers.py).
 """
 import asyncio
 import json
@@ -10,6 +11,7 @@ from typing import Dict, Set, Optional, Any
 from fastapi import WebSocket, WebSocketDisconnect
 from .database import get_db_connection, get_cursor
 from .debate_service import DebateService
+from .websocket_handlers import WebSocketCommandHandlers
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +88,7 @@ class WebSocketService:
     def __init__(self):
         self.manager = ConnectionManager()
         self.debate_service = DebateService()
+        self.handlers = WebSocketCommandHandlers(self.manager, self.debate_service)
     
     def _create_event_envelope(
         self,
@@ -130,7 +133,7 @@ class WebSocketService:
             'timestamp': datetime.now(timezone.utc).isoformat()
         }
     
-    async def _persist_event(self, debate_id: str, event_type: str, payload: Dict[str, Any], sender_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def _persist_event(self, debate_id: str, event_type: str, payload: Dict[str, Any], sender_id: Optional[str] = None, sender_type: str = 'human') -> Optional[Dict[str, Any]]:
         """Persist event to database and return with sequence_number."""
         try:
             with get_db_connection() as conn:
@@ -150,13 +153,13 @@ class WebSocketService:
                 cursor.execute("""
                     INSERT INTO events (
                         event_id, debate_id, event_type, sequence_number,
-                        created_at, content, sender_id
+                        created_at, content, sender_id, sender_type
                     ) VALUES (
                         gen_random_uuid(), %s, %s, %s,
-                        NOW(), %s, %s
+                        NOW(), %s, %s, %s
                     )
                     RETURNING event_id, sequence_number, created_at
-                """, (debate_id, event_type, next_seq, json.dumps(payload), sender_id))
+                """, (debate_id, event_type, next_seq, json.dumps(payload), sender_id, sender_type))
                 
                 event = cursor.fetchone()
                 conn.commit()
@@ -174,35 +177,52 @@ class WebSocketService:
         """Process command messages from client."""
         command = message.get('command')
         request_id = message.get('request_id', 'unknown')
-        debate_id = message.get('debate_id')
         
-        if not command or not debate_id:
+        if not command:
             await self.manager.send_to_client(
                 websocket,
-                self._create_error(request_id, command or 'unknown', 'Missing command or debate_id')
+                self._create_error(request_id, 'unknown', 'Missing command')
             )
             return
         
+        # SECURITY: Get debate_id from connection metadata ONLY (never trust client)
         metadata = self.manager.connection_metadata.get(websocket, {})
+        debate_id = metadata.get('debate_id')
         user_id = metadata.get('user_id')
+        
+        if not debate_id:
+            await self.manager.send_to_client(
+                websocket,
+                self._create_error(request_id, command, 'Connection not associated with debate')
+            )
+            return
+        
+        # Validate client debate_id if provided (prevent mistakes, not for auth)
+        client_debate_id = message.get('debate_id')
+        if client_debate_id and client_debate_id != debate_id:
+            await self.manager.send_to_client(
+                websocket,
+                self._create_error(request_id, command, f'Debate ID mismatch: connected to {debate_id}, requested {client_debate_id}')
+            )
+            return
         
         try:
             if command == 'join_presence':
-                await self._handle_join_presence(websocket, debate_id, user_id, request_id)
+                await self.handlers.handle_join_presence(websocket, debate_id, user_id, request_id, self._persist_event, self._create_event_envelope, self._create_ack)
             elif command == 'leave_presence':
-                await self._handle_leave_presence(websocket, debate_id, user_id, request_id)
+                await self.handlers.handle_leave_presence(websocket, debate_id, user_id, request_id, self._persist_event, self._create_event_envelope, self._create_ack)
             elif command == 'typing':
-                await self._handle_typing(websocket, debate_id, user_id, request_id, message.get('payload', {}))
+                await self.handlers.handle_typing(websocket, debate_id, user_id, request_id, message.get('payload', {}), self._create_event_envelope, self._create_ack)
             elif command == 'control.next_turn':
-                await self._handle_next_turn(websocket, debate_id, user_id, request_id, message.get('payload', {}))
+                await self.handlers.handle_next_turn(websocket, debate_id, user_id, request_id, message.get('payload', {}), self._create_event_envelope, self._create_ack, self._create_error)
             elif command == 'control.pause':
-                await self._handle_pause(websocket, debate_id, user_id, request_id)
+                await self.handlers.handle_pause(websocket, debate_id, user_id, request_id, self._create_event_envelope, self._create_ack, self._create_error)
             elif command == 'control.resume':
-                await self._handle_resume(websocket, debate_id, user_id, request_id)
+                await self.handlers.handle_resume(websocket, debate_id, user_id, request_id, self._create_event_envelope, self._create_ack, self._create_error)
             elif command == 'control.end':
-                await self._handle_end(websocket, debate_id, user_id, request_id)
+                await self.handlers.handle_end(websocket, debate_id, user_id, request_id, self._create_event_envelope, self._create_ack, self._create_error)
             elif command == 'intervene':
-                await self._handle_intervene(websocket, debate_id, user_id, request_id, message.get('payload', {}))
+                await self.handlers.handle_intervene(websocket, debate_id, user_id, request_id, message.get('payload', {}), self._persist_event, self._create_event_envelope, self._create_ack, self._create_error)
             else:
                 await self.manager.send_to_client(
                     websocket,
@@ -215,179 +235,6 @@ class WebSocketService:
                 self._create_error(request_id, command, str(e))
             )
     
-    async def _handle_join_presence(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str):
-        """Handle join_presence command."""
-        event_data = await self._persist_event(debate_id, 'presence_update', {
-            'action': 'join',
-            'participant_id': user_id
-        }, sender_id=user_id)
-        
-        if event_data:
-            # Broadcast to room
-            envelope = self._create_event_envelope(
-                'presence_update',
-                debate_id,
-                {'action': 'join', 'participant_id': user_id},
-                sequence_number=event_data['sequence_number'],
-                event_id=event_data['event_id'],
-                sender_type='user',
-                sender_id=user_id
-            )
-            await self.manager.broadcast_to_debate(debate_id, envelope)
-        
-        # Send ACK
-        await self.manager.send_to_client(websocket, self._create_ack(request_id, 'join_presence'))
-    
-    async def _handle_leave_presence(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str):
-        """Handle leave_presence command."""
-        event_data = await self._persist_event(debate_id, 'presence_update', {
-            'action': 'leave',
-            'participant_id': user_id
-        }, sender_id=user_id)
-        
-        if event_data:
-            envelope = self._create_event_envelope(
-                'presence_update',
-                debate_id,
-                {'action': 'leave', 'participant_id': user_id},
-                sequence_number=event_data['sequence_number'],
-                event_id=event_data['event_id'],
-                sender_type='user',
-                sender_id=user_id
-            )
-            await self.manager.broadcast_to_debate(debate_id, envelope)
-        
-        await self.manager.send_to_client(websocket, self._create_ack(request_id, 'leave_presence'))
-    
-    async def _handle_typing(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str, payload: Dict):
-        """Handle typing command (ephemeral, no persistence)."""
-        envelope = self._create_event_envelope(
-            'typing',
-            debate_id,
-            {'participant_id': user_id, **payload},
-            sender_type='user',
-            sender_id=user_id
-        )
-        await self.manager.broadcast_to_debate(debate_id, envelope)
-        await self.manager.send_to_client(websocket, self._create_ack(request_id, 'typing'))
-    
-    async def _handle_next_turn(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str, payload: Dict):
-        """Handle control.next_turn command."""
-        try:
-            # Get OpenRouter key from payload (required for BYOK)
-            openrouter_key = payload.get('openrouter_key')
-            if not openrouter_key:
-                raise ValueError("OpenRouter API key required for next turn")
-            
-            from .turn_orchestrator import TurnOrchestrator
-            
-            orchestrator = TurnOrchestrator(openrouter_key)
-            result = orchestrator.trigger_next_turn(debate_id)
-            
-            # Broadcast the new agent message event to all clients
-            event_data = await self._persist_event(debate_id, 'agent_message', {
-                'agent_name': result['participant_name'],
-                'message': result['message'],
-                'turn_number': result['turn_number']
-            }, sender_id=result['participant_id'])
-            
-            if event_data:
-                envelope = self._create_event_envelope(
-                    'agent_message',
-                    debate_id,
-                    {
-                        'agent_name': result['participant_name'],
-                        'message': result['message'],
-                        'turn_number': result['turn_number']
-                    },
-                    sequence_number=event_data['sequence_number'],
-                    event_id=event_data['event_id'],
-                    sender_type='agent',
-                    sender_id=result['participant_id']
-                )
-                await self.manager.broadcast_to_debate(debate_id, envelope)
-            
-            await self.manager.send_to_client(websocket, self._create_ack(request_id, 'control.next_turn'))
-        except Exception as e:
-            await self.manager.send_to_client(websocket, self._create_error(request_id, 'control.next_turn', str(e)))
-    
-    async def _handle_pause(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str):
-        """Handle control.pause command."""
-        debate = self.debate_service.pause_debate(debate_id)
-        if debate:
-            await self.manager.send_to_client(websocket, self._create_ack(request_id, 'control.pause'))
-            # Broadcast state change
-            envelope = self._create_event_envelope(
-                'state_update',
-                debate_id,
-                {'state': 'paused'},
-                sender_type='system'
-            )
-            await self.manager.broadcast_to_debate(debate_id, envelope)
-        else:
-            await self.manager.send_to_client(websocket, self._create_error(request_id, 'control.pause', 'Failed to pause'))
-    
-    async def _handle_resume(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str):
-        """Handle control.resume command."""
-        debate = self.debate_service.resume_debate(debate_id)
-        if debate:
-            await self.manager.send_to_client(websocket, self._create_ack(request_id, 'control.resume'))
-            envelope = self._create_event_envelope(
-                'state_update',
-                debate_id,
-                {'state': 'running'},
-                sender_type='system'
-            )
-            await self.manager.broadcast_to_debate(debate_id, envelope)
-        else:
-            await self.manager.send_to_client(websocket, self._create_error(request_id, 'control.resume', 'Failed to resume'))
-    
-    async def _handle_end(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str):
-        """Handle control.end command."""
-        debate = self.debate_service.end_debate(debate_id)
-        if debate:
-            await self.manager.send_to_client(websocket, self._create_ack(request_id, 'control.end'))
-            envelope = self._create_event_envelope(
-                'state_update',
-                debate_id,
-                {'state': 'ended'},
-                sender_type='system'
-            )
-            await self.manager.broadcast_to_debate(debate_id, envelope)
-        else:
-            await self.manager.send_to_client(websocket, self._create_error(request_id, 'control.end', 'Failed to end'))
-    
-    async def _handle_intervene(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str, payload: Dict):
-        """Handle intervene command."""
-        try:
-            message_text = payload.get('message')
-            if not message_text:
-                raise ValueError("Intervention message required")
-            
-            # Persist intervention as event
-            event_data = await self._persist_event(debate_id, 'intervention', {
-                'actor': payload.get('actor', 'Moderator'),
-                'message': message_text
-            }, sender_id=user_id)
-            
-            if event_data:
-                envelope = self._create_event_envelope(
-                    'intervention',
-                    debate_id,
-                    {
-                        'actor': payload.get('actor', 'Moderator'),
-                        'message': message_text
-                    },
-                    sequence_number=event_data['sequence_number'],
-                    event_id=event_data['event_id'],
-                    sender_type='user',
-                    sender_id=user_id
-                )
-                await self.manager.broadcast_to_debate(debate_id, envelope)
-            
-            await self.manager.send_to_client(websocket, self._create_ack(request_id, 'intervene'))
-        except Exception as e:
-            await self.manager.send_to_client(websocket, self._create_error(request_id, 'intervene', str(e)))
     
     async def send_historical_events(self, websocket: WebSocket, debate_id: str, since_sequence: int = 0):
         """Send historical events to a newly connected client."""

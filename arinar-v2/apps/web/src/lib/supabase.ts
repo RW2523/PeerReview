@@ -15,8 +15,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 /**
  * Get current session access token
  * Returns null if no active session
+ * 
+ * In development mode (NEXT_PUBLIC_AUTH_MODE=development), uses test token from env
  */
 export async function getAccessToken(): Promise<string | null> {
+  // Development mode: use test token for local testing without Supabase
+  const authMode = process.env.NEXT_PUBLIC_AUTH_MODE;
+  if (authMode === 'development') {
+    const testToken = process.env.NEXT_PUBLIC_TEST_TOKEN;
+    if (testToken) {
+      return testToken;
+    }
+  }
+  
+  // Production mode: use Supabase session
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token || null;
 }

@@ -3,13 +3,15 @@
 import { useState, useRef, useEffect } from 'react';
 import styles from './InterveneComposer.module.css';
 import * as api from '@/lib/api';
+import { WSCommandType, WSAckMessage } from '@/lib/wsClient';
 
 interface InterveneComposerProps {
   debateId: string;
   participants: { name: string; id: string }[];
+  sendCommand?: (command: WSCommandType, payload?: Record<string, any>) => Promise<WSAckMessage>;
 }
 
-export default function InterveneComposer({ debateId, participants }: InterveneComposerProps) {
+export default function InterveneComposer({ debateId, participants, sendCommand }: InterveneComposerProps) {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,9 +26,17 @@ export default function InterveneComposer({ debateId, participants }: InterveneC
     setError(null);
 
     try {
-      await api.intervene(debateId, {
-        message: message.trim(),
-      });
+      // Prefer WebSocket if available, fallback to REST
+      if (sendCommand) {
+        await sendCommand('intervene', {
+          message: message.trim(),
+          actor: 'Moderator'
+        });
+      } else {
+        await api.intervene(debateId, {
+          message: message.trim(),
+        });
+      }
 
       setMessage('');
       setShowMentions(false);

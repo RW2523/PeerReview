@@ -55,8 +55,8 @@ function RoomPageContent() {
     }
   }, [searchParams, debateId]);
 
-  // WebSocket connection for realtime room transport
-  const { sendCommand, connectionStatus } = useDebateRoom({
+  // WebSocket connection for realtime room transport (single connection owner)
+  const { events, sendCommand, connectionStatus } = useDebateRoom({
     debateId: debateId || '',
     enabled: !!debateId && debateState !== 'ended',
   });
@@ -202,8 +202,17 @@ function RoomPageContent() {
           />
         ) : (
           <>
-            <EventFeed debateId={debateId} />
-            <InterveneComposer debateId={debateId} participants={participants} />
+            <EventFeed 
+              events={events}
+              connectionStatus={connectionStatus}
+              onPresenceUpdate={handlePresenceUpdate}
+              onTyping={handleTyping}
+            />
+            <InterveneComposer 
+              debateId={debateId} 
+              participants={participants}
+              sendCommand={sendCommand}
+            />
           </>
         )}
       </main>

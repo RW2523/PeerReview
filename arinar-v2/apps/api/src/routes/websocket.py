@@ -7,6 +7,7 @@ from typing import Dict, Any
 from ..auth import get_current_user_ws, check_workspace_access
 from ..debate_service import DebateService
 from ..websocket_service import ws_service
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -71,16 +72,28 @@ async def websocket_debate_room(
     query_params = dict(websocket.query_params)
     token = query_params.get('token')
     
-    if not token:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing auth token")
-        return
-    
-    # Validate token and get user
-    try:
-        user = await get_current_user_ws(token)
-    except HTTPException as e:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid auth token")
-        return
+    # Development mode: bypass auth if REQUIRE_AUTH=false
+    if not settings.require_auth:
+        logger.info(f"⚠️  Development mode: bypassing auth for WebSocket (REQUIRE_AUTH=false)")
+        user = {
+            'sub': '00000000-0000-0000-0000-000000000999',  # Valid UUID format for dev user
+            'workspace_id': '00000000-0000-0000-0000-000000000101',
+            'tenant_id': '00000000-0000-0000-0000-000000000001',
+            'email': 'dev@arinar.ai',
+            'role': 'operator'
+        }
+    else:
+        # Production mode: validate token
+        if not token:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing auth token")
+            return
+        
+        # Validate token and get user
+        try:
+            user = await get_current_user_ws(token)
+        except HTTPException as e:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid auth token")
+            return
     
     # Verify debate exists and user has workspace access
     debate_service = DebateService()
