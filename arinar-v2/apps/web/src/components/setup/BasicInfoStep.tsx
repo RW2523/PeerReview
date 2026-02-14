@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
+import * as api from '@/lib/api';
 import styles from './SetupSteps.module.css';
 
 interface BasicInfoStepProps {
@@ -32,9 +35,14 @@ export function BasicInfoStep({
   onMaxRoundsChange,
   isLoading,
 }: BasicInfoStepProps) {
+  const router = useRouter();
+  const { apiKey } = useOpenRouterKey();
   const [agendaInput, setAgendaInput] = useState('');
   const [outcomeInput, setOutcomeInput] = useState('');
   const [meetingType, setMeetingType] = useState<'rounds' | 'time'>(maxRounds ? 'rounds' : 'time');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showKeyPoints, setShowKeyPoints] = useState(false);
+  const [keyPoints, setKeyPoints] = useState<string[]>([]);
 
   const handleAddAgendaItem = () => {
     if (agendaInput.trim()) {
@@ -58,6 +66,49 @@ export function BasicInfoStep({
     onDesiredOutcomesChange(desiredOutcomes.filter((_, i) => i !== index));
   };
 
+  const handleImproveProblemStatement = async () => {
+    if (!apiKey) {
+      router.push('/settings');
+      return;
+    }
+
+    if (!problemStatement || problemStatement.trim().length < 10) {
+      alert('Please enter at least a brief problem statement (10+ characters) to improve');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const result = await api.improveProblemStatement(problemStatement, apiKey);
+      
+      // Update problem statement
+      onProblemChange(result.improved_text);
+      
+      // Update key points
+      setKeyPoints(result.key_points);
+      if (result.key_points.length > 0) {
+        setShowKeyPoints(true);
+      }
+      
+      // Update agenda items if provided
+      if (result.agenda_items && result.agenda_items.length > 0) {
+        onAgendaChange(result.agenda_items);
+      }
+      
+      // Update desired outcomes if provided
+      if (result.desired_outcomes && result.desired_outcomes.length > 0) {
+        onDesiredOutcomesChange(result.desired_outcomes);
+      }
+      
+    } catch (err) {
+      console.error('Failed to improve problem statement:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to improve problem statement';
+      alert(errorMsg);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className={styles.section}>
       <h2>Meeting Details</h2>
@@ -71,14 +122,44 @@ export function BasicInfoStep({
         disabled={isLoading}
       />
 
-      <label>Problem Statement *</label>
+      <label>
+        Problem Statement *
+        <button
+          type="button"
+          onClick={handleImproveProblemStatement}
+          disabled={isLoading || isGenerating || !problemStatement.trim()}
+          className={styles.generateButton}
+          title="Use AI to improve this problem statement"
+        >
+          {isGenerating ? '⏳' : '✨'} {isGenerating ? 'Generating...' : 'Improve with AI'}
+        </button>
+      </label>
       <textarea
         value={problemStatement}
         onChange={(e) => onProblemChange(e.target.value)}
         placeholder="What question or problem should the group discuss?"
-        rows={3}
-        disabled={isLoading}
+        rows={4}
+        disabled={isLoading || isGenerating}
       />
+      {showKeyPoints && keyPoints.length > 0 && (
+        <div className={styles.keyPoints}>
+          <div className={styles.keyPointsHeader}>
+            <strong>📌 Key Discussion Points:</strong>
+            <button
+              type="button"
+              onClick={() => setShowKeyPoints(false)}
+              className={styles.closeButton}
+            >
+              ✕
+            </button>
+          </div>
+          <ul>
+            {keyPoints.map((point, idx) => (
+              <li key={idx}>{point}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <label>Meeting Agenda (optional)</label>
       <div className={styles.listInput}>

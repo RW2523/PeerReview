@@ -27,6 +27,7 @@ interface UseDebateSetupActionsReturn {
   isLoading: boolean;
   createdDebateId: string | null;
   createdParticipantIds: string[];
+  setCreatedParticipantIds: (ids: string[]) => void;
   handleCreateDebate: () => Promise<{ debateId: string; participantIds: string[] } | null>;
   handleLaunchDebate: (debateId: string, apiKey: string | null) => Promise<void>;
 }
@@ -163,6 +164,7 @@ export function useDebateSetupActions(
     isLoading,
     createdDebateId,
     createdParticipantIds,
+    setCreatedParticipantIds,
     handleCreateDebate,
     handleLaunchDebate,
   };

@@ -75,6 +75,101 @@
   color: var(--success);
 }
 
+/* AI Generate Button */
+.generateButton {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, var(--accent), #9b59b6);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.generateButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
+}
+
+.generateButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Key Points Display */
+.keyPoints {
+  margin-top: 12px;
+  padding: 16px;
+  background: rgba(88, 166, 255, 0.05);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 8px;
+  animation: slideIn 300ms ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.keyPointsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.keyPoints ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.keyPoints ul li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-0);
+}
+
+.keyPoints ul li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.closeButton {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.closeButton:hover {
+  color: var(--text-0);
+  transform: scale(1.1);
+}
+
 .section h2 {
   font-size: 24px;
   font-weight: 500;
@@ -91,7 +186,9 @@
 }
 
 .section label {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-1);

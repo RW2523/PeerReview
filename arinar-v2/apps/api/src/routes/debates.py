@@ -32,13 +32,17 @@ async def list_debates(
     List debates in a workspace with cursor pagination.
     Protected by workspace access checks.
     """
-    # Check workspace access
-    if current_user:
-        check_workspace_access(workspace_id, current_user)
-    
-    service = DebateService()
+    import traceback
+    import logging
+    logger = logging.getLogger(__name__)
     
     try:
+        # Check workspace access
+        if current_user:
+            check_workspace_access(current_user, workspace_id)
+        
+        service = DebateService()
+        
         # Get debates from DB
         debates_data = service.list_debates(workspace_id, limit=limit, cursor=cursor)
         
@@ -48,10 +52,10 @@ async def list_debates(
                 workspace_id=d["workspace_id"],
                 title=d["title"],
                 state=d["state"],
-                created_at=d["created_at"],
-                updated_at=d.get("updated_at"),
-                started_at=d.get("started_at"),
-                ended_at=d.get("ended_at"),
+                created_at=d["created_at"].isoformat() if d.get("created_at") else None,
+                updated_at=d["updated_at"].isoformat() if d.get("updated_at") else None,
+                started_at=d["started_at"].isoformat() if d.get("started_at") else None,
+                ended_at=d["ended_at"].isoformat() if d.get("ended_at") else None,
             )
             for d in debates_data["items"]
         ]
@@ -61,6 +65,8 @@ async def list_debates(
             next_cursor=debates_data.get("next_cursor")
         )
     except Exception as e:
+        logger.error(f"Error listing debates: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list debates: {str(e)}"

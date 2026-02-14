@@ -24,6 +24,7 @@ export default function SetupPage() {
   const { apiKey } = useOpenRouterKey();
   const [step, setStep] = useState(1);
   const [canEnterRoom, setCanEnterRoom] = useState(false);
+  const [participantIds, setParticipantIds] = useState<string[]>([]);
   
   // Step 1: Basic Info
   const [title, setTitle] = useState('');
@@ -86,6 +87,7 @@ export default function SetupPage() {
     isLoading,
     createdDebateId,
     createdParticipantIds,
+    setCreatedParticipantIds,
     handleCreateDebate: createDebate,
     handleLaunchDebate,
   } = useDebateSetupActions({
@@ -146,6 +148,12 @@ export default function SetupPage() {
   };
 
   const handleCreateDebate = async () => {
+    // Validate participants exist
+    if (participants.length === 0) {
+      alert('Please add at least one participant before continuing');
+      return;
+    }
+    
     // Validate memory import
     const memoryError = validateMemoryImport(participants);
     if (memoryError) {
@@ -153,7 +161,26 @@ export default function SetupPage() {
       return;
     }
 
-    const result = createdDebateId ? { debateId: createdDebateId, participantIds: createdParticipantIds } : await createDebate();
+    let result;
+    
+    // If debate already exists (from step 2 file uploads), just add participants
+    if (createdDebateId && participantIds.length === 0) {
+      try {
+        const addResult = await api.addParticipantsToDebate(createdDebateId, participants);
+        setParticipantIds(addResult.participant_ids);
+        setCreatedParticipantIds(addResult.participant_ids); // Update hook state
+        result = { debateId: createdDebateId, participantIds: addResult.participant_ids };
+      } catch (err: any) {
+        alert(`Failed to add participants: ${err.message}`);
+        return;
+      }
+    } else {
+      // Otherwise create debate with participants (or recreate if participants changed)
+      result = await createDebate();
+      if (result) {
+        setParticipantIds(result.participantIds);
+      }
+    }
     if (result) {
       // Create memory grants if enabled
       const shouldContinue = await createMemoryGrants(result.debateId, result.participantIds);

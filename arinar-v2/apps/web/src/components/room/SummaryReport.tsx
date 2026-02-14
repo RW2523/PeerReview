@@ -96,12 +96,20 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
     <div className={styles.report}>
       <div className={styles.reportHeader}>
         <h2>Meeting Report</h2>
-        <button
-          onClick={() => setSummary(null)}
-          className={styles.regenerateBtn}
-        >
-          Regenerate
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            onClick={() => router.push('/history')}
+            className={styles.historyBtn}
+          >
+            📜 View in History
+          </button>
+          <button
+            onClick={() => setSummary(null)}
+            className={styles.regenerateBtn}
+          >
+            Regenerate
+          </button>
+        </div>
       </div>
 
       {/* Agenda & Outcome Review */}

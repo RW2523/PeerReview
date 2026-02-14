@@ -491,6 +491,37 @@ export async function listDebates(
   return response.json();
 }
 
+export async function getDebateEvents(debateId: string): Promise<any[]> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/events`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get events: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function getDebateSummary(debateId: string): Promise<any> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/summary`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null; // No summary generated yet
+    }
+    throw new Error(`Failed to get summary: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
 // Materials upload and status
 // ============================================================================
 // MATERIALS DOMAIN (lines 430-510)  
@@ -986,6 +1017,60 @@ export async function getAgentKnowledgeUnit(knowledgeId: string) {
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`Failed to fetch knowledge unit: ${error}`);
+  }
+  
+  return response.json();
+}
+
+// ============================================================================
+// AI ASSIST DOMAIN
+// ============================================================================
+
+export interface ImproveProblemStatementResponse {
+  improved_text: string;
+  key_points: string[];
+  agenda_items: string[];
+  desired_outcomes: string[];
+}
+
+export async function improveProblemStatement(
+  inputText: string,
+  openrouterKey: string
+): Promise<ImproveProblemStatementResponse> {
+  const response = await fetch(`${API_URL}/ai/improve-problem-statement`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-OpenRouter-Key': openrouterKey,
+    },
+    body: JSON.stringify({ input_text: inputText }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || 'Failed to improve problem statement');
+  }
+  
+  return response.json();
+}
+
+// ============================================================================
+// PARTICIPANTS DOMAIN
+// ============================================================================
+
+export async function addParticipantsToDebate(
+  debateId: string,
+  participants: SetupParticipant[]
+): Promise<{ participant_ids: string[] }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/participants`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ participants }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to add participants: ${response.statusText}`);
   }
   
   return response.json();

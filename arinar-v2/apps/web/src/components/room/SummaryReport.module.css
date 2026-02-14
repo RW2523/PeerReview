@@ -101,6 +101,29 @@
   color: var(--text-0);
 }
 
+.headerActions {
+  display: flex;
+  gap: 12px;
+}
+
+.historyBtn {
+  padding: 8px 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--text-0);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.historyBtn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
 .regenerateBtn {
   padding: 8px 16px;
   background: var(--surface-0);
@@ -109,6 +132,7 @@
   color: var(--text-0);
   font-size: 13px;
   font-weight: 500;
+  cursor: pointer;
   transition: all 150ms;
 }
 

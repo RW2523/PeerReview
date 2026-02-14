@@ -38,6 +38,12 @@ export default function AppNav() {
             >
               Room
             </Link>
+            <Link
+              href="/history"
+              className={`${styles.link} ${isActive('/history') ? styles.active : ''}`}
+            >
+              📜 History
+            </Link>
           </div>
 
           <UserMenu />

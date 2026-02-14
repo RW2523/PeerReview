@@ -1,12 +1,65 @@
 """Events and SSE streaming endpoints"""
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import StreamingResponse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+import psycopg2.extras
 from ..auth import get_current_user, check_workspace_access
 from ..debate_service import DebateService
 from ..stream_service import StreamService
+from ..database import get_db_connection, get_cursor
 
 router = APIRouter()
+
+
+@router.get("/debates/{debate_id}/events")
+async def get_debate_events(
+    debate_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    limit: Optional[int] = None
+):
+    """
+    Get all events for a debate (for history/transcript viewing)
+    
+    Protected: Requires valid JWT and workspace access
+    
+    Args:
+        debate_id: Debate ID
+        limit: Optional limit on number of events (default: all)
+    
+    Returns:
+        List of events in sequence order
+    """
+    # Verify debate exists and user has access
+    service = DebateService()
+    debate = service.get_debate(debate_id)
+    
+    if not debate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Debate {debate_id} not found"
+        )
+    
+    check_workspace_access(current_user, debate['workspace_id'])
+    
+    # Fetch events
+    with get_db_connection() as conn:
+        cursor = get_cursor(conn)
+        
+        query = """
+            SELECT event_id, debate_id, event_type, sender_type, sender_id,
+                   sequence_number, content, created_at
+            FROM events
+            WHERE debate_id = %s
+            ORDER BY sequence_number ASC
+        """
+        
+        if limit:
+            query += f" LIMIT {limit}"
+        
+        cursor.execute(query, (debate_id,))
+        events = cursor.fetchall()
+        
+        return [dict(event) for event in events]
 
 
 @router.get("/debates/{debate_id}/events/stream")
