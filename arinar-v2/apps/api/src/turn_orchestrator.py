@@ -181,6 +181,28 @@ class TurnOrchestrator:
             # Add conversation history
             messages.extend(conversation_history)
             
+            # Extract any recent human interventions and make them VERY prominent
+            recent_human_messages = []
+            for event in reversed(history_events[-5:]):  # Check last 5 events
+                if event['event_type'] == 'human_message':
+                    content = event.get('content') or {}
+                    text = content.get('text', '')
+                    actor = content.get('actor', 'Moderator')
+                    recent_human_messages.append(f"{actor}: {text}")
+            
+            if recent_human_messages:
+                # Add as a HIGH PRIORITY system message that demands response
+                messages.append({
+                    "role": "system",
+                    "content": f"""🚨 URGENT MODERATOR INTERVENTION 🚨
+
+The moderator has directly addressed the debate participants. You MUST acknowledge and respond to this intervention:
+
+{chr(10).join(f"• {msg}" for msg in recent_human_messages)}
+
+⚠️ CRITICAL: Your next response MUST explicitly address this moderator message. Start your response by acknowledging what the moderator said."""
+                })
+            
             # Build list of participants who have already spoken (for @mentions)
             agents_who_spoke = set()
             for event in history_events:
@@ -324,13 +346,14 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 {length_instruction}
 
 **Communication Style - BE CONVERSATIONAL AND ORGANIC:**
-- **BUILD ON others**: If @FirstPrinciplesThinker said "time is of essence", don't repeat that phrase. Instead say "@FirstPrinciplesThinker makes a great point about urgency..." or "I agree we need to act quickly, and I'd add..."
+- **BUILD ON others**: If an Active participant said "time is of essence", don't repeat that phrase. Instead say "@TheirName makes a great point about urgency..." or "I agree we need to act quickly, and I'd add..."
 - **NO ROBOTIC REPETITION**: Avoid copying exact phrases. Each agent should have their own voice and phrasing.
-- **USE @mentions**: Directly address who you're responding to (e.g., "@EmpatheticVoice, your point about...")
-- **REACT genuinely**: Agree/disagree with SPECIFIC points, not generic statements
+- **USE @mentions for ACTIVE participants ONLY**: Directly address who you're responding to (e.g., "@ActiveAgent, your point about...")
+- **REACT genuinely**: Agree/disagree with SPECIFIC points from Active participants, not generic statements
 - **ASK FOLLOW-UP questions**: "What do you think about X?" or "How would you address Y?"
 - **VARY your language**: If someone says "crucial", you might say "vital" or "essential" - don't parrot the same words
 - **BE OPEN-MINDED**: Don't come with pre-determined conclusions unless it's your final turn
+- **CRITICAL**: NEVER reference or address participants who are not listed as "Active" above
 
 **Desired Outcomes to Keep in Mind:**
 {chr(10).join(f'- {outcome}' for outcome in desired_outcomes) if desired_outcomes else 'No specific outcomes defined'}"""
@@ -459,9 +482,11 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 })
             elif event['event_type'] == 'human_message':
                 text = content.get('text', '')
+                actor = content.get('actor', 'Moderator')
+                # Make human interventions prominent in history
                 history.append({
                     "role": "user",
-                    "content": text
+                    "content": f"🎙️ **MODERATOR INTERVENTION by {actor}**:\n\n{text}\n\n[This is a direct moderator message that requires acknowledgment]"
                 })
         
         # Limit history to last 10 messages to avoid context overflow

@@ -55,21 +55,31 @@ async def generate_summary(
         )
     
     try:
-        summary_service = SummaryService(request.openrouter_api_key)
-        outputs = summary_service.generate_summary(debate_id)
-        
-        # Save summary
-        saved = service.save_outputs(
+        summary_service = SummaryService()
+        outputs = summary_service.generate_summary(
             debate_id=debate_id,
-            outputs=outputs
+            openrouter_api_key=request.openrouter_api_key,
+            model_id=request.model_id if hasattr(request, 'model_id') else "anthropic/claude-3.5-sonnet"
         )
         
+        # The summary_service.generate_summary already saves to DB
+        # Retrieve the saved record which includes output_id
+        saved_summary = summary_service.get_summary(debate_id)
+        
+        if not saved_summary:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Summary was generated but failed to save to database"
+            )
+        
         return SummaryResponse(
-            output_id=saved['output_id'],
-            debate_id=saved['debate_id'],
-            summary=saved['summary'],
-            minutes_of_meeting=saved['minutes_of_meeting'],
-            action_items=saved['action_items']
+            output_id=str(saved_summary['output_id']),
+            debate_id=debate_id,
+            summary=saved_summary['summary'],
+            minutes=saved_summary['minutes'],
+            action_items=saved_summary['action_items'],
+            generated_at=saved_summary['generated_at'].isoformat() if hasattr(saved_summary['generated_at'], 'isoformat') else str(saved_summary['generated_at']),
+            model_used=saved_summary.get('model_used')
         )
     
     except OpenRouterAuthError as e:

@@ -117,6 +117,7 @@ function EventCard({ event }: { event: WSEventEnvelope }) {
 
   const getEventColor = (type: string) => {
     if (type.includes('agent_message')) return 'var(--accent)';
+    if (type.includes('human_message')) return '#ff6b35'; // Bright orange for human interventions
     if (type.includes('intervention')) return 'var(--warning)';
     if (type.includes('summary')) return 'var(--success)';
     if (type.includes('error')) return 'var(--danger)';
