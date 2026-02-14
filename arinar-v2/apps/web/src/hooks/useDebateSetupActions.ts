@@ -55,11 +55,8 @@ export function useDebateSetupActions(
       selectedMemorySources,
     } = options;
 
-    if (participants.length === 0) {
-      alert('At least 1 participant required');
-      return null;
-    }
-
+    // Allow creating debate without participants initially (for file uploads)
+    // Validation happens later at preflight
     setIsLoading(true);
     try {
       // 1. Create debate (returns participant_ids)

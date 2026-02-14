@@ -50,20 +50,32 @@ export function ParticipantsStep({
     }
   };
 
-  // Get unique categories
-  const categories = ['All', ...Array.from(new Set(templates.map(t => t.category)))];
+  // Get unique categories (excluding Facilitator since we hide Ultimate Host)
+  const categories = ['All', ...Array.from(new Set(templates
+    .filter(t => t.category !== 'Facilitator')
+    .map(t => t.category)))];
   
-  // Filter templates by category
+  // Filter templates by category and exclude Ultimate Host
+  const availableTemplates = templates.filter(t => 
+    t.template_id !== 'ultimate-host' && 
+    t.role_title !== 'Ultimate Host' &&
+    t.label !== 'Ultimate Host (Neutral Moderator)'
+  );
+  
   const filteredTemplates = selectedCategory === 'All' 
-    ? templates 
-    : templates.filter(t => t.category === selectedCategory);
+    ? availableTemplates 
+    : availableTemplates.filter(t => t.category === selectedCategory);
   
   // Limit templates shown initially (show 6, then "Show more" button)
   const displayedTemplates = showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
   
-  // Filter and limit agents
+  // Filter and limit agents (exclude inline/test agents and Ultimate Host)
   const filteredAgents = agents.filter(agent => 
-    agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase())
+    agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase()) &&
+    !agent.name.includes('(Inline)') &&  // Exclude inline template instances
+    !agent.name.includes('Ultimate Host') &&
+    agent.name !== 'Test PM Agent' &&
+    agent.name !== 'Persistent PM'
   );
   const displayedAgents = showAllAgents ? filteredAgents : filteredAgents.slice(0, 6);
   

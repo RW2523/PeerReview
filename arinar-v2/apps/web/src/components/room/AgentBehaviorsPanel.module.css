@@ -233,6 +233,114 @@
   border-left: 3px solid #f093fb;
 }
 
+/* Conversation Threads (Chat-style DMs) */
+.conversationThread {
+  background: var(--surface-0);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.threadHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 12px;
+}
+
+.threadParticipants {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-0);
+  letter-spacing: -0.01em;
+}
+
+.threadCount {
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--surface-1);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.threadMessages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.dmBubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  animation: popIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dmLeft {
+  align-self: flex-start;
+  background: linear-gradient(135deg, rgba(88, 166, 255, 0.15) 0%, rgba(102, 126, 234, 0.15) 100%);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  border-radius: 18px 18px 18px 4px;
+}
+
+.dmRight {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 18px 18px 4px 18px;
+}
+
+.dmSender {
+  font-size: 10px;
+  font-weight: 700;
+  color: #58a6ff;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.dmRight .dmSender {
+  color: #10b981;
+}
+
+.dmText {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-0);
+  word-wrap: break-word;
+  font-weight: 500;
+}
+
+.dmTime {
+  font-size: 10px;
+  color: var(--text-2);
+  margin-top: 6px;
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* Task Cards */
 .taskCard {
   background: linear-gradient(135deg, rgba(79, 172, 254, 0.08) 0%, rgba(0, 242, 254, 0.08) 100%);

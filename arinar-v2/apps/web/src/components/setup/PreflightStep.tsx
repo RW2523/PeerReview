@@ -303,13 +303,40 @@ export function PreflightStep({
               const name = getParticipantName(participantRun.participant_id);
               const initials = getInitials(name);
 
+              // Check if web research was performed
+              const webResearchPerformed = participantRun.metadata?.web_research_performed || false;
+              const webSourcesCount = participantRun.metadata?.web_search_urls?.length || 0;
+              const materialsCount = participantRun.metadata?.material_chunks_count || 0;
+              const memoryCount = participantRun.metadata?.imported_chunks_count || 0;
+
               return (
                 <div key={participantRun.participant_run_id} className={styles.participantCard}>
                   <div className={styles.participantAvatar}>
                     {initials}
                   </div>
                   <div className={styles.participantInfo}>
-                    <div className={styles.participantName}>{name}</div>
+                    <div className={styles.participantNameRow}>
+                      <div className={styles.participantName}>{name}</div>
+                      {participantRun.status === 'success' && (
+                        <div className={styles.badges}>
+                          {webSourcesCount > 0 && (
+                            <span className={styles.webBadge} title={`Researched ${webSourcesCount} web sources`}>
+                              🌐 {webSourcesCount}
+                            </span>
+                          )}
+                          {materialsCount > 0 && (
+                            <span className={styles.materialBadge} title={`${materialsCount} materials analyzed`}>
+                              📄 {materialsCount}
+                            </span>
+                          )}
+                          {memoryCount > 0 && (
+                            <span className={styles.memoryBadge} title={`${memoryCount} memory chunks`}>
+                              🧠 {memoryCount}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     {getStatusPill(participantRun.status, participantRun.participant_run_id)}
                     {participantRun.status === 'running' && (
                       <AnimatedStatus 

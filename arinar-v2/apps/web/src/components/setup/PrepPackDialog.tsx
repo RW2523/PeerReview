@@ -41,12 +41,19 @@ export function PrepPackDialog({
   
   if (!isOpen || !content) return null;
 
-  // Extract web research from metadata
+  // Extract web research from metadata (structured data)
   const webResearchPerformed = metadata?.web_research_performed || false;
   const webResearchQuery = metadata?.web_research_query || '';
+  const webSearchUrls = metadata?.web_search_urls || [];
+  const webSearchResults = metadata?.web_search_results || [];
   
-  // Parse web research results from content
+  // Fallback: Parse from content if metadata doesn't have structured results
   const extractWebResearch = (rawContent: string) => {
+    if (webSearchResults.length > 0) {
+      return webSearchResults; // Use structured data from metadata
+    }
+    
+    // Fallback to parsing from content string
     const match = rawContent.match(/\*\*Web Research Results:\*\*\n([\s\S]*?)(?=\n\*\*|$)/);
     if (match) {
       const resultsText = match[1];
@@ -57,7 +64,7 @@ export function PrepPackDialog({
           number: m[1],
           title: m[2].trim(),
           snippet: m[3].trim(),
-          source: m[4].trim()
+          url: m[4].trim()
         });
       }
       return results;
@@ -98,7 +105,7 @@ export function PrepPackDialog({
             className={`${styles.tab} ${activeTab === 'research' ? styles.tabActive : ''}`}
             onClick={() => setActiveTab('research')}
           >
-            🌐 Research ({webResearchResults.length})
+            🌐 Research ({webSearchUrls.length})
           </button>
           <button 
             className={`${styles.tab} ${activeTab === 'understanding' ? styles.tabActive : ''}`}
@@ -233,19 +240,34 @@ export function PrepPackDialog({
                         {webResearchResults.map((result, idx) => (
                           <div key={idx} className={styles.researchCard}>
                             <div className={styles.researchHeader}>
-                              <span className={styles.researchNumber}>#{result.number}</span>
+                              <span className={styles.researchNumber}>#{idx + 1}</span>
                               <h4 className={styles.researchTitle}>{result.title}</h4>
                             </div>
                             <p className={styles.researchSnippet}>{result.snippet}...</p>
                             <a 
-                              href={result.source} 
+                              href={result.url || result.source} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className={styles.researchLink}
                             >
-                              🔗 {result.source}
+                              🔗 {result.url || result.source}
                             </a>
                           </div>
+                        ))}
+                      </div>
+                    ) : webSearchUrls.length > 0 ? (
+                      <div className={styles.urlList}>
+                        <p className={styles.label}>🔗 URLs Researched ({webSearchUrls.length}):</p>
+                        {webSearchUrls.map((url, idx) => (
+                          <a 
+                            key={idx}
+                            href={url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className={styles.urlItem}
+                          >
+                            {idx + 1}. {url}
+                          </a>
                         ))}
                       </div>
                     ) : (

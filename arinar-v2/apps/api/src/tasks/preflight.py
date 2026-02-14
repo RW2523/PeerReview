@@ -187,6 +187,7 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         system_prompt = agent_config.get('system_prompt', '')
         model_config = agent_config.get('model_config', {})
         agent_name = agent_config.get('name', 'Participant')
+        role_description = agent_config.get('role_description') or agent_config.get('role') or agent_name
         
         # For inline agents (no agent_id), create a temporary agent record
         # This is needed because agent_knowledge_units has a NOT NULL FK to agents table
@@ -288,29 +289,49 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         
         # 3. Perform web research (if available and debate is recent/current topic)
         web_research_results = ""
+        web_search_urls = []  # Store URLs separately for metadata
+        web_search_data = []  # Store full structured results
+        
         if WEB_SEARCH_AVAILABLE and problem_statement:
             try:
                 # Broadcast progress: Researching online
                 _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Researching topic online')
                 
-                print(f"    🔍 Performing web search for: {problem_statement[:100]}")
+                # Generate PERSONA-SPECIFIC search query based on agent's role
+                role_name = role_description or "analyst"
+                persona_context = system_prompt[:150] if system_prompt else ""
                 
-                # Generate focused search query (keep it short for better results)
-                search_query = problem_statement[:100]  # Limit query length
+                # Create unique search angle based on persona
+                search_query = f"{problem_statement[:80]} {role_name} perspective analysis"
+                
+                print(f"    🔍 Persona-specific web search ({role_name})")
+                print(f"    📝 Query: {search_query[:120]}")
                 
                 with DDGS() as ddgs:
-                    # Search for max 5 results to keep it token-efficient
-                    results = list(ddgs.text(search_query, max_results=5))
+                    # Search for 10-15 results to get comprehensive coverage
+                    results = list(ddgs.text(search_query, max_results=15))
                     
                     if results:
-                        web_research_results = "\n**Web Research Results:**\n"
-                        for i, result in enumerate(results[:3], 1):  # Only use top 3 to save tokens
-                            title = result.get('title', 'N/A')
-                            snippet = result.get('body', '')[:200]  # Limit snippet length
-                            link = result.get('href', '')
-                            web_research_results += f"{i}. {title}\n   {snippet}...\n   Source: {link}\n\n"
+                        web_research_results = "\n**Web Research Results** (Top 10 sources for your analysis):\n"
                         
-                        print(f"    ✅ Found {len(results)} research results, using top 3")
+                        # Use top 10 results for comprehensive research
+                        sources_to_use = min(10, len(results))
+                        for i, result in enumerate(results[:sources_to_use], 1):
+                            title = result.get('title', 'N/A')
+                            snippet = result.get('body', '')[:250]  # More context per source
+                            link = result.get('href', '')
+                            web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {link}\n\n"
+                            
+                            # Store structured data
+                            web_search_urls.append(link)
+                            web_search_data.append({
+                                'title': title,
+                                'snippet': snippet[:250],
+                                'url': link
+                            })
+                        
+                        print(f"    ✅ Found {len(results)} total results, providing top {sources_to_use} sources")
+                        print(f"    🔗 First 3 URLs: {', '.join(web_search_urls[:3])}")
                     else:
                         print(f"    ℹ️ No web search results found")
             except Exception as e:
@@ -318,7 +339,14 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                 web_research_results = ""
         
         # 3b. Build prep prompt
+        # Get current date/time for temporal context
+        current_datetime = datetime.utcnow()
+        current_date_str = current_datetime.strftime("%A, %B %d, %Y")
+        current_time_str = current_datetime.strftime("%I:%M %p UTC")
+        
         prep_prompt = f"""You are preparing for an important strategic discussion.
+
+**Current Date & Time**: {current_date_str} at {current_time_str}
 
 **Discussion Title**: {debate_title}
 
@@ -333,15 +361,26 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
 **Imported Context from Prior Meetings**:
 {imported_context if imported_context else 'No prior context imported.'}
 
-{web_research_results}
+{web_research_results if web_research_results else '**No web research performed for this preparation.**'}
 
-**Task**: Generate a concise preparation memo (250-400 words) covering:
-1. Key facts and insights (reference web research if provided)
-2. Potential risks or concerns
-3. Open questions to explore during the discussion
-4. Your initial thoughts (but remain open-minded for the actual debate)
+**Task**: Generate YOUR preparation memo (400-600 words) in YOUR voice and perspective covering:
+1. Key facts and insights - analyze and synthesize findings from ALL web research sources through YOUR lens
+2. Potential risks or concerns based on YOUR expertise
+3. Open questions YOU want to explore
+4. YOUR initial position/recommendations (but remain open-minded)
 
-**IMPORTANT**: If web research was provided, cite those sources. Keep the memo concise and focused."""
+**CRITICAL INSTRUCTIONS**: 
+- STAY IN CHARACTER - this memo should reflect YOUR unique perspective, analytical style, and personality
+- ALWAYS consider the current date ({current_date_str}) when analyzing information
+- If web research results are provided above (multiple sources), you MUST:
+  * Apply YOUR expertise to analyze patterns and themes across ALL sources
+  * Cite multiple sources with their URLs throughout your memo
+  * Use YOUR analytical framework to note conflicting information
+  * Reference at least 5-7 key sources analyzed through YOUR perspective
+- Use inline citations like: "According to [source title] (URL), ..."
+- Your memo should demonstrate YOUR unique analytical approach and voice
+- This prep work is PRIVATE to you - other participants will NOT see this
+- During the debate, you can only reference what others have actually said"""
         
         # 4. Call OpenRouter to generate prep pack
         # For V1, use a simple synchronous call (no streaming)
@@ -379,16 +418,63 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
             # Real OpenRouter call
             try:
                 client = OpenRouterClient(api_key=openrouter_key)
+                
+                # Build persona-specific system prompt by COMBINING agent's persona with research instructions
+                # This preserves each agent's unique character while ensuring they cite sources
+                persona_specific_prompt = f"""{system_prompt if system_prompt else 'You are a strategic advisor.'}
+
+**ADDITIONAL INSTRUCTIONS FOR PREPARATION**:
+When preparing for this debate:
+1. STAY IN CHARACTER - analyze everything through your unique perspective and personality
+2. MUST incorporate web research sources when provided - cite at least 5-7 different sources with URLs
+3. Synthesize information across sources using YOUR analytical style
+4. Note temporal context - is information current or outdated?
+5. Apply YOUR expertise to identify patterns, risks, opportunities based on your role
+6. Your memo should be 400-600 words, reference-heavy, and reflect YOUR voice and perspective"""
+                
+                # Adjust model config for longer, more detailed output
+                enhanced_config = model_config.copy()
+                enhanced_config['max_tokens'] = 2000  # Allow longer prep packs
+                enhanced_config['temperature'] = 0.7  # Balanced creativity
+                
+                print(f"    🎭 Using persona: {role_description[:50]}...")
+                
                 response = client.chat_completion(
                     model=model_id,
                     messages=[
-                        {"role": "system", "content": "You are a strategic preparation assistant."},
+                        {"role": "system", "content": persona_specific_prompt},
                         {"role": "user", "content": prep_prompt}
                     ],
-                    **model_config
+                    **enhanced_config
                 )
-                prep_pack_content = response.get('content', 'Error generating prep pack')
-                print(f"    ✅ Generated prep pack: {len(prep_pack_content)} chars")
+                prep_pack_content = response.get('content', '')
+                
+                if not prep_pack_content or len(prep_pack_content.strip()) == 0:
+                    print(f"    ⚠️ OpenRouter returned empty content! Creating fallback prep pack...")
+                    prep_pack_content = f"""**Preparation Memo** (Fallback - OpenRouter returned empty response)
+
+**Current Date**: {current_date_str}
+
+**Role**: {role_description}
+
+**Problem Statement**: {problem_statement[:300]}
+
+**Web Research Summary** ({len(web_search_urls)} sources found):
+{"" if not web_search_urls else chr(10).join([f"- {url}" for url in web_search_urls[:5]])}
+
+**Status**: OpenRouter returned an empty response. Web research data was collected but LLM failed to generate prep pack."""
+                else:
+                    print(f"    ✅ Generated prep pack: {len(prep_pack_content)} chars")
+                    
+                    # Log if web research was included
+                    if web_search_urls:
+                        print(f"    📊 Web research was available ({len(web_search_urls)} URLs)")
+                        # Check if URLs are actually cited in content
+                        citations_found = sum(1 for url in web_search_urls[:3] if url in prep_pack_content)
+                        if citations_found == 0:
+                            print(f"    ⚠️ WARNING: No web sources were cited in the prep pack content!")
+                        else:
+                            print(f"    ✓ {citations_found} sources cited in prep pack")
             except Exception as e:
                 print(f"    ❌ OpenRouter error: {str(e)}")
                 prep_pack_content = f"Error calling OpenRouter: {str(e)}\n\nFallback prep pack with {len(material_chunks)} materials and {len(imported_chunks)} imported chunks."
@@ -428,6 +514,8 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                 'semantic_query_used': semantic_query[:200],
                 'web_research_performed': web_research_performed,
                 'web_research_query': problem_statement[:100] if web_research_performed else None,
+                'web_search_urls': web_search_urls,  # List of URLs searched
+                'web_search_results': web_search_data,  # Full structured results
                 'generated_at': datetime.utcnow().isoformat()
             })
         ))

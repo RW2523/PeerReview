@@ -5,7 +5,7 @@ from .config import settings
 from .routes import (
     health, agents, debates, turns, setup, summary, events, openrouter,
     personas, materials, memory, preflight, artifacts, embeddings,
-    workspace_settings, presence, websocket, knowledge
+    workspace_settings, presence, websocket, knowledge, analytics
 )
 
 
@@ -43,6 +43,7 @@ app.include_router(workspace_settings.router, tags=["workspace-settings"])
 app.include_router(presence.router, tags=["presence"])
 app.include_router(websocket.router, tags=["websocket"])
 app.include_router(knowledge.router, tags=["knowledge"])
+app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 
 
 if __name__ == "__main__":

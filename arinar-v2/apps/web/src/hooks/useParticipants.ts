@@ -33,7 +33,14 @@ export function useParticipants() {
         alert('Maximum 8 participants allowed');
         return prev;
       }
-      return [...prev, { agent_id: agent.agent_id }];
+      return [...prev, { 
+        agent_id: agent.agent_id,
+        name: agent.name,
+        role_description: agent.role_description,
+        system_prompt: agent.system_prompt,
+        model_id: agent.model_id,
+        model_config: agent.llm_config,
+      }];
     });
   }, []);
 

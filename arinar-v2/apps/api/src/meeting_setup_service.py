@@ -42,8 +42,10 @@ class MeetingSetupService:
         """
         Returns: (debate_id, participant_ids, material_ids)
         """
-        if not participants or len(participants) < 1:
-            raise MeetingSetupError("participants must contain at least 1 participant")
+        # Allow creating debate without participants (for file uploads in Step 2)
+        # Participants can be added later before launching
+        participants = participants or []
+        
         if len(participants) > self.MAX_ACTIVE_PARTICIPANTS:
             raise MeetingSetupError(
                 f"participants exceeds maximum of {self.MAX_ACTIVE_PARTICIPANTS}"

@@ -88,9 +88,9 @@ export function MaterialsStep({
           onClick={() => fileInputRef.current?.click()} 
           className={styles.btnAdd}
           disabled={!debateId || uploading}
-          title={!debateId ? 'File uploads available after creating debate (complete all steps first)' : ''}
+          title={!debateId ? 'Debate being created...' : 'Upload PDF, DOCX, TXT, or MD files'}
         >
-          <span>📎</span> {uploading ? 'Uploading...' : !debateId ? 'Upload Files (after setup)' : 'Upload Files'}
+          <span>📎</span> {uploading ? 'Uploading...' : 'Upload Files'}
         </button>
       </div>
 

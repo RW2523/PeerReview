@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, List
 import psycopg2.extras
 from .database import get_db_connection, get_cursor
 from .openrouter_client import OpenRouterClient
+from .agent_autonomy import AgentAutonomyService
 
 
 class TurnOrchestrator:
@@ -148,8 +149,16 @@ class TurnOrchestrator:
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             
+            # Add current date/time for temporal context
+            current_datetime = datetime.now(timezone.utc)
+            current_date_str = current_datetime.strftime("%A, %B %d, %Y")
+            current_time_str = current_datetime.strftime("%I:%M %p UTC")
+            
             # Context message with topic, agenda, outcomes
-            context_parts = [f"Debate Topic: {debate['title'] or 'Untitled Debate'}"]
+            context_parts = [
+                f"📅 Current Date & Time: {current_date_str} at {current_time_str}",
+                f"Debate Topic: {debate['title'] or 'Untitled Debate'}"
+            ]
             if debate['description']:
                 context_parts.append(f"Problem: {debate['description']}")
             if agenda:
@@ -184,24 +193,25 @@ class TurnOrchestrator:
             # Build participant list - only @mention those who have spoken
             current_agent_name = (next_participant['agent_config'] or {}).get('name') or next_participant['role_name']
             participants_spoken = []
-            participants_upcoming = []
+            total_other_participants = 0
             
             for p in participants:
                 name = (p['agent_config'] or {}).get('name') or p['role_name']
                 if name == current_agent_name:
                     continue  # Skip self
+                total_other_participants += 1
                 if name in agents_who_spoke:
                     participants_spoken.append(f"@{name}")
-                else:
-                    participants_upcoming.append(name)
             
-            # Format participant list
+            # Format participant list - DO NOT reveal names of agents who haven't spoken yet
+            # This prevents agents from hallucinating/citing prep work of agents who haven't contributed
             if participants_spoken:
+                unspoken_count = total_other_participants - len(participants_spoken)
                 participant_list = f"Active: {', '.join(participants_spoken)}"
-                if participants_upcoming:
-                    participant_list += f" | Upcoming: {', '.join(participants_upcoming)}"
+                if unspoken_count > 0:
+                    participant_list += f" | {unspoken_count} other participant(s) haven't spoken yet"
             else:
-                participant_list = f"You're speaking first! Others will respond: {', '.join(participants_upcoming) if participants_upcoming else 'None'}"
+                participant_list = f"You're speaking first! {total_other_participants} other participant(s) will respond after you."
             
             # Calculate progress and urgency
             max_rounds = policy_config.get('max_rounds')
@@ -300,6 +310,15 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 
 **Context:** {urgency} | Turn {turn_in_round}/{len(participants)} in this round
 **Other Participants:** {participant_list}
+
+⚠️ CRITICAL RULES:
+1. TEMPORAL AWARENESS: Today is {current_date_str}. When discussing events, policies, or data, always consider recency and note if information is outdated.
+2. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. 
+3. Base your response ONLY on:
+   - Your own preparation notes
+   - What Active participants have actually said
+   - The debate topic and materials
+   - Current temporal context
 
 **Your Response:**
 {length_instruction}
@@ -448,6 +467,48 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
         # Limit history to last 10 messages to avoid context overflow
             return history
     
+    def _persist_autonomous_event(self, debate_id: str, event_type: str, content: Dict[str, Any]) -> str:
+        """Persist autonomous behavior event to database for analysis"""
+        from .database import get_db_connection, get_cursor
+        import psycopg2.extras
+        
+        with get_db_connection() as conn:
+            cursor = get_cursor(conn)
+            try:
+                event_id = str(uuid.uuid4())
+                
+                # Get next sequence number
+                cursor.execute("""
+                    SELECT COALESCE(MAX(sequence_number), 0) + 1
+                    FROM events
+                    WHERE debate_id = %s
+                """, (debate_id,))
+                sequence_number = cursor.fetchone()['coalesce']
+                
+                # Insert event
+                cursor.execute("""
+                    INSERT INTO events (
+                        event_id, debate_id, event_type, sender_type,
+                        sequence_number, content, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                """, (
+                    event_id,
+                    debate_id,
+                    event_type,
+                    'system',
+                    sequence_number,
+                    psycopg2.extras.Json(content)
+                ))
+                
+                conn.commit()
+                return event_id
+            except Exception as e:
+                print(f"❌ Failed to persist {event_type}: {e}")
+                conn.rollback()
+                return None
+            finally:
+                cursor.close()
+    
     async def _async_autonomous_behaviors(
         self,
         debate_id: str,
@@ -471,24 +532,30 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 )
                 
                 if coalition:
-                    event = {
-                        'type': 'coalition_formed',
-                        'debate_id': debate_id,
-                        'event_id': str(uuid.uuid4()),
-                        'sequence_number': current_seq + 1,
-                        'occurred_at': datetime.utcnow().isoformat() + 'Z',
-                        'sender_type': 'system',
-                        'payload': {
-                            'members': coalition['members'],
-                            'strategy': coalition.get('strategy'),
-                            'type': coalition.get('type', 'alliance'),
-                            'formed_by': agent_name
-                        }
+                    content = {
+                        'members': coalition['members'],
+                        'strategy': coalition.get('strategy'),
+                        'type': coalition.get('type', 'alliance'),
+                        'formed_by': agent_name,
+                        'timestamp': datetime.utcnow().isoformat()
                     }
-                    await websocket_manager.broadcast_to_debate(debate_id, event)
+                    
+                    # PERSIST TO DATABASE
+                    event_id = self._persist_autonomous_event(debate_id, 'coalition_formed', content)
+                    
+                    if event_id:
+                        # Broadcast via WebSocket
+                        event = {
+                            'type': 'coalition_formed',
+                            'debate_id': debate_id,
+                            'event_id': event_id,
+                            'sender_type': 'system',
+                            'payload': content
+                        }
+                        await websocket_manager.broadcast_to_debate(debate_id, event)
             
-            # Private messaging (30% of 25% = 7.5% overall)
-            if random.random() < 0.3 and len(participants) >= 2:
+            # Private messaging with back-and-forth (60% chance - agents love to DM!)
+            if random.random() < 0.6 and len(participants) >= 2:
                 other_agents = [
                     (p.get('agent_config') or {}).get('name') or p.get('role_name')
                     for p in participants
@@ -502,20 +569,69 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                         for e in history_events[-3:] if e.get('event_type') == 'agent_message'
                     ])
                     
+                    # Check for previous DM from target to current agent (unreplied)
+                    from .database import get_db_connection, get_cursor
+                    previous_dm = None
+                    
+                    with get_db_connection() as conn:
+                        cursor = get_cursor(conn)
+                        try:
+                            cursor.execute("""
+                                SELECT content FROM events
+                                WHERE debate_id = %s AND event_type = 'private_message'
+                                  AND content->>'from_agent' = %s
+                                  AND content->>'to_agent' = %s
+                                ORDER BY sequence_number DESC LIMIT 1
+                            """, (debate_id, target, agent_name))
+                            
+                            result = cursor.fetchone()
+                            if result:
+                                # Check if current agent already replied
+                                cursor.execute("""
+                                    SELECT COUNT(*) as count FROM events
+                                    WHERE debate_id = %s AND event_type = 'private_message'
+                                      AND content->>'from_agent' = %s
+                                      AND content->>'to_agent' = %s
+                                      AND sequence_number > (
+                                        SELECT sequence_number FROM events
+                                        WHERE debate_id = %s AND event_type = 'private_message'
+                                          AND content->>'from_agent' = %s
+                                          AND content->>'to_agent' = %s
+                                        ORDER BY sequence_number DESC LIMIT 1
+                                      )
+                                """, (debate_id, agent_name, target, debate_id, target, agent_name))
+                                
+                                if cursor.fetchone()['count'] == 0:
+                                    previous_dm = result['content'].get('message')
+                        finally:
+                            cursor.close()
+                    
+                    # Generate message (reply if previous_dm exists, otherwise initial)
                     message = autonomy_service.generate_private_message(
-                        debate_id, agent_name, target, context, desired_outcomes
+                        debate_id, agent_name, target, context, desired_outcomes, previous_dm
                     )
                     
                     if message:
-                        event = {
-                            'type': 'private_message',
-                            'debate_id': debate_id,
-                            'event_id': str(uuid.uuid4()),
-                            'sequence_number': current_seq + 2,
-                            'occurred_at': datetime.utcnow().isoformat() + 'Z',
-                            'sender_type': 'system',
-                            'payload': {'from': agent_name, 'to': target, 'message': message}
+                        content = {
+                            'from_agent': agent_name,
+                            'to_agent': target,
+                            'message': message,
+                            'is_reply': bool(previous_dm),
+                            'timestamp': datetime.utcnow().isoformat()
                         }
-                        await websocket_manager.broadcast_to_debate(debate_id, event)
+                        
+                        # PERSIST TO DATABASE
+                        event_id = self._persist_autonomous_event(debate_id, 'private_message', content)
+                        
+                        if event_id:
+                            # Broadcast via WebSocket
+                            event = {
+                                'type': 'private_message',
+                                'debate_id': debate_id,
+                                'event_id': event_id,
+                                'sender_type': 'system',
+                                'payload': content
+                            }
+                            await websocket_manager.broadcast_to_debate(debate_id, event)
         except Exception as e:
             print(f"⚠️ Autonomous behaviors error: {e}")

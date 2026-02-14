@@ -302,6 +302,59 @@
   font-style: italic;
 }
 
+/* Research Stats */
+.researchStats {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.08) 100%);
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.urlCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.queryBadge {
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--surface-1);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* URL List */
+.urlList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.urlItem {
+  display: block;
+  padding: 10px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #3b82f6;
+  text-decoration: none;
+  transition: all 0.2s;
+  word-break: break-all;
+}
+
+.urlItem:hover {
+  background: var(--surface-2);
+  border-color: #3b82f6;
+  transform: translateX(4px);
+}
+
 /* Research Results */
 .researchResults {
   display: flex;

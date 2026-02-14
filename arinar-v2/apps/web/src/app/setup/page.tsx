@@ -132,6 +132,19 @@ export default function SetupPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Create debate early (after step 1) to enable file uploads
+  const handleCreateDebateEarly = async () => {
+    if (createdDebateId) {
+      setStep(2);
+      return;
+    }
+    
+    const result = await createDebate();
+    if (result) {
+      setStep(2);
+    }
+  };
+
   const handleCreateDebate = async () => {
     // Validate memory import
     const memoryError = validateMemoryImport(participants);
@@ -140,7 +153,7 @@ export default function SetupPage() {
       return;
     }
 
-    const result = await createDebate();
+    const result = createdDebateId ? { debateId: createdDebateId, participantIds: createdParticipantIds } : await createDebate();
     if (result) {
       // Create memory grants if enabled
       const shouldContinue = await createMemoryGrants(result.debateId, result.participantIds);
@@ -212,6 +225,7 @@ export default function SetupPage() {
 
           {step === 2 && (
             <MaterialsStep
+              debateId={createdDebateId}
               materials={materials}
               onAdd={handleAddMaterial}
               onUpdate={handleUpdateMaterial}
@@ -292,13 +306,24 @@ export default function SetupPage() {
           
           <div style={{ flex: 1 }} />
           
-          {step < 4 && (
+          {step === 1 && (
+            <button
+              onClick={handleCreateDebateEarly}
+              disabled={!canGoNext() || isLoading}
+              className={styles.btnNext}
+            >
+              <span>{isLoading ? 'Creating...' : 'Next'}</span>
+              <span className={styles.btnIcon}>→</span>
+            </button>
+          )}
+          
+          {step > 1 && step < 4 && (
             <button
               onClick={() => setStep(step + 1)}
               disabled={!canGoNext() || isLoading}
               className={styles.btnNext}
             >
-              <span>{isLoading ? 'Loading...' : 'Next'}</span>
+              <span>Next</span>
               <span className={styles.btnIcon}>→</span>
             </button>
           )}

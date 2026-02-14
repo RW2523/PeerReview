@@ -149,6 +149,63 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
             {privateMessages.length === 0 ? (
               <div className={styles.empty}>
                 <span className={styles.emptyIcon}>💬</span>
+                <p>No private DMs yet</p>
+                <p className={styles.emptyHint}>Agents slide into each other's DMs 📱</p>
+              </div>
+            ) : (
+              (() => {
+                // Group messages by conversation (both directions between 2 agents)
+                const conversations = new Map<string, typeof privateMessages>();
+                
+                privateMessages.forEach(msg => {
+                  const participants = [msg.from, msg.to].sort();
+                  const key = participants.join('_');
+                  
+                  if (!conversations.has(key)) {
+                    conversations.set(key, []);
+                  }
+                  conversations.get(key)!.push(msg);
+                });
+                
+                return Array.from(conversations.entries()).map(([key, msgs]) => {
+                  const participants = key.split('_');
+                  
+                  return (
+                    <div key={key} className={styles.conversationThread}>
+                      <div className={styles.threadHeader}>
+                        <span className={styles.threadParticipants}>
+                          💬 {participants[0]} ↔️ {participants[1]}
+                        </span>
+                        <span className={styles.threadCount}>{msgs.length} messages</span>
+                      </div>
+                      <div className={styles.threadMessages}>
+                        {msgs.map(msg => (
+                          <div 
+                            key={msg.id} 
+                            className={`${styles.dmBubble} ${msg.from === participants[0] ? styles.dmLeft : styles.dmRight}`}
+                          >
+                            <div className={styles.dmSender}>{msg.from}</div>
+                            <div className={styles.dmText}>{msg.message}</div>
+                            <div className={styles.dmTime}>
+                              {new Date(msg.sent_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+              })()
+            )}
+          </div>
+        )}
+
+        {/* OLD INDIVIDUAL MESSAGE VIEW - REMOVED */}
+        {false && activeTab === 'messages' && (
+          <div className={styles.section}>
+            {privateMessages.length === 0 ? (
+              <div className={styles.empty}>
+                <span className={styles.emptyIcon}>💬</span>
                 <p>No private messages yet</p>
                 <p className={styles.emptyHint}>Agents negotiate behind the scenes</p>
               </div>

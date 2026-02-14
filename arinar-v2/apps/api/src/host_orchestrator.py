@@ -186,7 +186,14 @@ class HostOrchestrator:
         participant_list = ", ".join([f"@{name}" for name in participant_names])
         outcomes_text = "\n".join([f"- {outcome}" for outcome in desired_outcomes]) if desired_outcomes else "- Reach a clear decision"
         
+        # Get current date/time for temporal context
+        current_datetime = datetime.now(timezone.utc)
+        current_date_str = current_datetime.strftime("%A, %B %d, %Y")
+        current_time_str = current_datetime.strftime("%I:%M %p UTC")
+        
         prompt = f"""You are the Ultimate Host providing the final conclusion for this debate.
+
+📅 **Current Date & Time**: {current_date_str} at {current_time_str}
 
 **Meeting Title**: {title}
 
@@ -202,13 +209,15 @@ class HostOrchestrator:
 
 **Your Task**:
 Provide your final conclusion as the Ultimate Host. Remember:
-1. Summarize the main positions discussed
-2. Identify areas of consensus
-3. Explain the majority viewpoint
-4. Acknowledge dissenting opinions respectfully
-5. Make a clear recommendation based on the discussion
-6. Reference specific arguments from participants
-7. Be objective and transparent about your reasoning
+1. Consider the current date ({current_date_str}) when evaluating the recency and relevance of discussed information
+2. Summarize the main positions discussed
+3. Identify areas of consensus
+4. Explain the majority viewpoint
+5. Acknowledge dissenting opinions respectfully
+6. Make a clear recommendation based on the discussion
+7. Reference specific arguments from participants
+8. Note if any information discussed appears outdated given today's date
+9. Be objective and transparent about your reasoning
 
 Provide your conclusion now:"""
         
