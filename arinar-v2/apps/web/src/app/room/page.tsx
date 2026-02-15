@@ -6,6 +6,7 @@ import AppNav from '@/components/layout/AppNav';
 import DebateSelector from '@/components/room/DebateSelector';
 import EventFeed from '@/components/room/EventFeed';
 import DebateControls from '@/components/room/DebateControls';
+import DebateTimer from '@/components/room/DebateTimer';
 import AgentBehaviorsPanel from '@/components/room/AgentBehaviorsPanel';
 import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
@@ -34,6 +35,7 @@ function RoomPageContent() {
   const [typingParticipants, setTypingParticipants] = useState<Set<string>>(new Set());
   const typingTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const [policyConfig, setPolicyConfig] = useState<any>(null);
+  const [debateStartedAt, setDebateStartedAt] = useState<string | null>(null);
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
@@ -51,7 +53,9 @@ function RoomPageContent() {
         .then(debate => {
           handleDebateLoaded(debate.debate_id, debate.title || 'Untitled', debate.state);
           setPolicyConfig(debate.policy_config || {});
+          setDebateStartedAt(debate.started_at || null);
           console.log('📊 Policy Config loaded:', debate.policy_config);
+          console.log('⏰ Debate started at:', debate.started_at);
         })
         .catch(err => {
           console.error('Failed to auto-load debate:', err);
@@ -65,15 +69,21 @@ function RoomPageContent() {
     enabled: !!debateId && debateState !== 'ended',
   });
 
-  // Update policy config when new agent messages arrive (to update progress indicator)
+  // Update policy config and debate metadata when new agent messages arrive or state changes
   useEffect(() => {
     if (!debateId) return;
     
     const hasNewAgentMessage = events.some(e => e.type === 'agent_message');
-    if (hasNewAgentMessage) {
+    const hasStateChange = events.some(e => e.type === 'state_update');
+    
+    if (hasNewAgentMessage || hasStateChange) {
       api.getDebate(debateId)
         .then(debate => {
           setPolicyConfig(debate.policy_config || {});
+          setDebateStartedAt(debate.started_at || null);
+          if (hasStateChange) {
+            setDebateState(debate.state);
+          }
         })
         .catch(err => {
           console.error('Failed to refresh debate policy:', err);
@@ -221,15 +231,12 @@ function RoomPageContent() {
                     </>
                   )}
                   {policyConfig.timebox_minutes && !policyConfig.max_rounds && (
-                    <>
-                      <div className={styles.progressLabel}>⏱️ Time Limit</div>
-                      <div className={styles.progressValue}>
-                        {policyConfig.timebox_minutes} minutes
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
-                        Debate will auto-end after time limit
-                      </div>
-                    </>
+                    <DebateTimer 
+                      debateId={debateId}
+                      timeboxMinutes={policyConfig.timebox_minutes}
+                      debateStartedAt={debateStartedAt}
+                      debateState={debateState}
+                    />
                   )}
                 </div>
               )}

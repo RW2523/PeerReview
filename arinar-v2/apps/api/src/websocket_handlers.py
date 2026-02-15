@@ -75,17 +75,26 @@ class WebSocketCommandHandlers:
     
     async def handle_next_turn(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str, payload: Dict, create_envelope_fn, create_ack_fn, create_error_fn):
         """Handle control.next_turn command."""
+        print(f"\n🎮 WEBSOCKET COMMAND: control.next_turn received")
+        print(f"   Debate ID: {debate_id}")
+        print(f"   User ID: {user_id}")
+        print(f"   Request ID: {request_id}")
+        print(f"   Payload keys: {list(payload.keys())}\n")
+        
         try:
             # Get OpenRouter key from payload (required for BYOK)
             openrouter_key = payload.get('openrouter_key')
             if not openrouter_key:
+                print("❌ ERROR: No OpenRouter key in payload!")
                 raise ValueError("OpenRouter API key required for next turn")
             
+            print(f"✅ OpenRouter key found, triggering turn orchestrator...")
             from .turn_orchestrator import TurnOrchestrator
             
             # TurnOrchestrator.trigger_next_turn persists the event and returns event details
             orchestrator = TurnOrchestrator(openrouter_key)
             result = orchestrator.trigger_next_turn(debate_id)
+            print(f"✅ Turn orchestrator returned successfully!")
             
             # Broadcast using the ALREADY PERSISTED event (no duplicate insert)
             envelope = create_envelope_fn(
@@ -103,8 +112,12 @@ class WebSocketCommandHandlers:
             )
             await self.manager.broadcast_to_debate(debate_id, envelope)
             
+            print(f"✅ Broadcasting complete, sending ACK to client\n")
             await self.manager.send_to_client(websocket, create_ack_fn(request_id, 'control.next_turn'))
         except Exception as e:
+            print(f"❌ WEBSOCKET ERROR in handle_next_turn: {e}")
+            import traceback
+            traceback.print_exc()
             await self.manager.send_to_client(websocket, create_error_fn(request_id, 'control.next_turn', str(e)))
     
     async def handle_pause(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str, create_envelope_fn, create_ack_fn, create_error_fn):
@@ -154,24 +167,36 @@ class WebSocketCommandHandlers:
     
     async def handle_intervene(self, websocket: WebSocket, debate_id: str, user_id: str, request_id: str, payload: Dict, persist_event_fn, create_envelope_fn, create_ack_fn, create_error_fn):
         """Handle intervene command."""
+        print(f"\n🎙️ INTERVENTION RECEIVED:")
+        print(f"   Debate ID: {debate_id}")
+        print(f"   User ID: {user_id}")
+        print(f"   Message: {payload.get('message', '')[:100]}")
+        print(f"   Tagged agents: {payload.get('tagged_agents', [])}\n")
+        
         try:
             message_text = payload.get('message')
             if not message_text:
                 raise ValueError("Intervention message required")
             
-            # Persist intervention as event
-            event_data = await persist_event_fn(debate_id, 'intervention', {
+            # Persist intervention as 'human_message' event type (to match turn_orchestrator expectations)
+            event_data = await persist_event_fn(debate_id, 'human_message', {
                 'actor': payload.get('actor', 'Moderator'),
-                'message': message_text
+                'text': message_text,  # Changed from 'message' to 'text' to match turn_orchestrator
+                'tagged_agents': payload.get('tagged_agents', []),
+                'action': 'intervene'
             }, sender_id=user_id)
             
+            print(f"✅ Intervention persisted as human_message with event_id: {event_data.get('event_id') if event_data else 'FAILED'}\n")
+            
             if event_data:
+                # Broadcast as 'human_message' type for consistency
                 envelope = create_envelope_fn(
-                    'intervention',
+                    'human_message',
                     debate_id,
                     {
                         'actor': payload.get('actor', 'Moderator'),
-                        'message': message_text
+                        'text': message_text,
+                        'tagged_agents': payload.get('tagged_agents', [])
                     },
                     sequence_number=event_data['sequence_number'],
                     event_id=event_data['event_id'],
@@ -179,7 +204,11 @@ class WebSocketCommandHandlers:
                     sender_id=user_id
                 )
                 await self.manager.broadcast_to_debate(debate_id, envelope)
+                print(f"✅ Intervention broadcasted to all debate participants\n")
             
             await self.manager.send_to_client(websocket, create_ack_fn(request_id, 'intervene'))
         except Exception as e:
+            print(f"❌ ERROR handling intervention: {e}")
+            import traceback
+            traceback.print_exc()
             await self.manager.send_to_client(websocket, create_error_fn(request_id, 'intervene', str(e)))

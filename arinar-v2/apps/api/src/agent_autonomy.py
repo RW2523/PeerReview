@@ -117,12 +117,18 @@ class AgentAutonomyService:
         from_agent: str,
         to_agent: str,
         conversation_context: str,
-        desired_outcomes: List[str]
+        desired_outcomes: List[str],
+        previous_dm: Optional[str] = None
     ) -> Optional[str]:
         """Generate human-like private message with personality"""
         
+        # Add previous DM context if this is a reply
+        previous_context = ""
+        if previous_dm:
+            previous_context = f"\n**Previous message from {to_agent}:**\n{previous_dm}\n\n(You're REPLYING to this message)\n"
+        
         message_prompt = f"""You are {from_agent}. Send a HUMAN-LIKE private DM to {to_agent}.
-
+{previous_context}
 **Recent conversation:**
 {conversation_context[:300]}
 

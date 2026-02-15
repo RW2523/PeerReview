@@ -46,20 +46,23 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
 
     events.forEach(event => {
       if (event.type === 'coalition_formed') {
+        console.log('🤝 Coalition event:', event);
         newCoalitions.push({
           id: event.event_id,
           members: event.payload?.members || [],
-          formed_at: event.occurred_at,
+          formed_at: event.occurred_at || event.payload?.timestamp,
           strategy: event.payload?.strategy,
           type: event.payload?.type || 'alliance'
         });
       } else if (event.type === 'private_message') {
+        console.log('💬 Private message event:', event);
+        // Backend uses 'from_agent' and 'to_agent' fields
         newMessages.push({
           id: event.event_id,
-          from: event.payload?.from,
-          to: event.payload?.to,
+          from: event.payload?.from_agent || event.payload?.from,
+          to: event.payload?.to_agent || event.payload?.to,
           message: event.payload?.message,
-          timestamp: event.occurred_at
+          timestamp: event.occurred_at || event.payload?.timestamp
         });
       } else if (event.type === 'agent_subtask') {
         newTasks.push({
@@ -67,9 +70,15 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
           agent: event.payload?.agent,
           task: event.payload?.task,
           status: event.payload?.status,
-          timestamp: event.occurred_at
+          timestamp: event.occurred_at || event.payload?.timestamp
         });
       }
+    });
+
+    console.log('📊 Processed behaviors:', {
+      coalitions: newCoalitions,
+      messages: newMessages,
+      tasks: newTasks
     });
 
     setCoalitions(newCoalitions);
@@ -101,7 +110,7 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
           className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('tasks')}
         >
-          📋 Sub-tasks ({subTasks.length})
+          🎯 Agent Actions ({subTasks.length})
         </button>
       </div>
 
@@ -169,14 +178,17 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
                 
                 return Array.from(conversations.entries()).map(([key, msgs]) => {
                   const participants = key.split('_');
+                  const isHostConversation = participants.includes('Host');
                   
                   return (
                     <div key={key} className={styles.conversationThread}>
                       <div className={styles.threadHeader}>
                         <span className={styles.threadParticipants}>
-                          💬 {participants[0]} ↔️ {participants[1]}
+                          {isHostConversation ? '❓' : '💬'} {participants[0]} ↔️ {participants[1]}
                         </span>
-                        <span className={styles.threadCount}>{msgs.length} messages</span>
+                        <span className={styles.threadCount}>
+                          {msgs.length} {isHostConversation ? 'question(s)' : 'messages'}
+                        </span>
                       </div>
                       <div className={styles.threadMessages}>
                         {msgs.map(msg => (
@@ -187,7 +199,7 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
                             <div className={styles.dmSender}>{msg.from}</div>
                             <div className={styles.dmText}>{msg.message}</div>
                             <div className={styles.dmTime}>
-                              {new Date(msg.sent_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </div>
                           </div>
                         ))}
@@ -231,9 +243,9 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
           <div className={styles.section}>
             {subTasks.length === 0 ? (
               <div className={styles.empty}>
-                <span className={styles.emptyIcon}>📋</span>
-                <p>No sub-tasks yet</p>
-                <p className={styles.emptyHint}>Agents break down goals into steps</p>
+                <span className={styles.emptyIcon}>🎯</span>
+                <p>No agent actions yet</p>
+                <p className={styles.emptyHint}>Agents will take autonomous actions during the debate</p>
               </div>
             ) : (
               subTasks.map(task => (

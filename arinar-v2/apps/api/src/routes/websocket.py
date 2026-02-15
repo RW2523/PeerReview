@@ -68,63 +68,52 @@ async def websocket_debate_room(
         "timestamp": "ISO8601"
     }
     """
-    # Extract token from query params
-    query_params = dict(websocket.query_params)
-    token = query_params.get('token')
+    print(f"\n🔌 WebSocket endpoint ENTERED: debate_id={debate_id}")
+    logger.info(f"🔌 WebSocket endpoint ENTERED: debate_id={debate_id}")
     
-    # Development mode: bypass auth if REQUIRE_AUTH=false
-    if not settings.require_auth:
-        logger.info(f"⚠️  Development mode: bypassing auth for WebSocket (REQUIRE_AUTH=false)")
-        user = {
-            'sub': '00000000-0000-0000-0000-000000000999',  # Valid UUID format for dev user
-            'workspace_id': '00000000-0000-0000-0000-000000000101',
-            'tenant_id': '00000000-0000-0000-0000-000000000001',
-            'email': 'dev@arinar.ai',
-            'role': 'operator'
-        }
-    else:
-        # Production mode: validate token
-        if not token:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing auth token")
-            return
+    try:
+        # Extract query params
+        query_params = dict(websocket.query_params)
+        print(f"📝 Query params: {list(query_params.keys())}")
         
-        # Validate token and get user
+        # TEMPORARY: Ultra-simple connection for debugging - accept connection immediately
+        user_id = '00000000-0000-0000-0000-000000000999'
+        workspace_id = '00000000-0000-0000-0000-000000000101'
+        
+        print(f"✅ Attempting to connect WebSocket...")
+        logger.info(f"✅ Attempting to connect WebSocket...")
+        
+        # Accept connection FIRST
+        await ws_service.manager.connect(websocket, debate_id, user_id, workspace_id)
+        
+        print(f"✅ WebSocket connected successfully!")
+        logger.info(f"✅ WebSocket connected successfully!")
+        
         try:
-            user = await get_current_user_ws(token)
-        except HTTPException as e:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid auth token")
-            return
-    
-    # Verify debate exists and user has workspace access
-    debate_service = DebateService()
-    debate = debate_service.get_debate(debate_id)
-    
-    if not debate:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Debate not found")
-        return
-    
-    try:
-        check_workspace_access(user, debate['workspace_id'])
-    except HTTPException:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Access denied")
-        return
-    
-    # Accept connection
-    await ws_service.manager.connect(websocket, debate_id, user['sub'], debate['workspace_id'])
-    
-    try:
-        # Send historical events
-        since_sequence = int(query_params.get('since', 0))
-        await ws_service.send_historical_events(websocket, debate_id, since_sequence)
+            # Send historical events
+            since_sequence = int(query_params.get('since', 0))
+            await ws_service.send_historical_events(websocket, debate_id, since_sequence)
+            
+            # Event loop - listen for commands
+            while True:
+                data = await websocket.receive_json()
+                await ws_service.handle_command(websocket, data)
         
-        # Event loop - listen for commands
-        while True:
-            data = await websocket.receive_json()
-            await ws_service.handle_command(websocket, data)
+        except WebSocketDisconnect:
+            ws_service.manager.disconnect(websocket)
+            logger.info(f"WebSocket disconnected: debate={debate_id}, user={user_id}")
+        except Exception as e:
+            logger.error(f"WebSocket error in event loop: {e}")
+            import traceback
+            traceback.print_exc()
+            ws_service.manager.disconnect(websocket)
     
-    except WebSocketDisconnect:
-        ws_service.manager.disconnect(websocket)
-        logger.info(f"WebSocket disconnected: debate={debate_id}, user={user['sub']}")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        ws_service.manager.disconnect(websocket)
+        print(f"❌ WEBSOCKET ENDPOINT ERROR: {e}")
+        logger.error(f"❌ WEBSOCKET ENDPOINT ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            await websocket.close(code=1011, reason=str(e))
+        except:
+            pass

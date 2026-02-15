@@ -73,6 +73,10 @@ class OpenRouterClient:
             "X-Title": "Arinar Debate Platform"
         }
         
+        # Validate model parameter
+        if not model or (isinstance(model, str) and model.strip() == ''):
+            raise ValueError(f"Invalid model parameter: {repr(model)}. Model cannot be empty.")
+        
         payload = {
             "model": model,
             "messages": messages,

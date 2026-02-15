@@ -419,3 +419,17 @@
     transform: translateY(0);
   }
 }
+
+/* Host conversation styling */
+.conversationThread:has(.threadParticipants:contains("Host")) {
+  border-left: 3px solid #f59e0b;
+}
+
+.conversationThread:has(.threadParticipants:contains("Host")) .threadHeader {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.conversationThread:has(.threadParticipants:contains("Host")) .dmBubble {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.3);
+}

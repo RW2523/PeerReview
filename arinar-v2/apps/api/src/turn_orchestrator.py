@@ -118,15 +118,23 @@ class TurnOrchestrator:
             agent_config = next_participant['agent_config'] or {}
             agent_name = agent_config.get('name') or next_participant['role_name']
             model_id = agent_config.get('model_id', 'openai/gpt-4o-mini')
+            
+            # CRITICAL FIX: If model_id is empty string or None, use default
+            if not model_id or model_id.strip() == '':
+                print(f"⚠️ WARNING: Agent {agent_name} has empty model_id, using default")
+                model_id = 'openai/gpt-4o-mini'
+            
             system_prompt = agent_config.get('system_prompt', '')
             
             # Debug: Print agent name extraction
-            print(f"🔍 AGENT NAME DEBUG:")
+            print(f"🔍 AGENT CONFIG DEBUG:")
             print(f"   Participant ID: {next_participant['participant_id']}")
             print(f"   Role name from DB: {next_participant['role_name']}")
             print(f"   Agent config keys: {list(agent_config.keys())}")
             print(f"   Agent config 'name': {agent_config.get('name')}")
-            print(f"   FINAL agent_name variable: {agent_name}\n")
+            print(f"   Agent config 'model_id': {repr(agent_config.get('model_id'))}")
+            print(f"   FINAL agent_name: {agent_name}")
+            print(f"   FINAL model_id: {model_id}\n")
             
             # Get prep pack for this agent
             cursor.execute("""
@@ -182,25 +190,46 @@ class TurnOrchestrator:
             messages.extend(conversation_history)
             
             # Extract any recent human interventions and make them VERY prominent
+            # Check MORE events to ensure we don't miss interventions in active debates
             recent_human_messages = []
-            for event in reversed(history_events[-5:]):  # Check last 5 events
+            for event in reversed(history_events[-15:]):  # Check last 15 events (up from 5)
                 if event['event_type'] == 'human_message':
                     content = event.get('content') or {}
                     text = content.get('text', '')
                     actor = content.get('actor', 'Moderator')
-                    recent_human_messages.append(f"{actor}: {text}")
+                    # Only include if not already in list (avoid duplicates)
+                    msg = f"{actor}: {text}"
+                    if msg not in recent_human_messages:
+                        recent_human_messages.append(msg)
             
             if recent_human_messages:
-                # Add as a HIGH PRIORITY system message that demands response
+                print(f"\n🎙️ INTERVENTION DETECTED in agent prompt:")
+                print(f"   Agent: {agent_name}")
+                print(f"   Interventions to include: {len(recent_human_messages)}")
+                for msg in recent_human_messages:
+                    print(f"     - {msg[:100]}")
+                print()
+                
+                # Add moderator guidance as context (not as primary focus)
                 messages.append({
                     "role": "system",
-                    "content": f"""🚨 URGENT MODERATOR INTERVENTION 🚨
+                    "content": f"""📢 Moderator Guidance:
 
-The moderator has directly addressed the debate participants. You MUST acknowledge and respond to this intervention:
+The moderator has provided the following input to help steer the debate:
 
 {chr(10).join(f"• {msg}" for msg in recent_human_messages)}
 
-⚠️ CRITICAL: Your next response MUST explicitly address this moderator message. Start your response by acknowledging what the moderator said."""
+**How to handle this:**
+- Briefly acknowledge the moderator's point (1 sentence max)
+- Integrate their guidance into your ongoing argument about the main debate topic
+- Continue focusing on the original problem statement and desired outcomes
+- Don't pivot completely - treat this as helpful context, not a new debate topic
+
+**Example (Good):**
+"Good point, Moderator. With that in mind, I'd also add that [continue your argument on the main topic]..."
+
+**Example (Bad - Don't do this):**
+"Let me completely shift focus to address what the moderator said..." ❌"""
                 })
             
             # Build list of participants who have already spoken (for @mentions)
@@ -336,7 +365,9 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 ⚠️ CRITICAL RULES:
 1. TEMPORAL AWARENESS: Today is {current_date_str}. When discussing events, policies, or data, always consider recency and note if information is outdated.
 2. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. 
-3. Base your response ONLY on:
+3. COMPREHENSIVE COVERAGE RULE: If the problem statement or moderator question has MULTIPLE parts (e.g., "analyze both Democrats AND Republicans", "address three factors"), you MUST cover ALL parts equally and thoroughly. DO NOT focus disproportionately on one aspect while ignoring others. 
+4. MULTI-PART QUESTION RULE: When moderator asks a question with multiple parts (e.g., "why X, Y, and Z?"), you MUST explicitly address EVERY SINGLE part in your response. Number your answers if helpful (1. X because... 2. Y because... 3. Z because...).
+5. Base your response ONLY on:
    - Your own preparation notes
    - What Active participants have actually said
    - The debate topic and materials
@@ -442,8 +473,8 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 'sequence_number': next_seq
             }
             
-            # Post-turn autonomous behaviors (50% chance, more visible)
-            should_trigger_autonomy = random.random() < 0.50 and total_turns > 1
+            # Post-turn autonomous behaviors (80% chance for better visibility, more visible)
+            should_trigger_autonomy = random.random() < 0.80 and total_turns > 1
             if should_trigger_autonomy:
                 print(f"    🎭 Triggering autonomous behaviors for {agent_name}...")
                 try:
@@ -483,14 +514,14 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             elif event['event_type'] == 'human_message':
                 text = content.get('text', '')
                 actor = content.get('actor', 'Moderator')
-                # Make human interventions prominent in history
+                # Add moderator input as context, but not overly prominent
                 history.append({
                     "role": "user",
-                    "content": f"🎙️ **MODERATOR INTERVENTION by {actor}**:\n\n{text}\n\n[This is a direct moderator message that requires acknowledgment]"
+                    "content": f"[{actor} note: {text}]"
                 })
         
         # Limit history to last 10 messages to avoid context overflow
-            return history
+        return history
     
     def _persist_autonomous_event(self, debate_id: str, event_type: str, content: Dict[str, Any]) -> str:
         """Persist autonomous behavior event to database for analysis"""
@@ -504,11 +535,11 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 
                 # Get next sequence number
                 cursor.execute("""
-                    SELECT COALESCE(MAX(sequence_number), 0) + 1
+                    SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_seq
                     FROM events
                     WHERE debate_id = %s
                 """, (debate_id,))
-                sequence_number = cursor.fetchone()['coalesce']
+                sequence_number = cursor.fetchone()['next_seq']
                 
                 # Insert event
                 cursor.execute("""
@@ -550,8 +581,8 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             from .websocket_service import websocket_manager
             autonomy_service = AgentAutonomyService(self.openrouter_client.api_key)
             
-            # Coalition formation (50% of 25% = 12.5% overall)
-            if random.random() < 0.5:
+            # Coalition formation (70% chance when autonomy triggers)
+            if random.random() < 0.70:
                 coalition = autonomy_service.analyze_and_form_coalitions(
                     debate_id, agent_name, participants, history_events, desired_outcomes
                 )
@@ -579,8 +610,59 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                         }
                         await websocket_manager.broadcast_to_debate(debate_id, event)
             
-            # Private messaging with back-and-forth (60% chance - agents love to DM!)
-            if random.random() < 0.6 and len(participants) >= 2:
+            # Question to Host/Moderator (30% chance - agents can ask for clarification)
+            if random.random() < 0.30:
+                # Generate a short clarifying question for the host
+                question_prompt = f"""You are {agent_name} in a debate about: {chr(10).join(desired_outcomes[:2]) if desired_outcomes else 'the current topic'}.
+
+Generate a SHORT (max 15 words) clarifying question to ask the moderator/host. Be specific and concise.
+
+Examples:
+- "Could you clarify the timeline for implementation?"
+- "What's the priority: cost or speed?"
+- "Are we considering international markets?"
+- "Should we focus on short-term or long-term impact?"
+
+Your question (15 words max):"""
+                
+                try:
+                    response = autonomy_service.openrouter_client.chat_completion(
+                        model='openai/gpt-4o-mini',
+                        messages=[
+                            {"role": "system", "content": "You generate short, specific clarifying questions for debates."},
+                            {"role": "user", "content": question_prompt}
+                        ],
+                        temperature=0.7,
+                        max_tokens=50
+                    )
+                    
+                    question = response.get('content', '').strip()
+                    if question and len(question.split()) <= 20:  # Enforce brevity
+                        content = {
+                            'from_agent': agent_name,
+                            'to_agent': 'Host',
+                            'message': question,
+                            'is_question_to_host': True,
+                            'timestamp': datetime.utcnow().isoformat()
+                        }
+                        
+                        event_id = self._persist_autonomous_event(debate_id, 'private_message', content)
+                        
+                        if event_id:
+                            event = {
+                                'type': 'private_message',
+                                'debate_id': debate_id,
+                                'event_id': event_id,
+                                'sender_type': 'system',
+                                'payload': content
+                            }
+                            await websocket_manager.broadcast_to_debate(debate_id, event)
+                            print(f"    ❓ Question to Host: {agent_name} → Host: {question[:60]}...")
+                except Exception as e:
+                    print(f"    ⚠️ Failed to generate host question: {e}")
+            
+            # Private messaging with back-and-forth (90% chance - agents love to DM!)
+            if random.random() < 0.90 and len(participants) >= 2:
                 other_agents = [
                     (p.get('agent_config') or {}).get('name') or p.get('role_name')
                     for p in participants

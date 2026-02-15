@@ -63,7 +63,7 @@ class SummaryService:
             model=model_id,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=2000
+            max_tokens=4000  # Increased to avoid truncation
         )
         
         # Parse structured output
@@ -161,29 +161,40 @@ class SummaryService:
     
     def _build_summary_prompt(self, context: str) -> str:
         """Build prompt for summary generation"""
-        return f"""You are analyzing a debate meeting. Generate structured outputs in JSON format.
+        return f"""You are analyzing a debate meeting. Generate a structured summary in JSON format.
 
 {context}
 
-Provide your response as valid JSON with this exact structure:
+**CRITICAL**: You MUST output ONLY valid, complete JSON. No markdown, no code blocks, no explanations.
+
+Output this EXACT JSON structure (fill in the content):
+
 {{
-  "summary": "1-3 sentence high-level summary of the debate",
-  "minutes": "Detailed meeting minutes covering key points discussed, decisions made, and notable disagreements (2-4 paragraphs)",
+  "summary": "Write 1-3 sentence high-level summary here",
+  "minutes": "Write detailed meeting minutes here (2-4 paragraphs covering key points, decisions, and disagreements)",
   "action_items": [
-    {{"description": "Action item description", "owner": "Role/person", "priority": "high|medium|low"}}
+    {{"description": "Specific action item", "owner": "Role or person responsible", "priority": "high"}},
+    {{"description": "Another action item", "owner": "Owner name", "priority": "medium"}}
   ]
 }}
 
 Requirements:
-- Summary: Concise, captures main outcome
-- Minutes: Comprehensive but readable
-- Action items: Specific, actionable, with clear ownership
-- Output ONLY valid JSON, no markdown formatting"""
+- Summary: Concise, captures main outcome and decisions
+- Minutes: Comprehensive, covers what was discussed and decided
+- Action items: Specific, actionable tasks with clear ownership and priority (high/medium/low)
+- MUST be valid, complete JSON - ensure all quotes are closed, all braces are matched
+- If no action items identified, use empty array: "action_items": []
+
+START YOUR RESPONSE WITH {{ and END WITH }}"""
     
     def _parse_summary_response(self, content: str) -> Dict[str, Any]:
         """Parse LLM response into structured outputs"""
+        import re
+        
+        # Try multiple parsing strategies
+        
+        # Strategy 1: Direct JSON parse
         try:
-            # Try to parse as JSON
             parsed = json.loads(content)
             
             # Validate structure
@@ -195,8 +206,12 @@ Requirements:
                 'minutes': parsed['minutes'],
                 'action_items': parsed['action_items']
             }
-        except json.JSONDecodeError:
-            # Fallback: extract from markdown if LLM wrapped in code block
+        except json.JSONDecodeError as e:
+            print(f"⚠️ JSON parse failed: {str(e)}")
+            pass
+        
+        # Strategy 2: Extract from markdown code block
+        try:
             if '```json' in content:
                 json_str = content.split('```json')[1].split('```')[0].strip()
                 parsed = json.loads(json_str)
@@ -205,7 +220,53 @@ Requirements:
                     'minutes': parsed['minutes'],
                     'action_items': parsed['action_items']
                 }
-            raise ValueError(f"Could not parse summary response as JSON: {content[:200]}")
+            elif '```' in content:
+                # Try generic code block
+                json_str = content.split('```')[1].split('```')[0].strip()
+                parsed = json.loads(json_str)
+                return {
+                    'summary': parsed['summary'],
+                    'minutes': parsed['minutes'],
+                    'action_items': parsed['action_items']
+                }
+        except (json.JSONDecodeError, IndexError) as e:
+            print(f"⚠️ Markdown extraction failed: {str(e)}")
+            pass
+        
+        # Strategy 3: Try to fix incomplete JSON
+        try:
+            # If JSON is incomplete, try to close it
+            content_cleaned = content.strip()
+            if content_cleaned.startswith('{') and not content_cleaned.endswith('}'):
+                # Add missing closing braces
+                open_count = content_cleaned.count('{')
+                close_count = content_cleaned.count('}')
+                content_cleaned += '}' * (open_count - close_count)
+                
+                # Also close any open arrays
+                open_arrays = content_cleaned.count('[')
+                close_arrays = content_cleaned.count(']')
+                if open_arrays > close_arrays:
+                    content_cleaned = content_cleaned.rstrip(',') + ']' * (open_arrays - close_arrays)
+                
+                parsed = json.loads(content_cleaned)
+                
+                return {
+                    'summary': parsed.get('summary', 'Summary generation incomplete'),
+                    'minutes': parsed.get('minutes', 'Minutes generation incomplete'),
+                    'action_items': parsed.get('action_items', [])
+                }
+        except Exception as e:
+            print(f"⚠️ JSON repair failed: {str(e)}")
+            pass
+        
+        # Strategy 4: Fallback to extracting text manually
+        print(f"⚠️ All parsing strategies failed. Creating fallback summary...")
+        return {
+            'summary': 'Summary generation failed - unable to parse AI response',
+            'minutes': f'The AI generated an invalid response format. Raw content (first 500 chars):\n\n{content[:500]}',
+            'action_items': []
+        }
     
     def _save_outputs(
         self,

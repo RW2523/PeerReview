@@ -297,15 +297,33 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                 # Broadcast progress: Researching online
                 _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Researching topic online')
                 
-                # Generate PERSONA-SPECIFIC search query based on agent's role
+                # Generate HIGHLY PERSONA-SPECIFIC search query based on agent's unique role and perspective
                 role_name = role_description or "analyst"
-                persona_context = system_prompt[:150] if system_prompt else ""
                 
-                # Create unique search angle based on persona
-                search_query = f"{problem_statement[:80]} {role_name} perspective analysis"
+                # Extract key persona traits from system prompt for MORE unique searches
+                persona_keywords = ""
+                if system_prompt:
+                    # Extract distinctive keywords from persona (focus words like "skeptical", "data-driven", "emotional", etc.)
+                    prompt_lower = system_prompt.lower()
+                    distinctive_traits = []
+                    trait_words = ['skeptical', 'analytical', 'emotional', 'data', 'strategic', 'critical', 
+                                   'creative', 'pragmatic', 'idealistic', 'technical', 'philosophical', 
+                                   'economic', 'social', 'political', 'scientific', 'historical']
+                    for trait in trait_words:
+                        if trait in prompt_lower:
+                            distinctive_traits.append(trait)
+                    if distinctive_traits:
+                        persona_keywords = " ".join(distinctive_traits[:3])  # Use up to 3 distinctive traits
+                
+                # Create UNIQUE search angle based on persona AND distinctive traits
+                # This ensures each agent searches with their own lens, getting different sources
+                if persona_keywords:
+                    search_query = f"{problem_statement[:60]} {persona_keywords} {role_name} analysis research"
+                else:
+                    search_query = f"{problem_statement[:60]} {role_name} expert perspective analysis recent"
                 
                 print(f"    🔍 Persona-specific web search ({role_name})")
-                print(f"    📝 Query: {search_query[:120]}")
+                print(f"    📝 Query: {search_query[:150]}")
                 
                 with DDGS() as ddgs:
                     # Search for 10-15 results to get comprehensive coverage

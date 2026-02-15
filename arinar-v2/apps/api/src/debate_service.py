@@ -20,7 +20,7 @@ class DebateService:
             cursor = get_cursor(conn)
             cursor.execute("""
                 SELECT debate_id, workspace_id, title, description, state, 
-                       policy_config, created_at, updated_at
+                       policy_config, created_at, updated_at, started_at, ended_at
                 FROM debates
                 WHERE debate_id = %s
             """, (debate_id,))
@@ -101,12 +101,13 @@ class DebateService:
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
             
-            # Update debate state
+            # Update debate state and record started_at timestamp
+            now = datetime.now(timezone.utc)
             cursor.execute("""
                 UPDATE debates
-                SET state = %s, updated_at = %s
+                SET state = %s, updated_at = %s, started_at = %s
                 WHERE debate_id = %s
-            """, (DebateState.RUNNING.value, datetime.now(timezone.utc), debate_id))
+            """, (DebateState.RUNNING.value, now, now, debate_id))
             
             # Create system event
             event_id = str(uuid.uuid4())
@@ -230,7 +231,7 @@ class DebateService:
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
             
-            # Create intervention event
+            # Create intervention event (using 'human_message' type to match turn_orchestrator expectations)
             event_id = str(uuid.uuid4())
             cursor.execute("""
                 INSERT INTO events (
@@ -240,12 +241,13 @@ class DebateService:
             """, (
                 event_id,
                 debate_id,
-                'intervention',
+                'human_message',  # Changed from 'intervention' to match turn_orchestrator
                 'human',
                 self._get_next_sequence(cursor, debate_id),
                 psycopg2.extras.Json({
                     'text': message,
                     'tagged_agents': tagged_agents or [],
+                    'actor': 'Moderator',  # Add actor field expected by turn_orchestrator
                     'action': 'intervene'
                 }),
                 datetime.now(timezone.utc)
