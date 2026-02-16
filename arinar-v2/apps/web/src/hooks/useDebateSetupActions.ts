@@ -154,7 +154,10 @@ export function useDebateSetupActions(
       // Check if YOLO mode is enabled
       if (options.yoloMode) {
         // Start autonomous mode
-        await api.startAutonomousDebate(debateId, options.autoTurnDelay || 10);
+        if (!apiKey) {
+          throw new Error('OpenRouter API key required for YOLO mode. Please add it in Settings.');
+        }
+        await api.startAutonomousDebate(debateId, options.autoTurnDelay || 10, apiKey);
         console.log('🚀 YOLO Mode activated!');
       } else {
         // Trigger first agent turn immediately (manual mode)

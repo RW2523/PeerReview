@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ReactNode } from 'react';
 import styles from './EventFeed.module.css';
 import { WSEventEnvelope, ConnectionStatus } from '@/lib/wsClient';
 
@@ -9,6 +9,80 @@ interface EventFeedProps {
   connectionStatus: ConnectionStatus;
   onPresenceUpdate?: (participantId: string, action: 'join' | 'leave') => void;
   onTyping?: (participantId: string) => void;
+}
+
+// Simple markdown parser for common patterns
+function parseMarkdown(text: string): ReactNode {
+  // Split by lines for list handling
+  const lines = text.split('\n');
+  const result: ReactNode[] = [];
+  let key = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Check for numbered list (1. 2. 3.)
+    const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+    if (numberedMatch) {
+      result.push(
+        <div key={key++} className={styles.listItem}>
+          <span className={styles.listNumber}>{numberedMatch[1]}.</span>
+          <span>{parseInlineMarkdown(numberedMatch[2])}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // Regular line with inline markdown
+    if (line.trim()) {
+      result.push(<div key={key++}>{parseInlineMarkdown(line)}</div>);
+    } else {
+      result.push(<br key={key++} />);
+    }
+  }
+
+  return <>{result}</>;
+}
+
+// Parse inline markdown (bold, italic, code, mentions)
+function parseInlineMarkdown(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+
+  // Pattern: **bold**, *italic*, `code`, @mentions
+  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(@[\w-]+)/g;
+  
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    // Add text before match
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+
+    if (match[1]) {
+      // **bold**
+      parts.push(<strong key={key++}>{match[2]}</strong>);
+    } else if (match[3]) {
+      // *italic*
+      parts.push(<em key={key++}>{match[4]}</em>);
+    } else if (match[5]) {
+      // `code`
+      parts.push(<code key={key++} className={styles.inlineCode}>{match[6]}</code>);
+    } else if (match[7]) {
+      // @mention
+      parts.push(<span key={key++} className={styles.mention}>{match[7]}</span>);
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
 }
 
 export default function EventFeed({ events: wsEvents, connectionStatus, onPresenceUpdate, onTyping }: EventFeedProps) {
@@ -97,9 +171,24 @@ export default function EventFeed({ events: wsEvents, connectionStatus, onPresen
             <p>No messages yet. The debate will appear here when it starts.</p>
           </div>
         ) : (
-          displayEvents.map((event) => (
-            <EventCard key={event.event_id} event={event} />
-          ))
+          displayEvents.map((event, index) => {
+            // Turn = complete round where ALL participants spoke
+            const turn = event.payload?.turn;
+            const previousEvent = index > 0 ? displayEvents[index - 1] : null;
+            const previousTurn = previousEvent?.payload?.turn;
+            
+            // Show separator when turn number changes
+            const showTurnSeparator = turn && turn !== previousTurn;
+
+            return (
+              <EventCard 
+                key={event.event_id} 
+                event={event} 
+                showTurnSeparator={showTurnSeparator}
+                turnNumber={turn}
+              />
+            );
+          })
         )}
       </div>
 
@@ -112,16 +201,16 @@ export default function EventFeed({ events: wsEvents, connectionStatus, onPresen
   );
 }
 
-function EventCard({ event }: { event: WSEventEnvelope }) {
+function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnvelope; showTurnSeparator?: boolean; turnNumber?: number }) {
   const [expanded, setExpanded] = useState(false);
 
   const getEventColor = (type: string) => {
-    if (type.includes('agent_message')) return 'var(--accent)';
-    if (type.includes('human_message')) return '#ff6b35'; // Bright orange for human interventions
-    if (type.includes('intervention')) return 'var(--warning)';
-    if (type.includes('summary')) return 'var(--success)';
-    if (type.includes('error')) return 'var(--danger)';
-    return 'var(--text-2)';
+    if (type.includes('agent_message')) return '#0070F3';
+    if (type.includes('human_message')) return '#0070F3';
+    if (type.includes('intervention')) return '#0070F3';
+    if (type.includes('summary')) return '#0070F3';
+    if (type.includes('error')) return '#E00';
+    return '#0070F3';
   };
 
   const getActor = () => {
@@ -139,51 +228,72 @@ function EventCard({ event }: { event: WSEventEnvelope }) {
     return null;
   };
 
+  const getEventTypeLabel = (type: string) => {
+    if (type === 'agent_message') return '💬 Message';
+    if (type === 'human_message') return '👤 You';
+    if (type === 'intervention') return '⚡ Intervention';
+    if (type === 'system_message') return '⚙️ System';
+    if (type === 'turn_start') return '▶️ Turn Start';
+    if (type === 'turn_end') return '⏸️ Turn End';
+    if (type === 'state_update') return '📊 State';
+    if (type === 'error') return '❌ Error';
+    return type.replace(/_/g, ' ');
+  };
+
   return (
-    <div className={styles.event} style={{ '--event-color': getEventColor(event.type) } as any}>
-      <div className={styles.eventHeader}>
-        <div className={styles.eventMeta}>
-          <span className={styles.actor}>{getActor()}</span>
-          <span className={styles.eventType}>{event.type}</span>
+    <>
+      {showTurnSeparator && turnNumber ? (
+        <div className={styles.turnSeparator}>
+          <div className={styles.turnLine} />
+          <span className={styles.turnLabel}>Turn #{turnNumber}</span>
+          <div className={styles.turnLine} />
         </div>
-        <span className={styles.timestamp}>
-          {event.occurred_at ? new Date(event.occurred_at).toLocaleTimeString() : 'N/A'}
-        </span>
+      ) : null}
+      <div className={styles.event} style={{ '--event-color': getEventColor(event.type) } as any}>
+        <div className={styles.eventHeader}>
+          <div className={styles.eventMeta}>
+            <span className={styles.actor}>{getActor()}</span>
+            <span className={styles.eventType}>{getEventTypeLabel(event.type)}</span>
+          </div>
+          <span className={styles.timestamp}>
+            {event.occurred_at ? new Date(event.occurred_at).toLocaleTimeString() : 'N/A'}
+          </span>
+        </div>
+
+        {getMessage() && (
+          <div className={styles.message}>
+            {parseMarkdown(getMessage()!)}
+          </div>
+        )}
+
+        <button
+          className={styles.expandBtn}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? 'Hide details' : 'Show details'}
+        </button>
+
+        {expanded && (
+          <div className={styles.details}>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>Event ID:</span>
+              <span className={styles.detailValue}>{event.event_id}</span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>Sequence:</span>
+              <span className={styles.detailValue}>#{event.sequence_number}</span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>Sender:</span>
+              <span className={styles.detailValue}>{event.sender_type} ({event.sender_id || 'system'})</span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>Payload:</span>
+              <pre className={styles.payloadPre}>{JSON.stringify(event.payload, null, 2)}</pre>
+            </div>
+          </div>
+        )}
       </div>
-
-      {getMessage() && (
-        <div className={styles.message}>
-          {getMessage()}
-        </div>
-      )}
-
-      <button
-        className={styles.expandBtn}
-        onClick={() => setExpanded(!expanded)}
-      >
-        {expanded ? 'Hide details' : 'Show details'}
-      </button>
-
-      {expanded && (
-        <div className={styles.details}>
-          <div className={styles.detailRow}>
-            <span className={styles.detailLabel}>Event ID:</span>
-            <span className={styles.detailValue}>{event.event_id}</span>
-          </div>
-          <div className={styles.detailRow}>
-            <span className={styles.detailLabel}>Sequence:</span>
-            <span className={styles.detailValue}>#{event.sequence_number}</span>
-          </div>
-          <div className={styles.detailRow}>
-            <span className={styles.detailLabel}>Sender:</span>
-            <span className={styles.detailValue}>{event.sender_type} ({event.sender_id || 'system'})</span>
-          </div>
-          <div className={styles.detailRow}>
-            <span className={styles.detailLabel}>Payload:</span>
-            <pre className={styles.payloadPre}>{JSON.stringify(event.payload, null, 2)}</pre>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }

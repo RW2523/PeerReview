@@ -262,7 +262,7 @@ export default function SetupPage() {
 
           {step === 2 && (
             <MaterialsStep
-              debateId={createdDebateId}
+              debateId={createdDebateId || undefined}
               materials={materials}
               onAdd={handleAddMaterial}
               onUpdate={handleUpdateMaterial}

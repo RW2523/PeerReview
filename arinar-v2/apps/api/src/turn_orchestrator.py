@@ -252,7 +252,8 @@ The moderator has provided the following input to help steer the debate:
                     continue  # Skip self
                 total_other_participants += 1
                 if name in agents_who_spoke:
-                    participants_spoken.append(f"@{name}")
+                    # Use full name with quotes to ensure LLM doesn't shorten it
+                    participants_spoken.append(f'@"{name}"')
             
             # Format participant list - DO NOT reveal names of agents who haven't spoken yet
             # This prevents agents from hallucinating/citing prep work of agents who haven't contributed
@@ -364,7 +365,7 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 
 ⚠️ CRITICAL RULES:
 1. TEMPORAL AWARENESS: Today is {current_date_str}. When discussing events, policies, or data, always consider recency and note if information is outdated.
-2. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. 
+2. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. ALWAYS use the FULL NAME exactly as shown in the Active list (e.g., '@"Senior Designer (Research-led)"' not just '@Senior'). 
 3. COMPREHENSIVE COVERAGE RULE: If the problem statement or moderator question has MULTIPLE parts (e.g., "analyze both Democrats AND Republicans", "address three factors"), you MUST cover ALL parts equally and thoroughly. DO NOT focus disproportionately on one aspect while ignoring others. 
 4. MULTI-PART QUESTION RULE: When moderator asks a question with multiple parts (e.g., "why X, Y, and Z?"), you MUST explicitly address EVERY SINGLE part in your response. Number your answers if helpful (1. X because... 2. Y because... 3. Z because...).
 5. Base your response ONLY on:

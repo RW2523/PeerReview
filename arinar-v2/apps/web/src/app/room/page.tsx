@@ -37,6 +37,7 @@ function RoomPageContent() {
   const [typingParticipants, setTypingParticipants] = useState<Set<string>>(new Set());
   const typingTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const [policyConfig, setPolicyConfig] = useState<any>(null);
+  const [participantTurnCounts, setParticipantTurnCounts] = useState<Record<string, number>>({});
   const [debateStartedAt, setDebateStartedAt] = useState<string | null>(null);
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
@@ -93,6 +94,16 @@ function RoomPageContent() {
           console.error('Failed to refresh debate policy:', err);
         });
     }
+    
+    // Calculate turn counts per participant
+    const counts: Record<string, number> = {};
+    events.forEach(event => {
+      if (event.type === 'agent_message' && event.payload?.agent_name) {
+        const agentName = event.payload.agent_name;
+        counts[agentName] = (counts[agentName] || 0) + 1;
+      }
+    });
+    setParticipantTurnCounts(counts);
   }, [events.length, debateId]); // Only when events array length changes
 
   // Presence join/leave via WebSocket
@@ -209,60 +220,60 @@ function RoomPageContent() {
                 </div>
               </div>
               
-              {(() => {
-                const shouldShow = policyConfig && debateState?.toLowerCase() === 'running' && participants.length > 0;
-                console.log('🎯 Progress Indicator Check:', {
-                  policyConfig: !!policyConfig,
-                  debateState: debateState?.toLowerCase(),
-                  participantsCount: participants.length,
-                  shouldShow,
-                  maxRounds: policyConfig?.max_rounds,
-                  timeboxMinutes: policyConfig?.timebox_minutes
-                });
-                return shouldShow;
-              })() && (
-                <div className={styles.progressIndicator}>
+              
+              {/* Turn & Progress Info */}
+              {policyConfig && debateState === 'running' && participants.length > 0 && (
+                <div className={styles.turnInfo}>
+                  <div className={styles.turnNumber}>
+                    <span className={styles.turnLabel}>TURN</span>
+                    <span className={styles.turnValue}>#{Math.floor((policyConfig.total_turns_taken || 0) / participants.length) + 1}</span>
+                  </div>
+                  <div className={styles.turnDetails}>
+                    <div className={styles.turnStat}>
+                      <span className={styles.statLabel}>Total Messages</span>
+                      <span className={styles.statValue}>{policyConfig.total_turns_taken || 0}</span>
+                    </div>
+                    {policyConfig.max_rounds && (
+                      <div className={styles.turnStat}>
+                        <span className={styles.statLabel}>Max Rounds</span>
+                        <span className={styles.statValue}>{policyConfig.max_rounds}</span>
+                      </div>
+                    )}
+                  </div>
                   {policyConfig.max_rounds && (
-                    <>
-                      <div className={styles.progressLabel}>🎯 Round Progress</div>
-                      <div className={styles.progressValue}>
-                        Round {Math.floor(((policyConfig.total_turns_taken || 0) / participants.length)) + 1} / {policyConfig.max_rounds}
-                      </div>
-                      <div className={styles.progressBar}>
-                        <div 
-                          className={styles.progressFill} 
-                          style={{
-                            width: `${Math.min(100, ((Math.floor(((policyConfig.total_turns_taken || 0) / participants.length)) + 1) / policyConfig.max_rounds) * 100)}%`
-                          }}
-                        />
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '8px' }}>
-                        {policyConfig.total_turns_taken || 0} / {policyConfig.max_rounds * participants.length} total turns
-                      </div>
-                    </>
-                  )}
-                  {policyConfig.timebox_minutes && !policyConfig.max_rounds && (
-                    <DebateTimer 
-                      debateId={debateId}
-                      timeboxMinutes={policyConfig.timebox_minutes}
-                      debateStartedAt={debateStartedAt}
-                      debateState={debateState}
-                    />
+                    <div className={styles.progressBar}>
+                      <div 
+                        className={styles.progressFill} 
+                        style={{
+                          width: `${Math.min(100, ((Math.floor((policyConfig.total_turns_taken || 0) / participants.length) + 1) / policyConfig.max_rounds) * 100)}%`
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               )}
-              
+
               <section className={styles.section}>
                 <h3>Participants</h3>
                 <div className={styles.participantsList}>
                   {participants.length === 0 ? (
                     <p className={styles.empty}>No participants yet</p>
                   ) : (
-                    participants.map((p) => (
-                      <div key={p.id} className={styles.participant}>
-                        {p.name}
-                      </div>
-                    ))
+                    participants.map((p) => {
+                      const turnCount = participantTurnCounts[p.name] || 0;
+                      const maxRounds = policyConfig?.max_rounds || '?';
+                      
+                      return (
+                        <div key={p.id} className={styles.participant}>
+                          <span className={styles.participantName}>{p.name}</span>
+                          {debateState === 'running' && (
+                            <span className={styles.participantTurns}>
+                              {turnCount}/{maxRounds}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </section>

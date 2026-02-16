@@ -263,8 +263,13 @@ async def start_debate(
     # Check workspace access (raises HTTPException if denied)
     check_workspace_access(current_user, debate['workspace_id'])
     
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"Starting debate {debate_id} - current state: {debate.get('state')}")
         debate = service.start_debate(debate_id)
+        logger.info(f"Debate {debate_id} started successfully - new state: {debate.get('state')}")
         
         return DebateResponse(
             debate_id=debate['debate_id'],
@@ -275,16 +280,21 @@ async def start_debate(
         )
     
     except ValueError as e:
+        logger.error(f"ValueError starting debate {debate_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
     except StateTransitionError as e:
+        logger.error(f"StateTransitionError starting debate {debate_id}: {str(e)} - current state: {debate.get('state')}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=f"Cannot start debate: {str(e)}"
         )
     except Exception as e:
+        logger.error(f"Unexpected error starting debate {debate_id}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"

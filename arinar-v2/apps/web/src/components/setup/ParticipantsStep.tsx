@@ -250,8 +250,8 @@ export function ParticipantsStep({
               </div>
             )}
 
-            {participants
-              .filter(p => p.name !== 'Ultimate Host' && p.role_name !== 'Ultimate Host')
+          {participants
+            .filter(p => p.name !== 'Ultimate Host')
               .map((participant, idx) => (
               <div key={idx} className={styles.selectedParticipantCard}>
                 <div className={styles.cardHeader}>

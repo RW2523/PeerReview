@@ -30,7 +30,7 @@ interface SubTask {
 interface AgentBehaviorsPanelProps {
   debateId: string;
   events: any[];
-  sendCommand?: (command: string, payload?: any) => Promise<void>;
+  sendCommand?: (command: any, payload?: any) => Promise<any>;
 }
 
 export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: AgentBehaviorsPanelProps) {

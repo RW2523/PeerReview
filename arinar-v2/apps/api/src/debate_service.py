@@ -14,19 +14,61 @@ class DebateService:
     Handles: start, pause, resume, intervene, end
     """
     
+    def __init__(self):
+        """Initialize and check if autonomous columns exist"""
+        self._has_autonomous_cols = None
+    
+    def _check_autonomous_cols(self) -> bool:
+        """Check if autonomous columns exist (cached)"""
+        if self._has_autonomous_cols is not None:
+            return self._has_autonomous_cols
+        
+        try:
+            with get_db_connection() as conn:
+                cursor = get_cursor(conn)
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'debates' 
+                    AND column_name = 'autonomous_mode'
+                """)
+                self._has_autonomous_cols = cursor.fetchone() is not None
+        except Exception:
+            self._has_autonomous_cols = False
+        
+        return self._has_autonomous_cols
+    
     def get_debate(self, debate_id: str) -> Optional[Dict[str, Any]]:
-        """Get debate by ID"""
+        """Get debate by ID - backward compatible with optional autonomous columns"""
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
-            cursor.execute("""
-                SELECT debate_id, workspace_id, title, description, state, 
-                       policy_config, created_at, updated_at, started_at, ended_at
-                FROM debates
-                WHERE debate_id = %s
-            """, (debate_id,))
+            
+            if self._check_autonomous_cols():
+                cursor.execute("""
+                    SELECT debate_id, workspace_id, title, description, state, 
+                           policy_config, created_at, updated_at, started_at, ended_at,
+                           autonomous_mode, autonomous_status, auto_turn_delay_seconds
+                    FROM debates
+                    WHERE debate_id = %s
+                """, (debate_id,))
+            else:
+                cursor.execute("""
+                    SELECT debate_id, workspace_id, title, description, state, 
+                           policy_config, created_at, updated_at, started_at, ended_at
+                    FROM debates
+                    WHERE debate_id = %s
+                """, (debate_id,))
             
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                result = dict(row)
+                # Add default values if columns don't exist
+                if 'autonomous_mode' not in result:
+                    result['autonomous_mode'] = False
+                    result['autonomous_status'] = None
+                    result['auto_turn_delay_seconds'] = 10
+                return result
+            return None
     
     def create_debate(
         self,
@@ -94,9 +136,18 @@ class DebateService:
         current_state = DebateState(debate['state'])
         
         if not DebateStateMachine.can_start(current_state):
-            raise StateTransitionError(
-                f"Cannot start debate in {current_state.value} state"
-            )
+            if current_state == DebateState.RUNNING:
+                raise StateTransitionError(
+                    f"Debate is already running. Use pause/resume to control it."
+                )
+            elif current_state == DebateState.ENDED:
+                raise StateTransitionError(
+                    f"Debate has already ended. Create a new debate to start another."
+                )
+            else:
+                raise StateTransitionError(
+                    f"Cannot start debate in {current_state.value} state. Current state must be 'pending'."
+                )
         
         with get_db_connection() as conn:
             cursor = get_cursor(conn)

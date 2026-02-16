@@ -12,13 +12,13 @@
   align-items: center;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-soft);
-  background: var(--bg-1);
+  background: #000000;
 }
 
 .feedHeader h2 {
   font-size: 18px;
   font-weight: 500;
-  color: var(--text-0);
+  color: #ffffff;
 }
 
 .connectionStatus {
@@ -26,7 +26,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text-2);
+  color: #888888;
 }
 
 .statusDot {
@@ -37,15 +37,15 @@
 }
 
 .statusDot.connected {
-  background: var(--success);
+  background: #0070F3;
 }
 
 .statusDot.connecting {
-  background: var(--warning);
+  background: #F5A623;
 }
 
 .statusDot.disconnected {
-  background: var(--text-2);
+  background: #888888;
   animation: none;
 }
 
@@ -78,6 +78,62 @@
   gap: 12px;
 }
 
+.turnSeparator {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 32px 0 24px 0;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.turnLine {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #0070F3, transparent);
+  min-width: 40px;
+}
+
+.turnBadge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #000000;
+  border: 1px solid #0070F3;
+  border-radius: 10px;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(0, 112, 243, 0.3);
+}
+
+.turnIcon {
+  font-size: 20px;
+}
+
+.turnText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.turnTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0070F3;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.turnSubtitle {
+  font-size: 9px;
+  font-weight: 600;
+  color: #666666;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .emptyFeed {
   display: flex;
   align-items: center;
@@ -90,13 +146,13 @@
 }
 
 .event {
-  background: var(--bg-1);
-  border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--event-color, var(--border-soft));
-  border-radius: 8px;
-  padding: 16px;
+  background: #000000;
+  border: 1px solid #1a1a1a;
+  border-left: 3px solid #0070F3;
+  border-radius: 10px;
+  padding: 18px;
   animation: slideIn 250ms ease-out;
-  transition: transform 150ms, box-shadow 150ms;
+  transition: transform 150ms, box-shadow 150ms, background 150ms;
 }
 
 @keyframes slideIn {
@@ -112,7 +168,10 @@
 
 .event:hover {
   transform: translateX(2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  background: #0a0a0a;
+  box-shadow: 0 4px 16px rgba(0, 112, 243, 0.15);
+  border-left-color: #0070F3;
+  border-color: #2a2a2a;
 }
 
 .eventHeader {
@@ -130,64 +189,153 @@
 }
 
 .actor {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--text-0);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .eventType {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--event-color, var(--text-2));
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 4px 8px;
-  background: var(--surface-0);
-  border-radius: 4px;
+  font-weight: 500;
+  color: #888888;
+  padding: 3px 8px;
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
+  border-radius: 12px;
+  white-space: nowrap;
 }
 
 .timestamp {
   font-size: 11px;
-  color: var(--text-2);
+  color: #666666;
 }
 
 .message {
   font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-1);
+  line-height: 1.7;
+  color: #ededed;
   margin-bottom: 12px;
   white-space: pre-wrap;
   word-wrap: break-word;
 }
 
+.message strong {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.message em {
+  font-style: italic;
+  color: #ededed;
+}
+
+.message .inlineCode {
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  background: #0a0a0a;
+  color: #0070F3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #1a1a1a;
+}
+
+.message .mention {
+  font-weight: 600;
+  color: #0070F3;
+  background: #0a0a0a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #1a1a1a;
+}
+
+.listItem {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0;
+  padding-left: 8px;
+}
+
+.listNumber {
+  font-weight: 700;
+  color: #0070F3;
+  min-width: 24px;
+  flex-shrink: 0;
+}
+
 .expandBtn {
   padding: 6px 12px;
-  background: var(--surface-0);
-  border: 1px solid var(--border-soft);
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
   border-radius: 4px;
-  color: var(--text-2);
+  color: #888888;
   font-size: 12px;
   font-weight: 500;
   transition: all 150ms;
 }
 
 .expandBtn:hover {
-  background: var(--surface-1);
-  color: var(--text-0);
-  border-color: var(--accent);
+  background: #1a1a1a;
+  color: #ffffff;
+  border-color: #0070F3;
 }
 
 .details {
   margin-top: 12px;
   padding: 12px;
-  background: var(--bg-0);
-  border: 1px solid var(--border-soft);
-  border-radius: 4px;
-  font-family: 'Monaco', 'Courier New', monospace;
+  background: #000000;
+  border: 1px solid #1a1a1a;
+  border-radius: 6px;
   font-size: 11px;
-  color: var(--text-1);
+  color: #cccccc;
   overflow-x: auto;
   line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detailRow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.detailLabel {
+  font-weight: 600;
+  color: #888888;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.detailValue {
+  color: #ededed;
+  word-break: break-all;
+}
+
+.payloadPre {
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  background: #000000;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0;
+  border: 1px solid #1a1a1a;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  color: #888888;
+  font-size: 14px;
+  text-align: center;
+  padding: 32px;
 }
 
 .jumpToBottom {
@@ -196,20 +344,21 @@
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 20px;
-  background: var(--accent);
+  background: #0070F3;
   border: none;
   border-radius: 20px;
-  color: var(--bg-0);
+  color: #ffffff;
   font-size: 13px;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 112, 243, 0.4);
   animation: bounce 2s ease-in-out infinite;
   transition: all 150ms;
 }
 
 .jumpToBottom:hover {
   transform: translateX(-50%) translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  background: #0060D9;
+  box-shadow: 0 6px 16px rgba(0, 112, 243, 0.6);
 }
 
 @keyframes bounce {

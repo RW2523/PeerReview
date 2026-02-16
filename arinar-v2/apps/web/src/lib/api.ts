@@ -462,6 +462,8 @@ export interface DebateListItem {
   updated_at?: string;
   started_at?: string;
   ended_at?: string;
+  participant_count?: number;
+  message_count?: number;
 }
 
 export interface DebateListResponse {
@@ -1082,17 +1084,21 @@ export async function addParticipantsToDebate(
 
 export async function startAutonomousDebate(
   debateId: string,
-  autoTurnDelaySeconds: number = 10
+  autoTurnDelaySeconds: number = 10,
+  openrouterKey: string
 ): Promise<{ status: string; debate_id: string }> {
-  const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/debates/${debateId}/start-autonomous`, {
+  const headers: any = await getAuthHeaders();
+  headers['X-OpenRouter-Key'] = openrouterKey;
+  
+  const response = await fetch(`${API_URL}/api/debates/${debateId}/start-autonomous`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ auto_turn_delay_seconds: autoTurnDelaySeconds }),
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to start autonomous debate: ${response.statusText}`);
+    const errorText = await response.text().catch(() => response.statusText);
+    throw new Error(`Failed to start autonomous debate: ${errorText}`);
   }
   
   return response.json();
@@ -1100,7 +1106,7 @@ export async function startAutonomousDebate(
 
 export async function pauseAutonomousDebate(debateId: string): Promise<{ status: string }> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/debates/${debateId}/pause-autonomous`, {
+  const response = await fetch(`${API_URL}/api/debates/${debateId}/pause-autonomous`, {
     method: 'POST',
     headers,
   });
@@ -1114,7 +1120,7 @@ export async function pauseAutonomousDebate(debateId: string): Promise<{ status:
 
 export async function resumeAutonomousDebate(debateId: string): Promise<{ status: string }> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/debates/${debateId}/resume-autonomous`, {
+  const response = await fetch(`${API_URL}/api/debates/${debateId}/resume-autonomous`, {
     method: 'POST',
     headers,
   });
@@ -1132,7 +1138,7 @@ export async function getAutonomousStatus(debateId: string): Promise<{
   has_background_task: boolean;
 }> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/debates/${debateId}/autonomous-status`, {
+  const response = await fetch(`${API_URL}/api/debates/${debateId}/autonomous-status`, {
     method: 'GET',
     headers,
   });

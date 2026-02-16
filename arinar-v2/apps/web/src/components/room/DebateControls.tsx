@@ -78,6 +78,30 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
     }
   };
 
+  const handlePauseYolo = async () => {
+    setPausingYolo(true);
+    setError(null);
+    try {
+      await api.pauseAutonomousDebate(debateId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to pause autonomous debate');
+    } finally {
+      setPausingYolo(false);
+    }
+  };
+
+  const handleResumeYolo = async () => {
+    setPausingYolo(true);
+    setError(null);
+    try {
+      await api.resumeAutonomousDebate(debateId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resume autonomous debate');
+    } finally {
+      setPausingYolo(false);
+    }
+  };
+
   const handleEnd = async () => {
     setShowEndConfirm(false);
     setLoading(true);
