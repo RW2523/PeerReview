@@ -30,19 +30,71 @@ interface SubTask {
 interface AgentBehaviorsPanelProps {
   debateId: string;
   events: any[];
+  sendCommand?: (command: string, payload?: any) => Promise<void>;
 }
 
-export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviorsPanelProps) {
+export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: AgentBehaviorsPanelProps) {
   const [coalitions, setCoalitions] = useState<Coalition[]>([]);
   const [privateMessages, setPrivateMessages] = useState<PrivateMessage[]>([]);
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
-  const [activeTab, setActiveTab] = useState<'coalitions' | 'messages' | 'tasks'>('coalitions');
+  const [activeTab, setActiveTab] = useState<'coalitions' | 'messages' | 'questions' | 'tasks'>('coalitions');
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [replyTexts, setReplyTexts] = useState<Map<string, string>>(new Map());
+  const [seenQuestionIds, setSeenQuestionIds] = useState<Set<string>>(new Set());
+  
+  // Filter messages sent to Host
+  const questionsToHost = privateMessages.filter(msg => msg.to === 'Host');
+  const agentToAgentMessages = privateMessages.filter(msg => msg.to !== 'Host');
+  
+  // Handle reply to agent question
+  const handleReply = async (questionId: string, agentName: string) => {
+    const replyText = replyTexts.get(questionId);
+    if (!replyText?.trim() || !sendCommand) return;
+    
+    try {
+      await sendCommand('intervene', {
+        message: replyText,
+        tagged_agents: [agentName]
+      });
+      
+      // Clear the reply text
+      setReplyTexts(prev => {
+        const next = new Map(prev);
+        next.delete(questionId);
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to send reply:', err);
+    }
+  };
+  
+  const updateReplyText = (questionId: string, text: string) => {
+    setReplyTexts(prev => {
+      const next = new Map(prev);
+      next.set(questionId, text);
+      return next;
+    });
+  };
+
+  // Keyboard shortcut to close (Escape)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   useEffect(() => {
     // Process events to extract agent behaviors
     const newCoalitions: Coalition[] = [];
     const newMessages: PrivateMessage[] = [];
     const newTasks: SubTask[] = [];
+    const newQuestionIds: string[] = [];
 
     events.forEach(event => {
       if (event.type === 'coalition_formed') {
@@ -57,10 +109,14 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
       } else if (event.type === 'private_message') {
         console.log('💬 Private message event:', event);
         // Backend uses 'from_agent' and 'to_agent' fields
+        const toAgent = event.payload?.to_agent || event.payload?.to;
+        if (toAgent === 'Host') {
+          newQuestionIds.push(event.event_id);
+        }
         newMessages.push({
           id: event.event_id,
           from: event.payload?.from_agent || event.payload?.from,
-          to: event.payload?.to_agent || event.payload?.to,
+          to: toAgent,
           message: event.payload?.message,
           timestamp: event.occurred_at || event.payload?.timestamp
         });
@@ -84,33 +140,106 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
     setCoalitions(newCoalitions);
     setPrivateMessages(newMessages);
     setSubTasks(newTasks);
-  }, [events]);
+    
+    // Auto-open panel ONLY for truly NEW questions (not seen before)
+    const unseenQuestions = newQuestionIds.filter(id => !seenQuestionIds.has(id));
+    if (unseenQuestions.length > 0 && !isOpen) {
+      console.log('🔔 New question(s) detected, auto-opening panel');
+      setIsOpen(true);
+      setActiveTab('questions');
+      // Mark these questions as seen
+      setSeenQuestionIds(prev => {
+        const next = new Set(prev);
+        unseenQuestions.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }, [events, isOpen, seenQuestionIds]);
+
+  // Calculate unread counts
+  const unreadQuestionsCount = questionsToHost.length;
+  const hasUnreadQuestions = unreadQuestionsCount > 0;
 
   return (
-    <div className={styles.panel}>
-      <div className={styles.header}>
-        <h3>🎭 Agent Behaviors</h3>
-        <p className={styles.subtitle}>Real-time strategic activity</p>
-      </div>
+    <>
+      {/* Floating Toggle Button */}
+      {!isOpen && (
+        <button 
+          className={`${styles.floatingToggle} ${hasUnreadQuestions ? styles.hasNotifications : ''}`}
+          onClick={() => setIsOpen(true)}
+          title={hasUnreadQuestions ? `${unreadQuestionsCount} question(s) from agents` : 'Agent Behaviors & Questions'}
+        >
+          🎭
+          {hasUnreadQuestions && (
+            <span className={styles.notificationBadge}>{unreadQuestionsCount}</span>
+          )}
+        </button>
+      )}
+
+      {/* Overlay */}
+      {isOpen && <div className={styles.overlay} onClick={() => setIsOpen(false)} />}
+
+      {/* Floating Panel */}
+      {isOpen && (
+        <div className={`${styles.panel} ${styles.panelOpen} ${isMinimized ? styles.panelMinimized : ''}`}>
+          <div className={styles.header}>
+            <div className={styles.headerLeft}>
+              <h3>🎭 Agent Activity</h3>
+              <span className={styles.liveBadge}>● LIVE</span>
+            </div>
+            <div className={styles.headerActions}>
+              <button 
+                className={styles.minimizeBtn} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMinimized(!isMinimized);
+                }} 
+                title={isMinimized ? "Expand" : "Minimize"}
+              >
+                {isMinimized ? '▢' : '−'}
+              </button>
+              <button 
+                className={styles.closeBtn} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  setIsMinimized(false);
+                }} 
+                title="Close (Esc)"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
 
       <div className={styles.tabs}>
         <button
           className={`${styles.tab} ${activeTab === 'coalitions' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('coalitions')}
+          title="Agent coalitions and alliances"
         >
-          🤝 Coalitions ({coalitions.length})
+          🤝 <span className={styles.tabLabel}>Groups</span> <span className={styles.count}>{coalitions.length}</span>
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'questions' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('questions')}
+          title="Questions agents asked you"
+        >
+          ❓ <span className={styles.tabLabel}>For Me</span> <span className={styles.count}>{questionsToHost.length}</span>
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'messages' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('messages')}
+          title="Private messages between agents"
         >
-          💬 Private Msgs ({privateMessages.length})
+          💬 <span className={styles.tabLabel}>Agent DMs</span> <span className={styles.count}>{agentToAgentMessages.length}</span>
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('tasks')}
+          title="Agent autonomous actions"
         >
-          🎯 Agent Actions ({subTasks.length})
+          🎯 <span className={styles.count}>{subTasks.length}</span>
         </button>
       </div>
 
@@ -153,20 +282,69 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
           </div>
         )}
 
+        {activeTab === 'questions' && (
+          <div className={styles.section}>
+            {questionsToHost.length === 0 ? (
+              <div className={styles.emptyCompact}>
+                <span className={styles.emptyIcon}>❓</span>
+                <p>No questions yet</p>
+              </div>
+            ) : (
+              <div className={styles.hostQuestions}>
+                {questionsToHost.map(msg => (
+                  <div key={msg.id} className={styles.hostQuestionCard}>
+                    <div className={styles.questionHeader}>
+                      <span className={styles.questionFrom}>❓ {msg.from}</span>
+                      <span className={styles.questionTime}>
+                        {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                    <div className={styles.questionText}>{msg.message}</div>
+                    
+                    {/* Reply Input */}
+                    <div className={styles.replyBox}>
+                      <input
+                        type="text"
+                        className={styles.replyInput}
+                        placeholder={`Reply to ${msg.from}...`}
+                        value={replyTexts.get(msg.id) || ''}
+                        onChange={(e) => updateReplyText(msg.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleReply(msg.id, msg.from);
+                          }
+                        }}
+                      />
+                      <button
+                        className={styles.replyBtn}
+                        onClick={() => handleReply(msg.id, msg.from)}
+                        disabled={!replyTexts.get(msg.id)?.trim()}
+                        title="Send reply (Enter)"
+                      >
+                        ↩
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'messages' && (
           <div className={styles.section}>
-            {privateMessages.length === 0 ? (
-              <div className={styles.empty}>
+            {agentToAgentMessages.length === 0 ? (
+              <div className={styles.emptyCompact}>
                 <span className={styles.emptyIcon}>💬</span>
-                <p>No private DMs yet</p>
-                <p className={styles.emptyHint}>Agents slide into each other's DMs 📱</p>
+                <p>No DMs yet</p>
               </div>
             ) : (
               (() => {
                 // Group messages by conversation (both directions between 2 agents)
-                const conversations = new Map<string, typeof privateMessages>();
+                const conversations = new Map<string, typeof agentToAgentMessages>();
                 
-                privateMessages.forEach(msg => {
+                agentToAgentMessages.forEach(msg => {
                   const participants = [msg.from, msg.to].sort();
                   const key = participants.join('_');
                   
@@ -178,17 +356,14 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
                 
                 return Array.from(conversations.entries()).map(([key, msgs]) => {
                   const participants = key.split('_');
-                  const isHostConversation = participants.includes('Host');
                   
                   return (
                     <div key={key} className={styles.conversationThread}>
                       <div className={styles.threadHeader}>
                         <span className={styles.threadParticipants}>
-                          {isHostConversation ? '❓' : '💬'} {participants[0]} ↔️ {participants[1]}
+                          💬 {participants[0]} ↔️ {participants[1]}
                         </span>
-                        <span className={styles.threadCount}>
-                          {msgs.length} {isHostConversation ? 'question(s)' : 'messages'}
-                        </span>
+                        <span className={styles.threadCount}>{msgs.length}</span>
                       </div>
                       <div className={styles.threadMessages}>
                         {msgs.map(msg => (
@@ -242,10 +417,9 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
         {activeTab === 'tasks' && (
           <div className={styles.section}>
             {subTasks.length === 0 ? (
-              <div className={styles.empty}>
+              <div className={styles.emptyCompact}>
                 <span className={styles.emptyIcon}>🎯</span>
-                <p>No agent actions yet</p>
-                <p className={styles.emptyHint}>Agents will take autonomous actions during the debate</p>
+                <p>No actions yet</p>
               </div>
             ) : (
               subTasks.map(task => (
@@ -267,7 +441,9 @@ export default function AgentBehaviorsPanel({ debateId, events }: AgentBehaviors
             )}
           </div>
         )}
-      </div>
-    </div>
+        </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -311,8 +311,6 @@ function RoomPageContent() {
               onStateChange={(newState) => setDebateState(newState)}
               sendCommand={sendCommand}
             />
-            
-            <AgentBehaviorsPanel debateId={debateId} events={events} />
           </>
         ) : (
           <div className={styles.hint}>
@@ -320,6 +318,11 @@ function RoomPageContent() {
           </div>
         )}
       </aside>
+
+      {/* Floating Agent Behaviors Panel */}
+      {debateId && (
+        <AgentBehaviorsPanel debateId={debateId} events={events} sendCommand={sendCommand} />
+      )}
       </div>
     </>
   );

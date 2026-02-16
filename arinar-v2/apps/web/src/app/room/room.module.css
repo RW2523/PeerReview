@@ -1,7 +1,7 @@
 /* Premium Room Layout */
 .room {
   display: grid;
-  grid-template-columns: 280px 1fr 420px;
+  grid-template-columns: 280px 1fr 320px;
   gap: 0;
   height: calc(100vh - 64px);
   overflow: hidden;
@@ -271,8 +271,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 24px;
+  gap: 20px;
+  padding: 20px;
 }
 
 .controlsSection,
@@ -338,9 +338,15 @@
 }
 
 /* Responsive */
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .room {
     grid-template-columns: 240px 1fr 280px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .room {
+    grid-template-columns: 200px 1fr 260px;
   }
 }
 
