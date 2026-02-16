@@ -61,14 +61,24 @@
 .debateHeader {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .debateTitle {
   font-size: 18px;
   font-weight: 500;
   color: var(--text-0);
-  margin-bottom: 12px;
+  margin: 0;
   line-height: 1.4;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .stateBadge {
@@ -99,6 +109,31 @@
 .state-ended {
   background: var(--surface-0);
   color: var(--text-2);
+}
+
+.yoloBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #000000;
+  border: 1px solid #0070F3;
+  color: #0070F3;
+  animation: pulse-yolo 2s infinite;
+}
+
+@keyframes pulse-yolo {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 112, 243, 0.4);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 4px rgba(0, 112, 243, 0.2);
+  }
 }
 
 /* Progress Indicator */

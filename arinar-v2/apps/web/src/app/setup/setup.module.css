@@ -42,11 +42,11 @@
 .wizard {
   max-width: 960px;
   margin: 0 auto;
-  background: linear-gradient(135deg, var(--bg-1) 0%, var(--surface-0) 100%);
+  background: #000000;
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-xl);
+  border-radius: 8px;
   padding: var(--space-5);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
   position: relative;
   overflow: hidden;
 }
@@ -57,9 +57,9 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
-  opacity: 0.6;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0.5;
 }
 
 .steps {

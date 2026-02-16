@@ -34,6 +34,10 @@ export default function SetupPage() {
   const [timeboxMinutes, setTimeboxMinutes] = useState<number | undefined>(30);
   const [maxRounds, setMaxRounds] = useState<number | undefined>(undefined);
   
+  // YOLO Mode Configuration
+  const [yoloMode, setYoloMode] = useState(false);
+  const [autoTurnDelay, setAutoTurnDelay] = useState(10);
+  
   // Host Configuration
   const [enableHost, setEnableHost] = useState(false);
   const [hostModelId, setHostModelId] = useState('openai/gpt-4o-mini');
@@ -100,6 +104,8 @@ export default function SetupPage() {
     maxRounds,
     enableHost,
     hostModelId,
+    yoloMode,
+    autoTurnDelay,
     participants,
     materials,
     selectedMemorySources: memoryImport.source_debate_ids,
@@ -240,12 +246,16 @@ export default function SetupPage() {
               desiredOutcomes={desiredOutcomes}
               timeboxMinutes={timeboxMinutes}
               maxRounds={maxRounds}
+              yoloMode={yoloMode}
+              autoTurnDelay={autoTurnDelay}
               onTitleChange={setTitle}
               onProblemChange={setProblemStatement}
               onAgendaChange={setAgenda}
               onDesiredOutcomesChange={setDesiredOutcomes}
               onTimeboxChange={setTimeboxMinutes}
               onMaxRoundsChange={setMaxRounds}
+              onYoloModeChange={setYoloMode}
+              onAutoTurnDelayChange={setAutoTurnDelay}
               isLoading={isLoading}
             />
           )}
@@ -304,6 +314,8 @@ export default function SetupPage() {
               title={title}
               problemStatement={problemStatement}
               timeboxMinutes={timeboxMinutes}
+              yoloMode={yoloMode}
+              autoTurnDelay={autoTurnDelay}
               materials={materials}
               participants={participants}
               workspaceId={workspaceId}

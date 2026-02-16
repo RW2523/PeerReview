@@ -5,6 +5,8 @@ interface ReviewStepProps {
   title: string;
   problemStatement: string;
   timeboxMinutes?: number;
+  yoloMode?: boolean;
+  autoTurnDelay?: number;
   materials: api.SetupMaterial[];
   participants: api.SetupParticipant[];
   workspaceId: string;
@@ -14,6 +16,8 @@ export function ReviewStep({
   title,
   problemStatement,
   timeboxMinutes,
+  yoloMode,
+  autoTurnDelay,
   materials,
   participants,
   workspaceId,
@@ -33,6 +37,11 @@ export function ReviewStep({
         <div className={styles.reviewItem}>
           <strong>Timebox:</strong> {timeboxMinutes ? `${timeboxMinutes} minutes` : 'None'}
         </div>
+        {yoloMode && (
+          <div className={styles.reviewItem} style={{ color: '#fb923c', fontWeight: 600 }}>
+            <strong>🚀 YOLO Mode:</strong> Enabled (auto-turn every {autoTurnDelay}s)
+          </div>
+        )}
         <div className={styles.reviewItem}>
           <strong>Materials:</strong> {materials.length}
         </div>

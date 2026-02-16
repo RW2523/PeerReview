@@ -282,15 +282,13 @@ export function ParticipantsStep({
                         </button>
                       </div>
                     )}
-                    {!participant.agent_id && (
-                      <button
-                        onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}
-                        className={styles.btnEditInline}
-                        title="Edit participant"
-                      >
-                        {editingIdx === idx ? '✕' : '✏️'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}
+                      className={styles.btnEditInline}
+                      title="Edit participant"
+                    >
+                      {editingIdx === idx ? '✕' : '✏️'}
+                    </button>
                     <button 
                       onClick={() => onRemove(idx)} 
                       className={styles.btnRemoveInline}
@@ -301,14 +299,21 @@ export function ParticipantsStep({
                   </div>
                 </div>
                 
-                {editingIdx === idx && !participant.agent_id && (
+                {editingIdx === idx && (
                   <div className={styles.editorPanelInline}>
+                    {participant.agent_id && (
+                      <div className={styles.agentIdBadge}>
+                        📌 Editing Existing Agent - Changes are for this debate only
+                      </div>
+                    )}
+                    
                     <label>Name</label>
                     <input
                       type="text"
                       value={participant.name || ''}
                       onChange={(e) => onUpdate(idx, { name: e.target.value })}
                       placeholder="Agent Name"
+                      disabled={!!participant.agent_id}
                     />
                     
                     <label>System Prompt</label>
@@ -319,23 +324,45 @@ export function ParticipantsStep({
                       rows={4}
                     />
                     
-                    <label>Model ID</label>
+                    <label>Model</label>
                     <ModelSelector
                       value={participant.model_id || ''}
                       onChange={(modelId) => onUpdate(idx, { model_id: modelId })}
                       placeholder="Select AI model..."
                     />
                     
-                    <label>Model Config (JSON)</label>
+                    <label>Temperature (0.0 - 2.0)</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={participant.model_config?.temperature ?? 0.7}
+                      onChange={(e) => {
+                        const temperature = parseFloat(e.target.value);
+                        onUpdate(idx, {
+                          model_config: {
+                            ...(participant.model_config || {}),
+                            temperature
+                          }
+                        });
+                      }}
+                      className={styles.tempSlider}
+                    />
+                    <div className={styles.tempValue}>
+                      {(participant.model_config?.temperature ?? 0.7).toFixed(1)}
+                    </div>
+                    
+                    <label>Advanced Config (JSON)</label>
                     <textarea
-                      value={JSON.stringify(participant.model_config || {}, null, 2)}
+                      value={JSON.stringify(participant.model_config || {temperature: 0.7}, null, 2)}
                       onChange={(e) => {
                         try {
                           onUpdate(idx, { model_config: JSON.parse(e.target.value) });
                         } catch {}
                       }}
                       rows={3}
-                      placeholder='{"temperature": 0.7}'
+                      placeholder='{"temperature": 0.7, "max_tokens": 1000}'
                     />
                   </div>
                 )}

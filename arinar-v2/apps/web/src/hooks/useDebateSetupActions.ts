@@ -18,6 +18,8 @@ interface UseDebateSetupActionsOptions {
   maxRounds?: number;
   enableHost?: boolean;
   hostModelId?: string;
+  yoloMode?: boolean;
+  autoTurnDelay?: number;
   participants: SetupParticipant[];
   materials: SetupMaterial[];
   selectedMemorySources: string[];
@@ -51,6 +53,8 @@ export function useDebateSetupActions(
       maxRounds,
       enableHost,
       hostModelId,
+      yoloMode,
+      autoTurnDelay,
       participants,
       materials,
       selectedMemorySources,
@@ -147,8 +151,15 @@ export function useDebateSetupActions(
       // Start the debate (pending -> running)
       await api.startDebate(debateId);
 
-      // Trigger first agent turn immediately
-      await api.triggerNextTurn(debateId, apiKey);
+      // Check if YOLO mode is enabled
+      if (options.yoloMode) {
+        // Start autonomous mode
+        await api.startAutonomousDebate(debateId, options.autoTurnDelay || 10);
+        console.log('🚀 YOLO Mode activated!');
+      } else {
+        // Trigger first agent turn immediately (manual mode)
+        await api.triggerNextTurn(debateId, apiKey);
+      }
 
       // Navigate to room
       router.push(`/room?debate_id=${debateId}`);

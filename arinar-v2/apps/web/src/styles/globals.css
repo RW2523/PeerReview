@@ -1,53 +1,53 @@
-/* Dark Matte Design System - Premium Tokens */
+/* Vercel-Style Design System - OLED Pitch Black */
 :root {
-  /* Backgrounds - layered depth */
-  --bg-0: #070707;
-  --bg-1: #0d0d0f;
-  --bg-2: #141418;
+  /* Backgrounds - Pure Black OLED */
+  --bg-0: #000000;
+  --bg-1: #000000;
+  --bg-2: #0a0a0a;
   
-  /* Surfaces - elevated panels */
-  --surface-0: rgba(255, 255, 255, 0.04);
-  --surface-1: rgba(255, 255, 255, 0.07);
-  --surface-2: rgba(255, 255, 255, 0.10);
+  /* Surfaces - Subtle elevation */
+  --surface-0: #0a0a0a;
+  --surface-1: #111111;
+  --surface-2: #1a1a1a;
   
-  /* Borders */
-  --border-soft: rgba(255, 255, 255, 0.10);
-  --border-medium: rgba(255, 255, 255, 0.15);
+  /* Borders - Sharp and minimal */
+  --border-soft: #1a1a1a;
+  --border-medium: #333333;
   
-  /* Typography */
-  --text-0: #f4f4f5;
-  --text-1: #c8c8cf;
-  --text-2: #9a9aa4;
-  --text-3: #6e6e78;
+  /* Typography - High contrast */
+  --text-0: #ffffff;
+  --text-1: #ededed;
+  --text-2: #888888;
+  --text-3: #666666;
   
-  /* Accent - calm blue (Anthropic/OpenAI style) */
-  --accent: #0ea5e9;
-  --accent-hover: #38bdf8;
-  --accent-subtle: rgba(14, 165, 233, 0.1);
+  /* Accent - Vercel Blue */
+  --accent: #0070F3;
+  --accent-hover: #0060D9;
+  --accent-subtle: rgba(0, 112, 243, 0.1);
   
   /* Semantic */
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --danger: #f87171;
+  --success: #0070F3;
+  --warning: #F5A623;
+  --danger: #E00;
   
-  /* Spacing scale (8px grid) */
-  --space-1: 8px;
-  --space-2: 16px;
-  --space-3: 24px;
-  --space-4: 32px;
-  --space-5: 48px;
-  --space-6: 64px;
+  /* Spacing scale (4px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
   
-  /* Radii */
+  /* Radii - Subtle */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-xl: 10px;
   
-  /* Shadows */
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* Shadows - Minimal */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.7);
 }
 
 * {
@@ -90,18 +90,19 @@ textarea {
   font-family: inherit;
   width: 100%;
   padding: 10px 12px;
-  background: var(--bg-1);
+  background: #000000;
   border: 1px solid var(--border-soft);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-0);
   font-size: 14px;
-  transition: border-color 150ms;
+  transition: all 0.2s;
 }
 
 input:focus,
 textarea:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.2);
 }
 
 input:disabled,

@@ -1075,3 +1075,71 @@ export async function addParticipantsToDebate(
   
   return response.json();
 }
+
+// ============================================================================
+// AUTONOMOUS DEBATE (YOLO MODE)
+// ============================================================================
+
+export async function startAutonomousDebate(
+  debateId: string,
+  autoTurnDelaySeconds: number = 10
+): Promise<{ status: string; debate_id: string }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/start-autonomous`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ auto_turn_delay_seconds: autoTurnDelaySeconds }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to start autonomous debate: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function pauseAutonomousDebate(debateId: string): Promise<{ status: string }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/pause-autonomous`, {
+    method: 'POST',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to pause autonomous debate: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function resumeAutonomousDebate(debateId: string): Promise<{ status: string }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/resume-autonomous`, {
+    method: 'POST',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to resume autonomous debate: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function getAutonomousStatus(debateId: string): Promise<{
+  status: string | null;
+  is_running: boolean;
+  has_background_task: boolean;
+}> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/autonomous-status`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get autonomous status: ${response.statusText}`);
+  }
+  
+  return response.json();
+}

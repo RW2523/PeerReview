@@ -180,3 +180,31 @@
   background: var(--surface-0);
   border-color: var(--accent);
 }
+
+.btnYoloPause {
+  background: #000000;
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+  font-weight: 500;
+}
+
+.btnYoloPause:hover:not(:disabled) {
+  background: #ff6b6b;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.btnYoloResume {
+  background: #000000;
+  border: 1px solid #0070F3;
+  color: #0070F3;
+  font-weight: 500;
+}
+
+.btnYoloResume:hover:not(:disabled) {
+  background: #0070F3;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 112, 243, 0.3);
+}

@@ -11,12 +11,16 @@ interface BasicInfoStepProps {
   desiredOutcomes: string[];
   timeboxMinutes?: number;
   maxRounds?: number;
+  yoloMode?: boolean;
+  autoTurnDelay?: number;
   onTitleChange: (value: string) => void;
   onProblemChange: (value: string) => void;
   onAgendaChange: (value: string[]) => void;
   onDesiredOutcomesChange: (value: string[]) => void;
   onTimeboxChange: (value: number | undefined) => void;
   onMaxRoundsChange: (value: number | undefined) => void;
+  onYoloModeChange?: (value: boolean) => void;
+  onAutoTurnDelayChange?: (value: number) => void;
   isLoading: boolean;
 }
 
@@ -27,12 +31,16 @@ export function BasicInfoStep({
   desiredOutcomes,
   timeboxMinutes,
   maxRounds,
+  yoloMode = false,
+  autoTurnDelay = 10,
   onTitleChange,
   onProblemChange,
   onAgendaChange,
   onDesiredOutcomesChange,
   onTimeboxChange,
   onMaxRoundsChange,
+  onYoloModeChange,
+  onAutoTurnDelayChange,
   isLoading,
 }: BasicInfoStepProps) {
   const router = useRouter();
@@ -78,8 +86,16 @@ export function BasicInfoStep({
     }
 
     setIsGenerating(true);
+    
+    // Set a 25 second timeout (backend times out at 20s)
+    const timeoutId = setTimeout(() => {
+      setIsGenerating(false);
+      alert('Request is taking too long. Please check:\n\n1. Your OpenRouter API key is valid\n2. You have credits at openrouter.ai\n3. Your internet connection is stable');
+    }, 25000);
+    
     try {
       const result = await api.improveProblemStatement(problemStatement, apiKey);
+      clearTimeout(timeoutId);
       
       // Update problem statement
       onProblemChange(result.improved_text);
@@ -101,9 +117,25 @@ export function BasicInfoStep({
       }
       
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error('Failed to improve problem statement:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Failed to improve problem statement';
-      alert(errorMsg);
+      
+      // Better error handling
+      let errorMsg = 'Failed to improve problem statement';
+      if (err instanceof Error) {
+        errorMsg = err.message;
+      }
+      
+      // Show helpful error messages
+      if (errorMsg.includes('Invalid API key')) {
+        alert('❌ Invalid OpenRouter API Key\n\nPlease check your API key in Settings.\nGet a key at: openrouter.ai');
+      } else if (errorMsg.includes('insufficient credits')) {
+        alert('💳 Insufficient Credits\n\nYour OpenRouter account needs credits.\nAdd credits at: openrouter.ai');
+      } else if (errorMsg.includes('slow to respond')) {
+        alert('⏱️ AI Service Timeout\n\nOpenRouter is responding slowly.\n\nTry:\n1. Wait a moment and try again\n2. Check openrouter.ai/status\n3. Use a shorter problem statement');
+      } else {
+        alert(`❌ Error: ${errorMsg}\n\nPlease try again or check the console for details.`);
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -131,7 +163,15 @@ export function BasicInfoStep({
           className={styles.generateButton}
           title="Use AI to improve this problem statement"
         >
-          {isGenerating ? '⏳' : '✨'} {isGenerating ? 'Generating...' : 'Improve with AI'}
+    {isGenerating ? (
+            <>
+              <span className={styles.spinner}>⏳</span> Generating...
+            </>
+          ) : (
+            <>
+              ✨ Improve with AI
+            </>
+          )}
         </button>
       </label>
       <textarea
@@ -245,68 +285,122 @@ export function BasicInfoStep({
         </ul>
       )}
 
-      <label>Meeting Limit</label>
-      <div className={styles.radioGroup}>
-        <label className={styles.radioLabel}>
-          <input
-            type="radio"
-            checked={meetingType === 'rounds'}
-            onChange={() => {
-              setMeetingType('rounds');
-              onTimeboxChange(undefined);
-              onMaxRoundsChange(3); // default to 3 rounds
-            }}
-            disabled={isLoading}
-          />
-          <span>Rounds-based (each participant speaks once per round)</span>
-        </label>
-        <label className={styles.radioLabel}>
-          <input
-            type="radio"
-            checked={meetingType === 'time'}
-            onChange={() => {
-              setMeetingType('time');
-              onMaxRoundsChange(undefined);
-              onTimeboxChange(30); // default to 30 minutes
-            }}
-            disabled={isLoading}
-          />
-          <span>Time-based (unlimited rounds within time limit)</span>
-        </label>
+      {/* YOLO Mode Toggle */}
+      <div className={styles.yoloSection}>
+        <div className={styles.yoloHeader}>
+          <label className={styles.yoloLabel}>
+            <div className={styles.yoloTitle}>
+              🚀 YOLO Mode
+              <span className={styles.betaBadge}>AUTO</span>
+            </div>
+            <div className={styles.yoloDescription}>
+              Fully autonomous debate - set it and forget it
+            </div>
+          </label>
+          <label className={styles.toggleSwitch}>
+            <input
+              type="checkbox"
+              checked={yoloMode}
+              onChange={(e) => onYoloModeChange?.(e.target.checked)}
+              disabled={isLoading}
+            />
+            <span className={styles.slider}></span>
+          </label>
+        </div>
+        
+        {yoloMode && (
+          <div className={styles.yoloSettings}>
+            <div className={styles.yoloInfo}>
+              ✨ Debate will run automatically without manual intervention
+            </div>
+            <label>Auto-turn delay (seconds)</label>
+            <input
+              type="range"
+              min="5"
+              max="60"
+              value={autoTurnDelay}
+              onChange={(e) => onAutoTurnDelayChange?.(parseInt(e.target.value))}
+              disabled={isLoading}
+              className={styles.rangeSlider}
+            />
+            <div className={styles.sliderValue}>{autoTurnDelay}s between turns</div>
+          </div>
+        )}
       </div>
 
-      {meetingType === 'rounds' && (
-        <>
-          <label>Number of Rounds *</label>
-          <input
-            type="number"
-            value={maxRounds || ''}
-            onChange={(e) => onMaxRoundsChange(e.target.value ? parseInt(e.target.value) : undefined)}
-            placeholder="3"
-            disabled={isLoading}
-            min="1"
-            max="10"
-          />
-          <p className={styles.helpText}>
-            Example: With 5 agents and 3 rounds, each agent will speak 3 times (15 total turns)
-          </p>
-        </>
-      )}
+      {/* Meeting Limit Cards */}
+      <label>Debate Duration</label>
+      <div className={styles.limitCards}>
+        <div 
+          className={`${styles.limitCard} ${meetingType === 'rounds' ? styles.limitCardActive : ''}`}
+          onClick={() => {
+            if (!isLoading) {
+              setMeetingType('rounds');
+              onTimeboxChange(undefined);
+              onMaxRoundsChange(3);
+            }
+          }}
+        >
+          <div className={styles.cardIcon}>🔄</div>
+          <div className={styles.cardTitle}>Rounds-Based</div>
+          <div className={styles.cardDescription}>
+            Each agent speaks once per round
+          </div>
+          {meetingType === 'rounds' && (
+            <div className={styles.cardInput}>
+              <input
+                type="number"
+                value={maxRounds || ''}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onMaxRoundsChange(e.target.value ? parseInt(e.target.value) : undefined);
+                }}
+                placeholder="3"
+                disabled={isLoading}
+                min="1"
+                max="20"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <span>rounds</span>
+            </div>
+          )}
+        </div>
 
-      {meetingType === 'time' && (
-        <>
-          <label>Meeting Duration (minutes) *</label>
-          <input
-            type="number"
-            value={timeboxMinutes || ''}
-            onChange={(e) => onTimeboxChange(e.target.value ? parseInt(e.target.value) : undefined)}
-            placeholder="30"
-            disabled={isLoading}
-            min="5"
-            max="240"
-          />
-        </>
-      )}
+        <div 
+          className={`${styles.limitCard} ${meetingType === 'time' ? styles.limitCardActive : ''}`}
+          onClick={() => {
+            if (!isLoading) {
+              setMeetingType('time');
+              onMaxRoundsChange(undefined);
+              onTimeboxChange(30);
+            }
+          }}
+        >
+          <div className={styles.cardIcon}>⏱️</div>
+          <div className={styles.cardTitle}>Time-Based</div>
+          <div className={styles.cardDescription}>
+            Unlimited rounds within time limit
+          </div>
+          {meetingType === 'time' && (
+            <div className={styles.cardInput}>
+              <input
+                type="number"
+                value={timeboxMinutes || ''}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onTimeboxChange(e.target.value ? parseInt(e.target.value) : undefined);
+                }}
+                placeholder="30"
+                disabled={isLoading}
+                min="5"
+                max="240"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <span>minutes</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

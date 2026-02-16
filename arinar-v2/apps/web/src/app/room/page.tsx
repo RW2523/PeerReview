@@ -30,6 +30,8 @@ function RoomPageContent() {
   const [debateId, setDebateId] = useState<string | null>(null);
   const [debateTitle, setDebateTitle] = useState<string>('');
   const [debateState, setDebateState] = useState<string>('pending');
+  const [isYoloMode, setIsYoloMode] = useState(false);
+  const [yoloStatus, setYoloStatus] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{ name: string; id: string }[]>([]);
   const [onlineParticipants, setOnlineParticipants] = useState<Set<string>>(new Set());
   const [typingParticipants, setTypingParticipants] = useState<Set<string>>(new Set());
@@ -54,8 +56,10 @@ function RoomPageContent() {
           handleDebateLoaded(debate.debate_id, debate.title || 'Untitled', debate.state);
           setPolicyConfig(debate.policy_config || {});
           setDebateStartedAt(debate.started_at || null);
+          setIsYoloMode(debate.autonomous_mode || false);
           console.log('📊 Policy Config loaded:', debate.policy_config);
           console.log('⏰ Debate started at:', debate.started_at);
+          console.log('🚀 YOLO Mode:', debate.autonomous_mode);
         })
         .catch(err => {
           console.error('Failed to auto-load debate:', err);
@@ -193,8 +197,15 @@ function RoomPageContent() {
             <>
               <div className={styles.debateHeader}>
                 <h1 className={styles.debateTitle}>{debateTitle || 'Untitled'}</h1>
-                <div className={`${styles.stateBadge} ${styles[`state-${debateState}`]}`}>
-                  {debateState?.toUpperCase()}
+                <div className={styles.badges}>
+                  <div className={`${styles.stateBadge} ${styles[`state-${debateState}`]}`}>
+                    {debateState?.toUpperCase()}
+                  </div>
+                  {isYoloMode && (
+                    <div className={styles.yoloBadge} title="Running autonomously">
+                      🚀 YOLO
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -299,6 +310,8 @@ function RoomPageContent() {
             <DebateControls
               debateId={debateId}
               currentState={debateState}
+              isYoloMode={isYoloMode}
+              yoloStatus={yoloStatus}
               policyConfig={policyConfig}
               totalTurns={policyConfig?.total_turns_taken || 0}
               participantCount={participants.length}
@@ -309,6 +322,7 @@ function RoomPageContent() {
                 }).catch(err => console.error('Failed to refresh policy:', err));
               }}
               onStateChange={(newState) => setDebateState(newState)}
+              onYoloStatusChange={setYoloStatus}
               sendCommand={sendCommand}
             />
           </>

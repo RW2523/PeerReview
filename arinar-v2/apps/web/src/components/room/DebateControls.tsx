@@ -9,21 +9,25 @@ import { WSCommandType, WSAckMessage } from '@/lib/wsClient';
 interface DebateControlsProps {
   debateId: string;
   currentState: string;
+  isYoloMode?: boolean;
+  yoloStatus?: string | null;
   policyConfig?: any;
   totalTurns?: number;
   participantCount?: number;
   onPolicyUpdate?: () => void;
   onStateChange: (newState: string) => void;
+  onYoloStatusChange?: (status: string | null) => void;
   sendCommand?: (command: WSCommandType, payload?: Record<string, any>) => Promise<WSAckMessage>;
 }
 
-export default function DebateControls({ debateId, currentState, policyConfig, totalTurns = 0, participantCount = 0, onPolicyUpdate, onStateChange, sendCommand }: DebateControlsProps) {
+export default function DebateControls({ debateId, currentState, isYoloMode = false, yoloStatus, policyConfig, totalTurns = 0, participantCount = 0, onPolicyUpdate, onStateChange, onYoloStatusChange, sendCommand }: DebateControlsProps) {
   const { apiKey } = useOpenRouterKey();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [triggeringTurn, setTriggeringTurn] = useState(false);
   const [extending, setExtending] = useState(false);
+  const [pausingYolo, setPausingYolo] = useState(false);
 
   const handleStart = async () => {
     setLoading(true);
@@ -222,14 +226,38 @@ export default function DebateControls({ debateId, currentState, policyConfig, t
           {loading && currentState === 'paused' ? 'Resuming...' : 'Resume'}
         </button>
 
-        <button
-          onClick={handleNextTurn}
-          disabled={!canTriggerTurn || triggeringTurn}
-          className={shouldConclude ? styles.btnConclude : (canTriggerTurn ? styles.btnPrimary : '')}
-          title={shouldConclude ? (policyConfig?.enable_host ? 'Host will provide final conclusion' : 'All rounds complete - End meeting') : (!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak')}
-        >
-          {triggeringTurn ? 'Agent thinking...' : shouldConclude ? '🏁 Conclude Meeting' : '▶ Next Turn'}
-        </button>
+        {isYoloMode && (currentState === 'running' || currentState === 'paused') ? (
+          <>
+            {yoloStatus !== 'paused' ? (
+              <button
+                onClick={handlePauseYolo}
+                disabled={pausingYolo}
+                className={styles.btnYoloPause}
+                title="Pause autonomous debate"
+              >
+                {pausingYolo ? 'Pausing...' : '⏸️ Pause YOLO'}
+              </button>
+            ) : (
+              <button
+                onClick={handleResumeYolo}
+                disabled={pausingYolo}
+                className={styles.btnYoloResume}
+                title="Resume autonomous debate"
+              >
+                {pausingYolo ? 'Resuming...' : '▶️ Resume YOLO'}
+              </button>
+            )}
+          </>
+        ) : (
+          <button
+            onClick={handleNextTurn}
+            disabled={!canTriggerTurn || triggeringTurn}
+            className={shouldConclude ? styles.btnConclude : (canTriggerTurn ? styles.btnPrimary : '')}
+            title={shouldConclude ? (policyConfig?.enable_host ? 'Host will provide final conclusion' : 'All rounds complete - End meeting') : (!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak')}
+          >
+            {triggeringTurn ? 'Agent thinking...' : shouldConclude ? '🏁 Conclude Meeting' : '▶ Next Turn'}
+          </button>
+        )}
 
         {canExtend && (
           <button

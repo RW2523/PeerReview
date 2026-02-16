@@ -6,7 +6,7 @@ from .routes import (
     health, agents, debates, turns, setup, summary, events, openrouter,
     personas, materials, memory, preflight, artifacts, embeddings,
     workspace_settings, presence, websocket, knowledge, analytics, ai_assist,
-    participants
+    participants, autonomous
 )
 
 
@@ -23,6 +23,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers
@@ -47,6 +48,7 @@ app.include_router(knowledge.router, tags=["knowledge"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 app.include_router(ai_assist.router, tags=["ai-assist"])
 app.include_router(participants.router, tags=["participants"])
+app.include_router(autonomous.router, tags=["autonomous"])
 
 
 if __name__ == "__main__":

@@ -21,6 +21,74 @@ class ProblemStatementResponse(BaseModel):
     desired_outcomes: list[str]
 
 
+class HealthCheckResponse(BaseModel):
+    status: str
+    model: str
+    credits_available: bool
+
+
+@router.get("/ai/health", response_model=HealthCheckResponse)
+async def health_check(
+    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key")
+):
+    """Quick health check for OpenRouter API key"""
+    if not x_openrouter_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OpenRouter API key required"
+        )
+    
+    if not x_openrouter_key.startswith('sk-or-'):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key format"
+        )
+    
+    try:
+        # Quick test with minimal tokens
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {x_openrouter_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "openai/gpt-4o-mini",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                }
+            )
+            
+            if response.status_code == 200:
+                return HealthCheckResponse(
+                    status="ok",
+                    model="openai/gpt-4o-mini",
+                    credits_available=True
+                )
+            elif response.status_code == 402:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Insufficient credits"
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"OpenRouter error: {response.status_code}"
+                )
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="OpenRouter timeout"
+        )
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Health check failed"
+        )
+
+
 @router.post("/ai/improve-problem-statement", response_model=ProblemStatementResponse)
 async def improve_problem_statement(
     request: ProblemStatementRequest,
@@ -34,6 +102,14 @@ async def improve_problem_statement(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OpenRouter API key required (X-OpenRouter-Key header)"
+        )
+    
+    # Quick validation - key should start with sk-or-
+    if not x_openrouter_key.startswith('sk-or-'):
+        logger.warning(f"Invalid API key format: {x_openrouter_key[:10]}...")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid OpenRouter API key format. Keys should start with 'sk-or-'. Get a key at openrouter.ai"
         )
     
     if not request.input_text or len(request.input_text.strip()) < 10:
@@ -114,17 +190,29 @@ Remember to follow the EXACT format with all four sections: PROBLEM STATEMENT, K
     
     try:
         # Retry logic for rate limits
-        max_retries = 3
-        retry_delay = 2  # seconds
+        max_retries = 2
+        retry_delay = 1  # seconds
         
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                # Shorter timeout to fail fast - use httpx.Timeout for more control
+                timeout_config = httpx.Timeout(
+                    connect=5.0,  # 5 seconds to connect
+                    read=15.0,    # 15 seconds to read response
+                    write=5.0,    # 5 seconds to send request
+                    pool=5.0      # 5 seconds to get connection from pool
+                )
+                
+                async with httpx.AsyncClient(timeout=timeout_config) as client:
+                    logger.info(f"Calling OpenRouter with {model} (attempt {attempt + 1}/{max_retries})")
+                    
                     response = await client.post(
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers={
                             "Authorization": f"Bearer {x_openrouter_key}",
                             "Content-Type": "application/json",
+                            "HTTP-Referer": "https://github.com/yourusername/arinar",  # Optional
+                            "X-Title": "Arinar Debate Platform",  # Optional
                         },
                         json={
                             "model": model,
@@ -136,6 +224,8 @@ Remember to follow the EXACT format with all four sections: PROBLEM STATEMENT, K
                             "temperature": 0.7,
                         }
                     )
+                    
+                    logger.info(f"OpenRouter responded with status {response.status_code}")
                     
                     if response.status_code == 429:
                         if attempt < max_retries - 1:
@@ -150,11 +240,25 @@ Remember to follow the EXACT format with all four sections: PROBLEM STATEMENT, K
                             )
                     
                     if response.status_code != 200:
-                        logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
-                        raise HTTPException(
-                            status_code=status.HTTP_502_BAD_GATEWAY,
-                            detail=f"AI service error: {response.status_code}"
-                        )
+                        error_text = response.text[:200]  # Truncate for logging
+                        logger.error(f"OpenRouter API error: {response.status_code} - {error_text}")
+                        
+                        # Better error messages
+                        if response.status_code == 401:
+                            raise HTTPException(
+                                status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Invalid API key. Please check your OpenRouter API key in Settings."
+                            )
+                        elif response.status_code == 402:
+                            raise HTTPException(
+                                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                                detail="OpenRouter account has insufficient credits. Please add credits at openrouter.ai"
+                            )
+                        else:
+                            raise HTTPException(
+                                status_code=status.HTTP_502_BAD_GATEWAY,
+                                detail=f"AI service error ({response.status_code}). Please try again."
+                            )
                     
                     result = response.json()
                     ai_output = result["choices"][0]["message"]["content"]
@@ -246,15 +350,16 @@ Remember to follow the EXACT format with all four sections: PROBLEM STATEMENT, K
         )
             
     except httpx.TimeoutException:
+        logger.error("OpenRouter timeout after 20s")
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="AI service timeout"
+            detail="AI service is slow to respond. Please try again or check openrouter.ai status."
         )
     except httpx.RequestError as e:
         logger.error(f"Request error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to connect to AI service"
+            detail="Network error connecting to AI service. Check your internet connection."
         )
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
