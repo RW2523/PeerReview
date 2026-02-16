@@ -414,6 +414,9 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             
             next_seq = cursor.fetchone()['next_seq']
             
+            # Calculate round number (complete rounds where ALL participants have spoken)
+            round_number = (current_turn_index // len(participants)) + 1
+            
             # Persist event
             event_id = str(uuid.uuid4())
             cursor.execute("""
@@ -432,8 +435,8 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                     'agent_name': agent_name,
                     'text': agent_message,
                     'model': response.get('model', model_id),
-                    'turn': total_turns + 1,
-                    'turn_index': current_turn_index
+                    'turn': round_number,  # Complete round number (1, 2, 3...)
+                    'turn_index': current_turn_index  # Sequential turn index (0, 1, 2, 3...)
                 }),
                 datetime.now(timezone.utc)
             ))

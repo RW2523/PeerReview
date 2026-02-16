@@ -81,57 +81,31 @@
 .turnSeparator {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin: 32px 0 24px 0;
+  gap: 12px;
+  margin: 20px 0 16px 0;
   width: 100%;
   position: relative;
-  z-index: 1;
+  opacity: 0.4;
 }
 
 .turnLine {
   flex: 1;
-  height: 2px;
-  background: linear-gradient(to right, transparent, #0070F3, transparent);
+  height: 1px;
+  background: #333333;
   min-width: 40px;
 }
 
 .turnBadge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: #000000;
-  border: 1px solid #0070F3;
-  border-radius: 10px;
-  flex-shrink: 0;
-  box-shadow: 0 0 20px rgba(0, 112, 243, 0.3);
-}
-
-.turnIcon {
-  font-size: 20px;
-}
-
-.turnText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.turnTitle {
-  font-size: 14px;
-  font-weight: 700;
-  color: #0070F3;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  line-height: 1;
-}
-
-.turnSubtitle {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: #666666;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  background: #0a0a0a;
+  border-radius: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .emptyFeed {

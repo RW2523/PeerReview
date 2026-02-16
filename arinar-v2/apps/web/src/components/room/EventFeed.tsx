@@ -50,8 +50,9 @@ function parseInlineMarkdown(text: string): ReactNode[] {
   let lastIndex = 0;
   let key = 0;
 
-  // Pattern: **bold**, *italic*, `code`, @mentions
-  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(@[\w-]+)/g;
+  // Pattern: **bold**, *italic*, `code`, @mentions (including quoted multi-word names)
+  // Updated pattern to match @"Full Name" or @SingleWord
+  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(@"([^"]+)")|(@[\w-]+)/g;
   
   let match;
   while ((match = pattern.exec(text)) !== null) {
@@ -70,8 +71,11 @@ function parseInlineMarkdown(text: string): ReactNode[] {
       // `code`
       parts.push(<code key={key++} className={styles.inlineCode}>{match[6]}</code>);
     } else if (match[7]) {
-      // @mention
-      parts.push(<span key={key++} className={styles.mention}>{match[7]}</span>);
+      // @"Full Name" mention (quoted)
+      parts.push(<span key={key++} className={styles.mention}>@{match[8]}</span>);
+    } else if (match[9]) {
+      // @SingleWord mention
+      parts.push(<span key={key++} className={styles.mention}>{match[9]}</span>);
     }
 
     lastIndex = pattern.lastIndex;
@@ -245,7 +249,7 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
       {showTurnSeparator && turnNumber ? (
         <div className={styles.turnSeparator}>
           <div className={styles.turnLine} />
-          <span className={styles.turnLabel}>Turn #{turnNumber}</span>
+          <span className={styles.turnBadge}>Round {turnNumber}</span>
           <div className={styles.turnLine} />
         </div>
       ) : null}

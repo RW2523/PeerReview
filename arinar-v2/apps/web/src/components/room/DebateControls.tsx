@@ -46,6 +46,18 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
     setLoading(true);
     setError(null);
     try {
+      // Check if debate can be paused
+      if (currentState !== 'running') {
+        setError('Can only pause a running debate');
+        setLoading(false);
+        return;
+      }
+      
+      // If YOLO mode, pause autonomous loop as well
+      if (isYoloMode) {
+        await api.pauseAutonomousDebate(debateId);
+      }
+      
       if (sendCommand) {
         await sendCommand('control.pause');
         onStateChange('paused');
@@ -64,6 +76,16 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
     setLoading(true);
     setError(null);
     try {
+      // If YOLO mode, resume autonomous loop as well
+      if (isYoloMode) {
+        if (!apiKey) {
+          setError('OpenRouter API key required for YOLO mode. Please add it in Settings.');
+          setLoading(false);
+          return;
+        }
+        await api.resumeAutonomousDebate(debateId, apiKey);
+      }
+      
       if (sendCommand) {
         await sendCommand('control.resume');
         onStateChange('running');
@@ -256,29 +278,7 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
           {loading && currentState === 'paused' ? 'Resuming...' : 'Resume'}
         </button>
 
-        {isYoloMode && (currentState === 'running' || currentState === 'paused') ? (
-          <>
-            {yoloStatus !== 'paused' ? (
-              <button
-                onClick={handlePauseYolo}
-                disabled={pausingYolo}
-                className={styles.btnYoloPause}
-                title="Pause autonomous debate"
-              >
-                {pausingYolo ? 'Pausing...' : '⏸️ Pause YOLO'}
-              </button>
-            ) : (
-              <button
-                onClick={handleResumeYolo}
-                disabled={pausingYolo}
-                className={styles.btnYoloResume}
-                title="Resume autonomous debate"
-              >
-                {pausingYolo ? 'Resuming...' : '▶️ Resume YOLO'}
-              </button>
-            )}
-          </>
-        ) : (
+        {!isYoloMode && (
           <button
             onClick={handleNextTurn}
             disabled={!canTriggerTurn || triggeringTurn}
