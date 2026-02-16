@@ -59,7 +59,7 @@ async def generate_summary(
         outputs = summary_service.generate_summary(
             debate_id=debate_id,
             openrouter_api_key=request.openrouter_api_key,
-            model_id=request.model_id if hasattr(request, 'model_id') else "anthropic/claude-3.5-sonnet"
+            model_id=request.model_id if hasattr(request, 'model_id') else "openai/gpt-4o-mini"  # Cost-optimized
         )
         
         # The summary_service.generate_summary already saves to DB

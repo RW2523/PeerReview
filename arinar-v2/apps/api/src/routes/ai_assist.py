@@ -42,8 +42,8 @@ async def improve_problem_statement(
             detail="Input text must be at least 10 characters"
         )
     
-    # Use Claude Haiku - very cost effective (~$0.25 per 1M input tokens)
-    model = "anthropic/claude-3-haiku"
+    # Use GPT-4o-mini - most cost effective for structured output ($0.15/$0.60)
+    model = "openai/gpt-4o-mini"
     
     system_prompt = """You are an expert at structuring multi-agent debates and meetings.
 

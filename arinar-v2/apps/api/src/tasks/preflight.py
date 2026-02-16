@@ -183,7 +183,7 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         # Extract agent details
         # agent_id can be None for inline agents (created from templates)
         agent_id = agent_config.get('agent_id') if agent_config else None
-        model_id = agent_config.get('model_id', 'anthropic/claude-3.5-sonnet')
+        model_id = agent_config.get('model_id', 'openai/gpt-4o-mini')  # Cost-optimized: $0.15/$0.60 (was $3/$15!)
         system_prompt = agent_config.get('system_prompt', '')
         model_config = agent_config.get('model_config', {})
         agent_name = agent_config.get('name', 'Participant')

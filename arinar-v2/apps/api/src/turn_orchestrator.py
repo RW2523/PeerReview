@@ -627,7 +627,7 @@ Your question (15 words max):"""
                 
                 try:
                     response = autonomy_service.openrouter_client.chat_completion(
-                        model='openai/gpt-4o-mini',
+                        model='google/gemini-flash-1.5',  # Most cost-effective: $0.075/$0.30 (4x cheaper!)
                         messages=[
                             {"role": "system", "content": "You generate short, specific clarifying questions for debates."},
                             {"role": "user", "content": question_prompt}

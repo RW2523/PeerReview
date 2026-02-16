@@ -82,7 +82,7 @@ class AgentAutonomyService:
         
         try:
             response = self.openrouter_client.chat_completion(
-                model='openai/gpt-4o-mini',  # Use cheap model for autonomy
+                model='google/gemini-flash-1.5',  # Most cost-effective: $0.075/$0.30 (4x cheaper!)
                 messages=[
                     {"role": "system", "content": "You are a human-like agent with opinions. Respond ONLY with valid JSON, no other text."},
                     {"role": "user", "content": coalition_prompt}
@@ -151,7 +151,7 @@ class AgentAutonomyService:
         
         try:
             response = self.openrouter_client.chat_completion(
-                model='openai/gpt-4o-mini',
+                model='google/gemini-flash-1.5',  # Most cost-effective: $0.075/$0.30 (4x cheaper!)
                 messages=[
                     {"role": "system", "content": "You are a human with personality. Be genuine, witty, or critical as needed."},
                     {"role": "user", "content": message_prompt}

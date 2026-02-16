@@ -25,7 +25,7 @@ class SummaryService:
         self,
         debate_id: str,
         openrouter_api_key: str,
-        model_id: str = "anthropic/claude-3.5-sonnet"
+        model_id: str = "openai/gpt-4o-mini"  # Cost-optimized: $0.15/$0.60 (was $3/$15!)
     ) -> Dict[str, Any]:
         """
         Generate summary/minutes/action items for a debate
