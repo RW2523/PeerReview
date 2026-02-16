@@ -59,7 +59,17 @@ async def get_debate_events(
         cursor.execute(query, (debate_id,))
         events = cursor.fetchall()
         
-        return [dict(event) for event in events]
+        # Transform events to match frontend expectations
+        return [{
+            'event_id': event['event_id'],
+            'debate_id': event['debate_id'],
+            'type': event['event_type'],  # Map event_type to type
+            'sender_type': event['sender_type'],
+            'sender_id': event['sender_id'],
+            'sequence_number': event['sequence_number'],
+            'payload': event['content'],  # Map content to payload
+            'created_at': event['created_at'].isoformat() if event.get('created_at') else None
+        } for event in events]
 
 
 @router.get("/debates/{debate_id}/events/stream")

@@ -91,10 +91,16 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
   };
 
   const handleResumeYolo = async () => {
+    if (!apiKey) {
+      setError('OpenRouter API key required. Please add it in Settings.');
+      return;
+    }
+    
     setPausingYolo(true);
     setError(null);
     try {
-      await api.resumeAutonomousDebate(debateId);
+      await api.resumeAutonomousDebate(debateId, apiKey);
+      console.log('✅ YOLO autonomous loop restarted');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resume autonomous debate');
     } finally {

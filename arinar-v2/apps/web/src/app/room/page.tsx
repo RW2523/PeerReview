@@ -86,6 +86,7 @@ function RoomPageContent() {
         .then(debate => {
           setPolicyConfig(debate.policy_config || {});
           setDebateStartedAt(debate.started_at || null);
+          setIsYoloMode(debate.autonomous_mode || false);
           if (hasStateChange) {
             setDebateState(debate.state);
           }

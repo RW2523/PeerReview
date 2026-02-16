@@ -1118,8 +1118,10 @@ export async function pauseAutonomousDebate(debateId: string): Promise<{ status:
   return response.json();
 }
 
-export async function resumeAutonomousDebate(debateId: string): Promise<{ status: string }> {
-  const headers = await getAuthHeaders();
+export async function resumeAutonomousDebate(debateId: string, openrouterKey: string): Promise<{ status: string }> {
+  const headers: any = await getAuthHeaders();
+  headers['X-OpenRouter-Key'] = openrouterKey;
+  
   const response = await fetch(`${API_URL}/api/debates/${debateId}/resume-autonomous`, {
     method: 'POST',
     headers,

@@ -188,7 +188,10 @@ async def get_debate(
         state=debate['state'],
         policy_config=debate.get('policy_config'),
         created_at=debate['created_at'].isoformat(),
-        participants=participant_list
+        participants=participant_list,
+        autonomous_mode=debate.get('autonomous_mode', False),
+        autonomous_status=debate.get('autonomous_status'),
+        auto_turn_delay_seconds=debate.get('auto_turn_delay_seconds', 10)
     )
 
 

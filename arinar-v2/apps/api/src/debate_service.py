@@ -39,34 +39,22 @@ class DebateService:
         return self._has_autonomous_cols
     
     def get_debate(self, debate_id: str) -> Optional[Dict[str, Any]]:
-        """Get debate by ID - backward compatible with optional autonomous columns"""
+        """Get debate by ID - always include autonomous columns"""
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
             
-            if self._check_autonomous_cols():
-                cursor.execute("""
-                    SELECT debate_id, workspace_id, title, description, state, 
-                           policy_config, created_at, updated_at, started_at, ended_at,
-                           autonomous_mode, autonomous_status, auto_turn_delay_seconds
-                    FROM debates
-                    WHERE debate_id = %s
-                """, (debate_id,))
-            else:
-                cursor.execute("""
-                    SELECT debate_id, workspace_id, title, description, state, 
-                           policy_config, created_at, updated_at, started_at, ended_at
-                    FROM debates
-                    WHERE debate_id = %s
-                """, (debate_id,))
+            # Always query autonomous columns (migration has been applied)
+            cursor.execute("""
+                SELECT debate_id, workspace_id, title, description, state, 
+                       policy_config, created_at, updated_at, started_at, ended_at,
+                       autonomous_mode, autonomous_status, auto_turn_delay_seconds
+                FROM debates
+                WHERE debate_id = %s
+            """, (debate_id,))
             
             row = cursor.fetchone()
             if row:
                 result = dict(row)
-                # Add default values if columns don't exist
-                if 'autonomous_mode' not in result:
-                    result['autonomous_mode'] = False
-                    result['autonomous_status'] = None
-                    result['auto_turn_delay_seconds'] = 10
                 return result
             return None
     

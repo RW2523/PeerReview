@@ -45,6 +45,9 @@ class DebateResponse(BaseModel):
     policy_config: Optional[Dict[str, Any]] = Field(default=None, description="Policy configuration (rounds, time limits, etc.)")
     created_at: str
     participants: List[ParticipantInfo] = Field(default_factory=list, description="Debate participants")
+    autonomous_mode: Optional[bool] = Field(default=False, description="Whether autonomous/YOLO mode is enabled")
+    autonomous_status: Optional[str] = Field(default=None, description="Autonomous debate status (running/paused/completed)")
+    auto_turn_delay_seconds: Optional[int] = Field(default=10, description="Delay between autonomous turns in seconds")
 
 
 class InterveneRequest(BaseModel):

@@ -4,7 +4,7 @@ Autonomous Debate Service - Handles self-running YOLO debates
 
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from .database import get_db_connection, get_cursor
 from .turn_orchestrator import TurnOrchestrator
@@ -59,8 +59,8 @@ class AutonomousDebateService:
             conn.commit()
             cursor.close()
     
-    async def resume_autonomous_debate(self, debate_id: str):
-        """Resume autonomous debate"""
+    async def resume_autonomous_debate(self, debate_id: str, openrouter_api_key: str):
+        """Resume autonomous debate - restart background task if needed"""
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
             cursor.execute("""
@@ -69,7 +69,23 @@ class AutonomousDebateService:
                 WHERE debate_id = %s
             """, (debate_id,))
             conn.commit()
+            
+            # Get the debate config to restart the loop if needed
+            cursor.execute("""
+                SELECT auto_turn_delay_seconds FROM debates WHERE debate_id = %s
+            """, (debate_id,))
+            result = cursor.fetchone()
             cursor.close()
+        
+        # Restart background task if not already running
+        if debate_id not in self.running_debates and result:
+            auto_turn_delay = result.get('auto_turn_delay_seconds', 10)
+            print(f"🔄 Restarting autonomous loop for debate {debate_id}")
+            task = asyncio.create_task(
+                self._run_autonomous_loop(debate_id, openrouter_api_key, auto_turn_delay)
+            )
+            self.running_debates[debate_id] = task
+            print(f"✅ Autonomous loop restarted")
     
     async def _run_autonomous_loop(
         self,
@@ -152,6 +168,7 @@ class AutonomousDebateService:
             cursor.close()
             
             if not result:
+                print(f"⚠️ No debate found for {debate_id}")
                 return True
             
             policy = result['policy_config'] or {}
@@ -169,16 +186,26 @@ class AutonomousDebateService:
             max_rounds = policy.get('max_rounds')
             if max_rounds and participant_count > 0:
                 current_round = (turn_count // participant_count) + 1
+                print(f"📊 Round check: {current_round}/{max_rounds} (turns={turn_count}, participants={participant_count})")
                 if current_round > max_rounds:
+                    print(f"⛔ Ending due to max_rounds: {current_round} > {max_rounds}")
                     return True
             
             # Check timebox
             timebox_minutes = policy.get('timebox_minutes')
             if timebox_minutes and result['started_at']:
-                elapsed = (datetime.utcnow() - result['started_at']).total_seconds() / 60
+                now = datetime.now(timezone.utc)
+                started = result['started_at']
+                # Make started_at timezone-aware if it isn't already
+                if started.tzinfo is None:
+                    started = started.replace(tzinfo=timezone.utc)
+                elapsed = (now - started).total_seconds() / 60
+                print(f"⏱️ Timebox check: {elapsed:.1f}/{timebox_minutes} minutes")
                 if elapsed >= timebox_minutes:
+                    print(f"⛔ Ending due to timebox: {elapsed:.1f} >= {timebox_minutes}")
                     return True
             
+            print(f"✅ Debate should continue")
             return False
     
     async def _conclude_debate(self, debate_id: str, openrouter_api_key: str):

@@ -48,9 +48,21 @@ async def pause_autonomous(debate_id: str):
 
 
 @router.post("/{debate_id}/resume-autonomous")
-async def resume_autonomous(debate_id: str):
+async def resume_autonomous(
+    debate_id: str,
+    x_openrouter_key: Optional[str] = Header(None)
+):
     """Resume autonomous debate"""
-    await autonomous_service.resume_autonomous_debate(debate_id)
+    # Get API key from header (needed to restart background task)
+    api_key = x_openrouter_key
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="OpenRouter API key required to resume autonomous debate."
+        )
+    
+    await autonomous_service.resume_autonomous_debate(debate_id, api_key)
     return {"status": "resumed"}
 
 
