@@ -84,6 +84,201 @@
   to { transform: rotate(360deg); }
 }
 
+/* Status Filter Tabs */
+.statusTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 6px;
+  background: var(--surface-0);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+}
+
+.statusTab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.statusTab:hover {
+  background: var(--surface-1);
+  color: var(--text-0);
+}
+
+.statusTabActive {
+  background: var(--accent);
+  color: white;
+}
+
+.statusTabActive:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.tabDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.tabDot[data-status="pending"] {
+  background: #fbbf24;
+}
+
+.tabDot[data-status="running"] {
+  background: #4ade80;
+}
+
+.tabDot[data-status="paused"] {
+  background: #f87171;
+}
+
+.tabDot[data-status="ended"] {
+  background: #666666;
+}
+
+.tabCount {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+.statusTabActive .tabCount {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.searchBox {
+  position: relative;
+  flex: 1;
+  min-width: 300px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 12px 40px 12px 44px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  color: var(--text-0);
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-1);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+.searchInput::placeholder {
+  color: var(--text-3);
+}
+
+.clearBtn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.clearBtn:hover {
+  color: var(--text-0);
+  background: var(--surface-2);
+}
+
+.sortBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sortBox label {
+  font-size: 14px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.sortSelect {
+  padding: 10px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  color: var(--text-0);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 180px;
+}
+
+.sortSelect:hover {
+  border-color: var(--accent);
+  background: var(--bg-1);
+}
+
+.sortSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+.resultsCount {
+  font-size: 14px;
+  color: var(--text-2);
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: var(--surface-0);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+}
+
 /* Empty State */
 .emptyState {
   text-align: center;
@@ -238,6 +433,29 @@
 .btnSecondary:hover {
   background: var(--surface-1);
   border-color: var(--accent);
+}
+
+.btnDelete {
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 150ms;
+  flex-shrink: 0;
+}
+
+.btnDelete:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btnDelete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Transcript View */

@@ -415,3 +415,30 @@ class DebateService:
             
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+    
+    def delete_debate(self, debate_id: str) -> bool:
+        """
+        Delete a debate and all associated data.
+        This includes events, participants, and the debate record itself.
+        """
+        with get_db_connection() as conn:
+            cursor = get_cursor(conn)
+            
+            # Delete in order of foreign key dependencies
+            # 1. Delete events
+            cursor.execute("""
+                DELETE FROM events WHERE debate_id = %s
+            """, (debate_id,))
+            
+            # 2. Delete participants
+            cursor.execute("""
+                DELETE FROM participants WHERE debate_id = %s
+            """, (debate_id,))
+            
+            # 3. Delete the debate itself
+            cursor.execute("""
+                DELETE FROM debates WHERE debate_id = %s
+            """, (debate_id,))
+            
+            conn.commit()
+            return True

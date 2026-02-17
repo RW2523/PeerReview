@@ -192,15 +192,15 @@
   font-size: 24px;
   font-weight: 500;
   color: var(--text-0);
-  margin: 0 0 12px 0;
+  margin: 0 0 20px 0;
   letter-spacing: -0.01em;
 }
 
 .hint {
   font-size: 14px;
   color: var(--text-2);
-  margin: 0 0 var(--space-4) 0;
-  line-height: 1.6;
+  margin: 0 0 var(--space-5) 0;
+  line-height: 1.8;
 }
 
 .section label {
@@ -303,9 +303,9 @@
 /* Two-column layout for Participants step */
 .twoColumnLayout {
   display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: 24px;
-  margin-top: 24px;
+  grid-template-columns: 1fr 420px;
+  gap: 48px;
+  margin-top: 40px;
 }
 
 @media (max-width: 1024px) {
@@ -323,7 +323,7 @@
   min-height: 500px;
   max-height: 700px;
   overflow-y: auto;
-  padding-right: 12px;
+  padding-right: 20px;
 }
 
 .selectionPanel::-webkit-scrollbar {
@@ -354,7 +354,7 @@
   background: var(--surface-0);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 32px;
   max-height: 700px;
   overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -364,8 +364,8 @@
   font-size: 15px;
   font-weight: 700;
   color: var(--text-0);
-  margin: 0 0 16px 0;
-  padding-bottom: 12px;
+  margin: 0 0 28px 0;
+  padding-bottom: 20px;
   border-bottom: 2px solid var(--border-soft);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -375,8 +375,8 @@
   background: var(--bg-1);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
-  margin-bottom: 10px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
   transition: all 200ms;
   animation: slideInRight 300ms ease-out;
 }
@@ -551,26 +551,27 @@
 
 .emptyState {
   text-align: center;
-  padding: 60px 20px;
+  padding: 80px 20px;
   color: var(--text-2);
 }
 
 .emptyIcon {
-  font-size: 48px;
-  margin-bottom: 12px;
+  font-size: 56px;
+  margin-bottom: 16px;
   opacity: 0.3;
 }
 
 .emptyState p {
   font-size: 15px;
   font-weight: 600;
-  margin: 0 0 4px 0;
+  margin: 0 0 8px 0;
   color: var(--text-1);
 }
 
 .emptyHint {
   font-size: 13px;
   color: var(--text-2);
+  line-height: 1.6;
 }
 
 .searchInput {
@@ -600,13 +601,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-4);
+  margin-bottom: 24px;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: 20px;
 }
 
 .templates h3 {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-0);
   margin: 0;
@@ -615,12 +616,13 @@
 
 .categoryFilter {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 28px;
 }
 
 .categoryBtn {
-  padding: 8px 16px;
+  padding: 11px 22px;
   background: transparent;
   border: 1.5px solid var(--border-soft);
   border-radius: 20px;
@@ -772,29 +774,29 @@
 }
 
 .templates {
-  margin-bottom: 24px;
+  margin-bottom: 36px;
 }
 
 .templates h3 {
   font-size: 14px;
   font-weight: 700;
   color: var(--accent);
-  margin: 0 0 var(--space-2) 0;
+  margin: 0 0 var(--space-4) 0;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 
 .templateGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
 }
 
 .templateCard {
   background: var(--surface-0) !important;
   border: 1px solid var(--border-soft) !important;
   border-radius: var(--radius-md) !important;
-  padding: var(--space-3) !important;
+  padding: 22px !important;
   text-align: left !important;
   transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
   position: relative;
@@ -833,14 +835,14 @@
   font-size: 15px;
   font-weight: 600;
   color: var(--text-0);
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 
 .templateRole {
   font-size: 13px;
   color: var(--text-2);
-  line-height: 1.4;
-  margin-bottom: 8px;
+  line-height: 1.6;
+  margin-bottom: 12px;
 }
 
 /* Selected template card state */
@@ -1672,13 +1674,6 @@
   font-weight: 500;
 }
 
-.helpText {
-  font-size: 13px;
-  color: var(--text-2);
-  margin-top: 8px;
-  font-style: italic;
-}
-
 /* Pulse animation for preflight status */
 @keyframes pulse {
   0%, 100% {
@@ -1689,84 +1684,84 @@
   }
 }
 
-/* Host Configuration Styles */
-.hostConfig {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
+/* Compact Host Configuration */
+.hostConfigCompact {
+  background: var(--surface-0);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 32px;
+  transition: all 0.2s;
 }
 
-.hostHeader {
-  margin-bottom: 0;
+.hostConfigCompact:hover {
+  border-color: var(--border-medium);
 }
 
-.hostToggle {
+.hostToggleRow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.hostToggleLabel {
+  display: flex;
+  align-items: center;
   gap: 12px;
-}
-
-.hostToggle input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  margin-top: 2px;
-  cursor: pointer;
-}
-
-.hostToggle label {
   flex: 1;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  user-select: none;
 }
 
-.hostToggle label strong {
-  font-size: 16px;
-  color: var(--text-0);
+.hostIcon {
+  font-size: 20px;
+  flex-shrink: 0;
 }
 
-.hostDescription {
-  font-size: 13px;
-  color: var(--text-2);
-  line-height: 1.5;
-}
-
-.hostSettings {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.hostSettings label {
-  display: block;
+.hostName {
   font-size: 14px;
-  font-weight: 500;
-  color: var(--text-1);
-  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-0);
+  flex-shrink: 0;
 }
 
-.modelSelect {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--bg-2);
+.hostHint {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.4;
+  flex: 1;
+}
+
+.hostControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.hostModelSelectCompact {
+  padding: 8px 12px;
+  background: var(--surface-1);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   color: var(--text-0);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s;
+  min-width: 160px;
 }
 
-.modelSelect:hover {
+.hostModelSelectCompact:hover {
   border-color: var(--accent);
+  background: var(--bg-1);
 }
 
-.modelSelect:focus {
+.hostModelSelectCompact:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
 }
 
 /* YOLO Mode Section - Vercel Style */
@@ -1774,8 +1769,8 @@
   background: #000000;
   border: 1px solid #333333;
   border-radius: 8px;
-  padding: 20px;
-  margin: 24px 0;
+  padding: 24px;
+  margin: 32px 0;
   transition: border-color 0.2s;
 }
 
@@ -1825,8 +1820,8 @@
 .toggleSwitch {
   position: relative;
   display: inline-block;
-  width: 44px;
-  height: 24px;
+  width: 48px;
+  height: 26px;
   flex-shrink: 0;
 }
 
@@ -1846,14 +1841,14 @@
   background: #1a1a1a;
   border: 1px solid #333333;
   transition: all 0.2s;
-  border-radius: 24px;
+  border-radius: 26px;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
+  height: 20px;
+  width: 20px;
   left: 2px;
   bottom: 2px;
   background: #666666;
@@ -1867,7 +1862,7 @@
 }
 
 .toggleSwitch input:checked + .slider:before {
-  transform: translateX(20px);
+  transform: translateX(22px);
   background: #ffffff;
 }
 

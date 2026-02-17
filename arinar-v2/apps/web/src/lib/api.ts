@@ -1134,6 +1134,21 @@ export async function resumeAutonomousDebate(debateId: string, openrouterKey: st
   return response.json();
 }
 
+export async function deleteDebate(debateId: string): Promise<{ success: boolean }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete debate: ${errorText}`);
+  }
+  
+  return response.json();
+}
+
 export async function getAutonomousStatus(debateId: string): Promise<{
   status: string | null;
   is_running: boolean;

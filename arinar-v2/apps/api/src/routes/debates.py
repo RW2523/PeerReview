@@ -601,6 +601,44 @@ async def extend_debate(
         )
 
 
+@router.delete("/debates/{debate_id}")
+async def delete_debate(
+    debate_id: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
+):
+    """
+    Delete a debate and all associated data.
+    Protected by workspace access checks.
+    """
+    service = DebateService()
+    debate = service.get_debate(debate_id)
+    
+    if not debate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Debate {debate_id} not found"
+        )
+    
+    # Check workspace access
+    if current_user:
+        check_workspace_access(current_user, debate['workspace_id'])
+    
+    try:
+        # Delete debate and associated data (events, participants, etc.)
+        service.delete_debate(debate_id)
+        
+        return {
+            "success": True,
+            "message": f"Debate {debate_id} deleted successfully"
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete debate: {str(e)}"
+        )
+
+
 # NOTE: Additional endpoints have been extracted for maintainability:
 #  - Turn orchestration: see routes/turns.py
 #  - Setup endpoint: see routes/setup.py

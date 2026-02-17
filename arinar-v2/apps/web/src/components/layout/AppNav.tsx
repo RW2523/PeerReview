@@ -28,7 +28,7 @@ export default function AppNav() {
           <div className={styles.links}>
             <Link
               href="/"
-              className={`${styles.link} ${isActive('/') && !pathname.includes('/room') && !pathname.includes('/settings') && !pathname.includes('/history') ? styles.active : ''}`}
+              className={`${styles.link} ${isActive('/') && !pathname.includes('/room') && !pathname.includes('/settings') && !pathname.includes('/history') && !pathname.includes('/architecture') ? styles.active : ''}`}
             >
               Create Debate
             </Link>
@@ -43,6 +43,12 @@ export default function AppNav() {
               className={`${styles.link} ${isActive('/history') ? styles.active : ''}`}
             >
               📜 History
+            </Link>
+            <Link
+              href="/architecture"
+              className={`${styles.link} ${isActive('/architecture') ? styles.active : ''}`}
+            >
+              📐 Architecture
             </Link>
           </div>
 

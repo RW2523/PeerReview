@@ -102,43 +102,41 @@ export function ParticipantsStep({
         <strong> Min 2, Max 8 participants.</strong>
       </p>
 
-      {/* Ultimate Host Configuration */}
-      <div className={styles.hostConfig}>
-        <div className={styles.hostHeader}>
-          <div className={styles.hostToggle}>
-            <input
-              type="checkbox"
-              id="enable-host"
-              checked={enableHost}
-              onChange={(e) => onEnableHostChange(e.target.checked)}
-            />
-            <label htmlFor="enable-host">
-              <strong>🏛️ Enable Ultimate Host</strong>
-              <span className={styles.hostDescription}>
-                Neutral moderator that synthesizes all viewpoints and provides a final decision based on majority consensus
-              </span>
+      {/* Compact Ultimate Host Toggle */}
+      <div className={styles.hostConfigCompact}>
+        <div className={styles.hostToggleRow}>
+          <label htmlFor="enable-host" className={styles.hostToggleLabel}>
+            <span className={styles.hostIcon}>🏛️</span>
+            <span className={styles.hostName}>Enable Ultimate Host</span>
+            <span className={styles.hostHint}>Neutral moderator synthesizes viewpoints & provides final decision</span>
+          </label>
+          
+          <div className={styles.hostControls}>
+            {enableHost && (
+              <select
+                value={hostModelId || 'openai/gpt-4o-mini'}
+                onChange={(e) => onHostModelChange(e.target.value)}
+                className={styles.hostModelSelectCompact}
+                title="Host AI Model"
+              >
+                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+                <option value="openai/gpt-4o">GPT-4o</option>
+                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                <option value="google/gemini-pro-1.5">Gemini Pro 1.5</option>
+              </select>
+            )}
+            
+            <label className={styles.toggleSwitch}>
+              <input
+                type="checkbox"
+                id="enable-host"
+                checked={enableHost}
+                onChange={(e) => onEnableHostChange(e.target.checked)}
+              />
+              <span className={styles.slider}></span>
             </label>
           </div>
         </div>
-        
-        {enableHost && (
-          <div className={styles.hostSettings}>
-            <label>Host AI Model</label>
-            <select
-              value={hostModelId || 'openai/gpt-4o-mini'}
-              onChange={(e) => onHostModelChange(e.target.value)}
-              className={styles.modelSelect}
-            >
-              <option value="openai/gpt-4o-mini">GPT-4o Mini (Fast & Cost-effective)</option>
-              <option value="openai/gpt-4o">GPT-4o (Balanced)</option>
-              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Premium)</option>
-              <option value="google/gemini-pro-1.5">Gemini Pro 1.5 (Advanced)</option>
-            </select>
-            <p className={styles.helpText}>
-              The host will speak last after all rounds are complete to provide a neutral, fact-based conclusion.
-            </p>
-          </div>
-        )}
       </div>
 
       <div className={styles.twoColumnLayout}>
