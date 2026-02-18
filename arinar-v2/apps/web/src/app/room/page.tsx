@@ -10,6 +10,7 @@ import DebateTimer from '@/components/room/DebateTimer';
 import AgentBehaviorsPanel from '@/components/room/AgentBehaviorsPanel';
 import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
+import DocumentPanel from './DocumentPanel';
 import { useDebateRoom } from '@/hooks/useDebateRoom';
 import * as api from '@/lib/api';
 import styles from './room.module.css';
@@ -39,6 +40,8 @@ function RoomPageContent() {
   const [policyConfig, setPolicyConfig] = useState<any>(null);
   const [participantTurnCounts, setParticipantTurnCounts] = useState<Record<string, number>>({});
   const [debateStartedAt, setDebateStartedAt] = useState<string | null>(null);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [showDocument, setShowDocument] = useState(false);
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
@@ -61,6 +64,18 @@ function RoomPageContent() {
           console.log('📊 Policy Config loaded:', debate.policy_config);
           console.log('⏰ Debate started at:', debate.started_at);
           console.log('🚀 YOLO Mode:', debate.autonomous_mode);
+          
+          // Check for document
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/debates/${debate.debate_id}/document`)
+            .then(res => res.ok ? res.json() : null)
+            .then(doc => {
+              if (doc && doc.document_id) {
+                setDocumentId(doc.document_id);
+                setShowDocument(true);
+                console.log('📄 Document found:', doc.document_id);
+              }
+            })
+            .catch(err => console.log('No document for this debate'));
         })
         .catch(err => {
           console.error('Failed to auto-load debate:', err);
@@ -315,7 +330,7 @@ function RoomPageContent() {
         )}
       </main>
 
-      {/* Right Panel: Controls & Agenda */}
+      {/* Right Panel: Controls & Document */}
       <aside className={styles.rightPanel}>
         {debateId ? (
           <>
@@ -337,6 +352,34 @@ function RoomPageContent() {
               onYoloStatusChange={setYoloStatus}
               sendCommand={sendCommand}
             />
+            
+            {/* Document Panel */}
+            {documentId && showDocument && (
+              <div style={{marginTop: '16px'}}>
+                <button 
+                  onClick={() => setShowDocument(!showDocument)}
+                  style={{
+                    marginBottom: '8px',
+                    padding: '8px 12px',
+                    background: 'var(--accent)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  📄 {showDocument ? 'Hide' : 'Show'} Document
+                </button>
+                <DocumentPanel 
+                  debateId={debateId} 
+                  documentId={documentId}
+                  userId="user-1"
+                  userName="User"
+                />
+              </div>
+            )}
           </>
         ) : (
           <div className={styles.hint}>

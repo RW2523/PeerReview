@@ -235,9 +235,9 @@ export function PrepPackDialog({
                       <span className={styles.queryText}>"{webResearchQuery}"</span>
                     </div>
 
-                    {webResearchResults.length > 0 ? (
+                      {webResearchResults.length > 0 ? (
                       <div className={styles.researchResults}>
-                        {webResearchResults.map((result, idx) => (
+                        {webResearchResults.map((result: any, idx: number) => (
                           <div key={idx} className={styles.researchCard}>
                             <div className={styles.researchHeader}>
                               <span className={styles.researchNumber}>#{idx + 1}</span>
@@ -258,7 +258,7 @@ export function PrepPackDialog({
                     ) : webSearchUrls.length > 0 ? (
                       <div className={styles.urlList}>
                         <p className={styles.label}>🔗 URLs Researched ({webSearchUrls.length}):</p>
-                        {webSearchUrls.map((url, idx) => (
+                        {webSearchUrls.map((url: string, idx: number) => (
                           <a 
                             key={idx}
                             href={url} 

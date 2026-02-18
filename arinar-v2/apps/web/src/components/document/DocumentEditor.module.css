@@ -1,0 +1,35 @@
+.editorWrapper {
+  min-height: 200px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-1);
+  padding: 16px;
+}
+
+.editor {
+  min-height: 180px;
+  color: var(--text-0);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.editor :global(.ProseMirror) {
+  outline: none;
+}
+
+.editor :global(.ProseMirror p) {
+  margin: 0 0 12px 0;
+}
+
+.editor :global(.ProseMirror h1),
+.editor :global(.ProseMirror h2),
+.editor :global(.ProseMirror h3) {
+  margin: 20px 0 12px 0;
+  font-weight: 600;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-2);
+}

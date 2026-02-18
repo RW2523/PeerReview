@@ -1166,3 +1166,36 @@ export async function getAutonomousStatus(debateId: string): Promise<{
   
   return response.json();
 }
+
+// ============================================================================
+// DOCUMENTS API
+// ============================================================================
+
+export async function createDocument(request: any): Promise<any> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/documents`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(request),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to create document: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function getDocument(documentId: string): Promise<any> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/documents/${documentId}`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get document: ${response.statusText}`);
+  }
+  
+  return response.json();
+}

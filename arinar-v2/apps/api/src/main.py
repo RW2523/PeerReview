@@ -6,7 +6,7 @@ from .routes import (
     health, agents, debates, turns, setup, summary, events, openrouter,
     personas, materials, memory, preflight, artifacts, embeddings,
     workspace_settings, presence, websocket, knowledge, analytics, ai_assist,
-    participants, autonomous
+    participants, autonomous, documents
 )
 
 
@@ -49,6 +49,15 @@ app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 app.include_router(ai_assist.router, tags=["ai-assist"])
 app.include_router(participants.router, tags=["participants"])
 app.include_router(autonomous.router, tags=["autonomous"])
+app.include_router(documents.router, tags=["documents"])
+
+# Document WebSocket endpoint
+from .websocket.document_hub import handle_document_websocket
+
+@app.websocket("/ws/document/{document_id}")
+async def websocket_document_endpoint(websocket, document_id: str):
+    """WebSocket endpoint for document collaboration"""
+    await handle_document_websocket(websocket, document_id)
 
 
 if __name__ == "__main__":

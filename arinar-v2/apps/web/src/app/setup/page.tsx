@@ -41,6 +41,11 @@ export default function SetupPage() {
   // Host Configuration
   const [enableHost, setEnableHost] = useState(false);
   const [hostModelId, setHostModelId] = useState('openai/gpt-4o-mini');
+  
+  // Document Configuration
+  const [enableDocuments, setEnableDocuments] = useState(false);
+  const [documentTemplateId, setDocumentTemplateId] = useState('meeting-summary');
+  const [documentTitle, setDocumentTitle] = useState('');
 
   // Pre-fill from draft if coming from home page
   useEffect(() => {
@@ -98,6 +103,9 @@ export default function SetupPage() {
     workspaceId,
     title,
     problemStatement,
+    enableDocuments,
+    documentTemplateId,
+    documentTitle,
     agenda,
     desiredOutcomes,
     timeboxMinutes,
@@ -271,20 +279,26 @@ export default function SetupPage() {
           )}
 
           {step === 3 && (
-            <ParticipantsStep
-              participants={participants}
-              templates={templates}
-              agents={agents}
-              enableHost={enableHost}
-              hostModelId={hostModelId}
-              onEnableHostChange={setEnableHost}
-              onHostModelChange={setHostModelId}
-              onAddFromTemplate={handleAddParticipantFromTemplate}
-              onAddExisting={handleAddExistingAgent}
-              onUpdate={handleUpdateParticipant}
-              onRemove={handleRemoveParticipant}
-              onReorder={handleReorderParticipant}
-            />
+          <ParticipantsStep
+            participants={participants}
+            templates={templates}
+            agents={agents}
+            enableHost={enableHost}
+            hostModelId={hostModelId}
+            enableDocuments={enableDocuments}
+            documentTemplateId={documentTemplateId}
+            documentTitle={documentTitle}
+            onEnableHostChange={setEnableHost}
+            onHostModelChange={setHostModelId}
+            onEnableDocumentsChange={setEnableDocuments}
+            onDocumentTemplateChange={setDocumentTemplateId}
+            onDocumentTitleChange={setDocumentTitle}
+            onAddFromTemplate={handleAddParticipantFromTemplate}
+            onAddExisting={handleAddExistingAgent}
+            onUpdate={handleUpdateParticipant}
+            onRemove={handleRemoveParticipant}
+            onReorder={handleReorderParticipant}
+          />
           )}
 
           {step === 4 && (

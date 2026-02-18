@@ -468,6 +468,16 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             conn.commit()
             print(f"✅ Transaction committed successfully!\n")
             
+            # 📄 Document Integration: Write to assigned sections
+            self._write_to_document_sections(
+                debate_id=debate_id,
+                agent_id=next_participant['participant_id'],
+                agent_name=agent_name,
+                agent_message=agent_message,
+                model_id=model_id,
+                system_prompt=system_prompt
+            )
+            
             result = {
                 'event_id': event_id,
                 'participant_id': next_participant['participant_id'],
@@ -746,3 +756,201 @@ Your question (15 words max):"""
                             await websocket_manager.broadcast_to_debate(debate_id, event)
         except Exception as e:
             print(f"⚠️ Autonomous behaviors error: {e}")
+    
+    def _write_to_document_sections(
+        self,
+        debate_id: str,
+        agent_id: str,
+        agent_name: str,
+        agent_message: str,
+        model_id: str,
+        system_prompt: str
+    ):
+        """
+        Write agent content to assigned document sections
+        """
+        try:
+            with get_db_connection() as conn:
+                cursor = get_cursor(conn)
+                
+                # Check if there's a document for this debate
+                cursor.execute("""
+                    SELECT document_id, title, template_id
+                    FROM documents
+                    WHERE debate_id = %s AND status IN ('draft', 'in_progress')
+                    LIMIT 1
+                """, (debate_id,))
+                
+                document = cursor.fetchone()
+                if not document:
+                    print(f"📄 No active document found for debate {debate_id}")
+                    return
+                
+                document_id = document['document_id']
+                
+                # Find sections assigned to this agent
+                cursor.execute("""
+                    SELECT section_id, section_key, section_title, section_type,
+                           word_limit, word_count, status, content_schema
+                    FROM document_sections
+                    WHERE document_id = %s
+                      AND assigned_agent_id = %s
+                      AND status IN ('assigned', 'pending', 'in_progress')
+                    ORDER BY section_order ASC
+                """, (document_id, agent_id))
+                
+                sections = cursor.fetchall()
+                if not sections:
+                    print(f"📄 No sections assigned to {agent_name} in document {document_id}")
+                    return
+                
+                print(f"\n📄 DOCUMENT WRITING: {agent_name} has {len(sections)} assigned section(s)")
+                
+                # Write to each assigned section
+                for section in sections:
+                    section_id = section['section_id']
+                    section_title = section['section_title']
+                    section_type = section['section_type']
+                    word_limit = section['word_limit']
+                    current_status = section['status']
+                    
+                    print(f"   Writing to: {section_title} (type: {section_type}, limit: {word_limit} words)")
+                    
+                    # Generate section-specific content
+                    content = self._generate_section_content(
+                        section_title=section_title,
+                        section_type=section_type,
+                        word_limit=word_limit,
+                        agent_name=agent_name,
+                        agent_message=agent_message,
+                        model_id=model_id,
+                        system_prompt=system_prompt,
+                        debate_context=f"Debate: {document['title']}"
+                    )
+                    
+                    if not content:
+                        continue
+                    
+                    # Count words
+                    word_count = len(content.split())
+                    
+                    # Update section status
+                    new_status = 'completed' if word_count >= (word_limit or 100) else 'in_progress'
+                    if current_status == 'pending':
+                        new_status = 'in_progress'
+                    
+                    # Update section in database
+                    cursor.execute("""
+                        UPDATE document_sections
+                        SET status = %s,
+                            word_count = %s,
+                            started_at = COALESCE(started_at, NOW()),
+                            completed_at = CASE WHEN %s = 'completed' THEN NOW() ELSE completed_at END
+                        WHERE section_id = %s
+                    """, (new_status, word_count, new_status, section_id))
+                    
+                    print(f"   ✅ Updated section: {word_count} words, status: {new_status}")
+                
+                # Update document status if all sections are completed
+                cursor.execute("""
+                    SELECT COUNT(*) as total,
+                           SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+                    FROM document_sections
+                    WHERE document_id = %s
+                """, (document_id,))
+                
+                counts = cursor.fetchone()
+                if counts['total'] > 0 and counts['completed'] == counts['total']:
+                    cursor.execute("""
+                        UPDATE documents
+                        SET status = 'completed',
+                            completed_at = NOW()
+                        WHERE document_id = %s
+                    """, (document_id,))
+                    print(f"   🎉 Document {document_id} marked as COMPLETED!")
+                else:
+                    cursor.execute("""
+                        UPDATE documents
+                        SET status = 'in_progress'
+                        WHERE document_id = %s AND status = 'draft'
+                    """, (document_id,))
+                
+                conn.commit()
+                print(f"📄 Document sections updated successfully\n")
+                
+        except Exception as e:
+            print(f"⚠️ Document writing error: {e}")
+    
+    def _generate_section_content(
+        self,
+        section_title: str,
+        section_type: str,
+        word_limit: int,
+        agent_name: str,
+        agent_message: str,
+        model_id: str,
+        system_prompt: str,
+        debate_context: str
+    ) -> str:
+        """
+        Generate content for a specific document section
+        """
+        try:
+            # For diagram sections, generate Mermaid code
+            if section_type == 'diagram':
+                prompt = f"""Generate a Mermaid.js diagram for the section titled "{section_title}".
+
+Context: {debate_context}
+
+Based on this discussion point: {agent_message[:500]}
+
+Create a clear, professional Mermaid diagram (flowchart, sequence, or ER diagram as appropriate).
+Return ONLY the Mermaid code, no explanations."""
+                
+                messages = [
+                    {"role": "system", "content": "You are a technical documentation expert who creates clear Mermaid.js diagrams."},
+                    {"role": "user", "content": prompt}
+                ]
+                
+            else:
+                # For text sections, summarize the agent's point for this section
+                prompt = f"""Write content for the document section titled "{section_title}".
+
+Context: {debate_context}
+
+Your role: {system_prompt[:200] if system_prompt else agent_name}
+
+Based on your contribution to the debate: {agent_message}
+
+Requirements:
+- Write {word_limit} words or less
+- Focus on the specific aspect covered by "{section_title}"
+- Be concise and professional
+- Use bullet points or short paragraphs
+- Return only the content, no meta-commentary"""
+                
+                messages = [
+                    {"role": "system", "content": f"You are {agent_name}, contributing to a collaborative document."},
+                    {"role": "user", "content": prompt}
+                ]
+            
+            # Call LLM to generate content
+            response = self.openrouter_client.chat_completion(
+                model=model_id,
+                messages=messages,
+                max_tokens=word_limit * 2 if section_type != 'diagram' else 500,
+                temperature=0.7
+            )
+            
+            content = response.get('content', '').strip()
+            
+            # For diagrams, clean up markdown code blocks if present
+            if section_type == 'diagram' and content:
+                # Remove markdown code blocks
+                content = content.replace('```mermaid', '').replace('```', '').strip()
+            
+            return content
+            
+        except Exception as e:
+            print(f"⚠️ Section content generation error: {e}")
+            return ""

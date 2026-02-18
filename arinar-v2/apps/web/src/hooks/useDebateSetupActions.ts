@@ -20,6 +20,9 @@ interface UseDebateSetupActionsOptions {
   hostModelId?: string;
   yoloMode?: boolean;
   autoTurnDelay?: number;
+  enableDocuments?: boolean;
+  documentTemplateId?: string;
+  documentTitle?: string;
   participants: SetupParticipant[];
   materials: SetupMaterial[];
   selectedMemorySources: string[];
@@ -95,6 +98,29 @@ export function useDebateSetupActions(
         } catch (memErr: any) {
           console.error('Memory import failed:', memErr);
           alert(`Warning: Memory import failed: ${memErr.message}. Continuing with debate creation.`);
+        }
+      }
+
+      // 3. Create document if enabled
+      if (options.enableDocuments) {
+        try {
+          const { getAllTemplates } = await import('@/lib/document/templates');
+          const templates = getAllTemplates();
+          const selectedTemplate = templates.find(t => t.id === options.documentTemplateId);
+          
+          if (selectedTemplate) {
+            const docTitle = options.documentTitle || `${title} - ${selectedTemplate.title}`;
+            await api.createDocument({
+              debate_id: debate_id,
+              template_id: options.documentTemplateId || 'meeting-summary',
+              title: docTitle,
+              custom_sections: selectedTemplate.sections,
+            });
+            console.log('✅ Document created successfully');
+          }
+        } catch (docErr: any) {
+          console.error('Document creation failed:', docErr);
+          alert(`Warning: Document creation failed: ${docErr.message}. Continuing with debate.`);
         }
       }
 

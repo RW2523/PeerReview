@@ -9,8 +9,14 @@ interface ParticipantsStepProps {
   agents: api.Agent[];
   enableHost: boolean;
   hostModelId?: string;
+  enableDocuments?: boolean;
+  documentTemplateId?: string;
+  documentTitle?: string;
   onEnableHostChange: (enabled: boolean) => void;
   onHostModelChange: (modelId: string) => void;
+  onEnableDocumentsChange?: (enabled: boolean) => void;
+  onDocumentTemplateChange?: (templateId: string) => void;
+  onDocumentTitleChange?: (title: string) => void;
   onAddFromTemplate: (template: api.AgentTemplate) => void;
   onAddExisting: (agent: api.Agent) => void;
   onUpdate: (idx: number, updates: Partial<api.SetupParticipant>) => void;
@@ -24,8 +30,14 @@ export function ParticipantsStep({
   agents,
   enableHost,
   hostModelId,
+  enableDocuments,
+  documentTemplateId,
+  documentTitle,
   onEnableHostChange,
   onHostModelChange,
+  onEnableDocumentsChange,
+  onDocumentTemplateChange,
+  onDocumentTitleChange,
   onAddFromTemplate,
   onAddExisting,
   onUpdate,
@@ -132,6 +144,55 @@ export function ParticipantsStep({
                 id="enable-host"
                 checked={enableHost}
                 onChange={(e) => onEnableHostChange(e.target.checked)}
+              />
+              <span className={styles.slider}></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Document Collaboration Toggle */}
+      <div className={styles.hostConfigCompact} style={{marginTop: '16px'}}>
+        <div className={styles.hostToggleRow}>
+          <label htmlFor="enable-documents" className={styles.hostToggleLabel}>
+            <span className={styles.hostIcon}>📄</span>
+            <span className={styles.hostName}>Enable Document Collaboration</span>
+            <span className={styles.hostHint}>Agents write structured documents together with diagrams</span>
+          </label>
+          
+          <div className={styles.hostControls}>
+            {enableDocuments && (
+              <>
+                <select
+                  value={documentTemplateId || 'meeting-summary'}
+                  onChange={(e) => onDocumentTemplateChange?.(e.target.value)}
+                  className={styles.hostModelSelectCompact}
+                  title="Document Template"
+                  style={{marginRight: '8px'}}
+                >
+                  <option value="meeting-summary">📋 Meeting Summary</option>
+                  <option value="medical-consultation">🏥 Medical Consultation</option>
+                  <option value="legal-analysis">⚖️ Legal Analysis</option>
+                  <option value="technical-decision">💻 Technical Decision</option>
+                  <option value="business-strategy">💼 Business Strategy</option>
+                </select>
+                <input
+                  type="text"
+                  value={documentTitle || ''}
+                  onChange={(e) => onDocumentTitleChange?.(e.target.value)}
+                  placeholder="Document title..."
+                  className={styles.hostModelSelectCompact}
+                  style={{width: '180px', marginRight: '8px'}}
+                />
+              </>
+            )}
+            
+            <label className={styles.toggleSwitch}>
+              <input
+                type="checkbox"
+                id="enable-documents"
+                checked={enableDocuments || false}
+                onChange={(e) => onEnableDocumentsChange?.(e.target.checked)}
               />
               <span className={styles.slider}></span>
             </label>
