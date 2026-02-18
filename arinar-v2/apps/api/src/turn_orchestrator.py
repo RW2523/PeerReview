@@ -839,15 +839,17 @@ Your question (15 words max):"""
                     if current_status == 'pending':
                         new_status = 'in_progress'
                     
-                    # Update section in database
+                    # Update section in database WITH CONTENT
                     cursor.execute("""
                         UPDATE document_sections
-                        SET status = %s,
+                        SET content = %s,
+                            status = %s,
                             word_count = %s,
                             started_at = COALESCE(started_at, NOW()),
-                            completed_at = CASE WHEN %s = 'completed' THEN NOW() ELSE completed_at END
+                            completed_at = CASE WHEN %s = 'completed' THEN NOW() ELSE completed_at END,
+                            updated_at = NOW()
                         WHERE section_id = %s
-                    """, (new_status, word_count, new_status, section_id))
+                    """, (content, new_status, word_count, new_status, section_id))
                     
                     print(f"   ✅ Updated section: {word_count} words, status: {new_status}")
                 

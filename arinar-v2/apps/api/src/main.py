@@ -1,5 +1,5 @@
 """FastAPI application entry point"""
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .routes import (
@@ -55,7 +55,7 @@ app.include_router(documents.router, tags=["documents"])
 from .websocket.document_hub import handle_document_websocket
 
 @app.websocket("/ws/document/{document_id}")
-async def websocket_document_endpoint(websocket, document_id: str):
+async def websocket_document_endpoint(websocket: WebSocket, document_id: str):
     """WebSocket endpoint for document collaboration"""
     await handle_document_websocket(websocket, document_id)
 

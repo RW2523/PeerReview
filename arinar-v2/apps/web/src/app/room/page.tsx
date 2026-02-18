@@ -41,7 +41,7 @@ function RoomPageContent() {
   const [participantTurnCounts, setParticipantTurnCounts] = useState<Record<string, number>>({});
   const [debateStartedAt, setDebateStartedAt] = useState<string | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const [showDocument, setShowDocument] = useState(false);
+  const [activeTab, setActiveTab] = useState<'transcript' | 'document'>('transcript');
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
@@ -71,7 +71,6 @@ function RoomPageContent() {
             .then(doc => {
               if (doc && doc.document_id) {
                 setDocumentId(doc.document_id);
-                setShowDocument(true);
                 console.log('📄 Document found:', doc.document_id);
               }
             })
@@ -298,7 +297,7 @@ function RoomPageContent() {
         </div>
       </aside>
 
-      {/* Center: Conversation Feed */}
+      {/* Center: Tabbed View */}
       <main className={styles.center}>
         {!debateId ? (
           <div className={styles.emptyState}>
@@ -315,17 +314,53 @@ function RoomPageContent() {
           />
         ) : (
           <>
-            <EventFeed 
-              events={events}
-              connectionStatus={connectionStatus}
-              onPresenceUpdate={handlePresenceUpdate}
-              onTyping={handleTyping}
-            />
-            <InterveneComposer 
-              debateId={debateId} 
-              participants={participants}
-              sendCommand={sendCommand}
-            />
+            {/* Tab Navigation */}
+            <div className={styles.tabNav}>
+              <button
+                className={`${styles.tab} ${activeTab === 'transcript' ? styles.tabActive : ''}`}
+                onClick={() => setActiveTab('transcript')}
+              >
+                💬 Live Transcript
+              </button>
+              {documentId && (
+                <button
+                  className={`${styles.tab} ${activeTab === 'document' ? styles.tabActive : ''}`}
+                  onClick={() => setActiveTab('document')}
+                >
+                  📄 Document
+                </button>
+              )}
+            </div>
+
+            {/* Tab Content */}
+            <div className={styles.tabContent}>
+              {activeTab === 'transcript' ? (
+                <>
+                  <EventFeed 
+                    events={events}
+                    connectionStatus={connectionStatus}
+                    onPresenceUpdate={handlePresenceUpdate}
+                    onTyping={handleTyping}
+                  />
+                  <InterveneComposer 
+                    debateId={debateId} 
+                    participants={participants}
+                    sendCommand={sendCommand}
+                  />
+                </>
+              ) : (
+                <div className={styles.documentView}>
+                  {documentId && (
+                    <DocumentPanel 
+                      debateId={debateId} 
+                      documentId={documentId}
+                      userId="user-1"
+                      userName="User"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </main>
@@ -352,34 +387,6 @@ function RoomPageContent() {
               onYoloStatusChange={setYoloStatus}
               sendCommand={sendCommand}
             />
-            
-            {/* Document Panel */}
-            {documentId && showDocument && (
-              <div style={{marginTop: '16px'}}>
-                <button 
-                  onClick={() => setShowDocument(!showDocument)}
-                  style={{
-                    marginBottom: '8px',
-                    padding: '8px 12px',
-                    background: 'var(--accent)',
-                    border: 'none',
-                    borderRadius: '6px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  📄 {showDocument ? 'Hide' : 'Show'} Document
-                </button>
-                <DocumentPanel 
-                  debateId={debateId} 
-                  documentId={documentId}
-                  userId="user-1"
-                  userName="User"
-                />
-              </div>
-            )}
           </>
         ) : (
           <div className={styles.hint}>

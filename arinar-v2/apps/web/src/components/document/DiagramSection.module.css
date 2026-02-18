@@ -1,9 +1,11 @@
 .container {
   position: relative;
-  background: var(--surface-1);
-  border-radius: 8px;
-  padding: 20px;
+  background: transparent;
+  border-radius: 0;
+  padding: 24px 0;
   margin: 16px 0;
+  border-top: 1px solid #e8e8e8;
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .diagram {
@@ -11,6 +13,9 @@
   justify-content: center;
   align-items: center;
   min-height: 200px;
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 4px;
 }
 
 .diagram :global(svg) {
