@@ -106,11 +106,13 @@ class DocumentSectionResponse(BaseModel):
     word_count: int = 0
     status: SectionStatus
     
+    content: Optional[str] = None  # THE MISSING FIELD!
     content_schema: Optional[Dict[str, Any]] = None
     
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

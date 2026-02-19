@@ -134,18 +134,26 @@ class DocumentService:
             if not doc_row:
                 raise ValueError(f"Document {document_id} not found")
             
-            # Get sections
+            # Get sections (including content!)
             cursor.execute("""
                 SELECT section_id, document_id, section_key, section_title,
                        section_type, section_order, assigned_agent_id, assigned_agent_name,
                        assignment_strategy, word_limit, word_count, status,
-                       content_schema, created_at, started_at, completed_at
+                       content, content_schema, created_at, started_at, completed_at, updated_at
                 FROM document_sections
                 WHERE document_id = %s
                 ORDER BY section_order ASC
             """, (document_id,))
             
             sections = [dict(row) for row in cursor.fetchall()]
+            
+            # DEBUG: Check if content is in sections
+            print(f"\n📋 DEBUG get_document sections:")
+            for idx, s in enumerate(sections):
+                has_content = 'content' in s and s['content'] is not None
+                content_len = len(s.get('content', '')) if has_content else 0
+                print(f"  Section {idx}: {s.get('section_title')} - content: {has_content} ({content_len} chars)")
+            print()
             
             # Calculate metadata
             total_words = sum(s['word_count'] for s in sections)

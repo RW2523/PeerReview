@@ -24,7 +24,38 @@ export default function DocumentPanel({
   userId,
   userName,
 }: DocumentPanelProps) {
-  const { document, loading } = useDocument(documentId || undefined);
+  const [document, setDocument] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  
+  // Direct fetch instead of using hook
+  React.useEffect(() => {
+    if (!documentId) return;
+    
+    const fetchDoc = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/documents/${documentId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDocument(data);
+          console.log('📄 Document loaded:', data.title, data.sections?.length, 'sections');
+        } else {
+          console.error('Failed to fetch document:', response.statusText);
+        }
+      } catch (err) {
+        console.error('Document fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDoc();
+    
+    // Poll for updates every 3 seconds
+    const interval = setInterval(fetchDoc, 3000);
+    return () => clearInterval(interval);
+  }, [documentId]);
+  
   const { provider, connected, synced } = useDocumentSync(
     documentId,
     userId,
@@ -43,10 +74,14 @@ export default function DocumentPanel({
     );
   }
 
-  if (loading) {
+  if (loading || !document) {
     return (
       <div className={styles.panel}>
-        <div className={styles.loading}>Loading document...</div>
+        <div className={styles.loading}>
+          Loading document... (ID: {documentId})
+          <br />
+          <small>Check browser console for errors</small>
+        </div>
       </div>
     );
   }
@@ -87,6 +122,16 @@ export default function DocumentPanel({
                 mermaidCode={section.content || 'graph TD\n  A[Start]-->B[End]'}
                 editable={false}
               />
+            ) : section.content ? (
+              <div style={{
+                padding: '16px 0',
+                color: '#1a1a1a',
+                fontSize: '15px',
+                lineHeight: '1.8',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {section.content}
+              </div>
             ) : (
               <DocumentEditor
                 provider={provider}

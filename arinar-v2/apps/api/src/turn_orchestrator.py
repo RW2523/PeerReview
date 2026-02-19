@@ -377,15 +377,42 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 **Your Response:**
 {length_instruction}
 
-**Communication Style - BE CONVERSATIONAL AND ORGANIC:**
-- **BUILD ON others**: If an Active participant said "time is of essence", don't repeat that phrase. Instead say "@TheirName makes a great point about urgency..." or "I agree we need to act quickly, and I'd add..."
-- **NO ROBOTIC REPETITION**: Avoid copying exact phrases. Each agent should have their own voice and phrasing.
-- **USE @mentions for ACTIVE participants ONLY**: Directly address who you're responding to (e.g., "@ActiveAgent, your point about...")
-- **REACT genuinely**: Agree/disagree with SPECIFIC points from Active participants, not generic statements
-- **ASK FOLLOW-UP questions**: "What do you think about X?" or "How would you address Y?"
-- **VARY your language**: If someone says "crucial", you might say "vital" or "essential" - don't parrot the same words
-- **BE OPEN-MINDED**: Don't come with pre-determined conclusions unless it's your final turn
-- **CRITICAL**: NEVER reference or address participants who are not listed as "Active" above
+**How to Participate (Act Like a Real Expert):**
+
+1. **USE YOUR EXPERTISE** - You have deep domain knowledge, SHOW IT:
+   - Share specific experiences: "In my practice, I've treated 50+ cases where..."
+   - Cite research/data: "The 2024 meta-analysis showed..." or "Latest guidelines recommend..."
+   - Use technical language from your field (explain if too jargon-heavy)
+   - Reference real examples: "I worked on a case where..."
+
+2. **HAVE STRONG OPINIONS** - Real experts are confident when they know something:
+   - "Based on 15 years of experience, X is clearly better than Y"
+   - "The evidence is overwhelming - we absolutely should..."
+   - "I've seen this fail too many times to recommend it"
+   - Don't hedge everything - be decisive when you have grounds
+
+3. **CHALLENGE BULLSHIT** - If someone is wrong or risky:
+   - "@Name, that approach is problematic because [specific reason]"
+   - "I strongly disagree - here's what the data actually shows..."
+   - Offer better alternative: "Instead, based on [your expertise], I'd recommend..."
+
+4. **BUILD ON GOOD IDEAS** - When someone nails it, extend their thinking:
+   - "Exactly! And taking that further..."
+   - "That reminds me of [related case/experience]..."
+   - Add a dimension they missed: "Also consider [new angle from your expertise]"
+
+5. **SHOW YOUR PERSONALITY** - Each expert is different:
+   - Cautious/methodical vs bold/innovative
+   - Data-driven vs experience-driven  
+   - Passionate vs analytical
+   - Optimistic vs skeptical
+   - Let YOUR style come through naturally
+
+**NEVER:**
+- Ask same question twice
+- Say "I agree" without adding value
+- Copy others' points in different words
+- Give generic advice anyone could give
 
 **Desired Outcomes to Keep in Mind:**
 {chr(10).join(f'- {outcome}' for outcome in desired_outcomes) if desired_outcomes else 'No specific outcomes defined'}"""
@@ -468,16 +495,6 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             conn.commit()
             print(f"✅ Transaction committed successfully!\n")
             
-            # 📄 Document Integration: Write to assigned sections
-            self._write_to_document_sections(
-                debate_id=debate_id,
-                agent_id=next_participant['participant_id'],
-                agent_name=agent_name,
-                agent_message=agent_message,
-                model_id=model_id,
-                system_prompt=system_prompt
-            )
-            
             result = {
                 'event_id': event_id,
                 'participant_id': next_participant['participant_id'],
@@ -487,22 +504,63 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                 'sequence_number': next_seq
             }
             
-            # Post-turn autonomous behaviors (80% chance for better visibility, more visible)
-            should_trigger_autonomy = random.random() < 0.80 and total_turns > 1
+            # 📄 Document Integration: Write to assigned sections (ASYNC - don't block!)
+            print(f"    📝 Scheduling async document writing for {agent_name}...")
+            try:
+                loop = asyncio.get_event_loop()
+                if loop and loop.is_running():
+                    asyncio.create_task(
+                        self._async_document_writing(
+                            debate_id=debate_id,
+                            agent_id=next_participant['participant_id'],
+                            agent_name=agent_name,
+                            agent_message=agent_message,
+                            model_id=model_id,
+                            system_prompt=system_prompt
+                        )
+                    )
+            except Exception as e:
+                print(f"    ⚠️ Failed to schedule document writing: {e}")
+            
+            # Post-turn autonomous behaviors (95% chance, starts from turn 0)
+            should_trigger_autonomy = random.random() < 0.95 and total_turns >= 0
             if should_trigger_autonomy:
                 print(f"    🎭 Triggering autonomous behaviors for {agent_name}...")
                 try:
-                    # Fire and forget - don't block the turn response
-                    loop = asyncio.get_event_loop()
-                    if loop and loop.is_running():
-                        asyncio.create_task(
-                            self._async_autonomous_behaviors(
-                                debate_id, agent_name, participants, history_events, 
-                                desired_outcomes, next_seq
-                            )
+                    # Get or create event loop properly
+                    try:
+                        loop = asyncio.get_running_loop()
+                        print(f"       Using existing event loop")
+                    except RuntimeError:
+                        print(f"       Creating new event loop")
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    # Schedule the task
+                    task = asyncio.create_task(
+                        self._async_autonomous_behaviors(
+                            debate_id, agent_name, participants, history_events, 
+                            desired_outcomes, next_seq
                         )
+                    )
+                    
+                    # Add error callback to catch silent failures
+                    def handle_task_result(t):
+                        if t.exception():
+                            print(f"       ❌ Autonomous behavior task failed: {t.exception()}")
+                            import traceback
+                            traceback.print_exception(type(t.exception()), t.exception(), t.exception().__traceback__)
+                        else:
+                            print(f"       ✅ Autonomous behavior task completed successfully")
+                    
+                    task.add_done_callback(handle_task_result)
+                    
+                    print(f"       ✅ Autonomous behavior task scheduled (ID: {id(task)})")
+                    
                 except Exception as e:
-                    print(f"    ⚠️ Failed to start autonomous behaviors: {e}")
+                    print(f"       ❌ Autonomy trigger failed: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             return result
     
@@ -579,6 +637,36 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             finally:
                 cursor.close()
     
+    async def _async_document_writing(
+        self,
+        debate_id: str,
+        agent_id: str,
+        agent_name: str,
+        agent_message: str,
+        model_id: str,
+        system_prompt: str
+    ):
+        """
+        Async document writing - runs in background, doesn't block turn response
+        """
+        try:
+            print(f"\n📝 [ASYNC] Document writing started for {agent_name}")
+            # Run the blocking document writing in executor to not block event loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,  # Use default executor
+                self._write_to_document_sections,
+                debate_id,
+                agent_id,
+                agent_name,
+                agent_message,
+                model_id,
+                system_prompt
+            )
+            print(f"✅ [ASYNC] Document writing completed for {agent_name}\n")
+        except Exception as e:
+            print(f"⚠️ [ASYNC] Document writing error: {e}")
+    
     async def _async_autonomous_behaviors(
         self,
         debate_id: str,
@@ -591,12 +679,17 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
         """
         Async autonomous behaviors - runs in background, doesn't block turn response
         """
+        print(f"\n🎭 [ASYNC] Autonomous behaviors STARTED for {agent_name}")
+        print(f"   Debate ID: {debate_id[:8]}...")
+        print(f"   Current Seq: {current_seq}")
+        print(f"   Participants: {[p.get('participant_name', 'Unknown') for p in participants]}")
+        
         try:
             from .websocket_service import websocket_manager
             autonomy_service = AgentAutonomyService(self.openrouter_client.api_key)
             
-            # Coalition formation (70% chance when autonomy triggers)
-            if random.random() < 0.70:
+            # Coalition formation (always attempt)
+            if True:
                 coalition = autonomy_service.analyze_and_form_coalitions(
                     debate_id, agent_name, participants, history_events, desired_outcomes
                 )
@@ -624,8 +717,8 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                         }
                         await websocket_manager.broadcast_to_debate(debate_id, event)
             
-            # Question to Host/Moderator (30% chance - agents can ask for clarification)
-            if random.random() < 0.30:
+            # Question to Host/Moderator (25% chance - occasional questions)
+            if random.random() < 0.25:
                 # Generate a short clarifying question for the host
                 question_prompt = f"""You are {agent_name} in a debate about: {chr(10).join(desired_outcomes[:2]) if desired_outcomes else 'the current topic'}.
 
@@ -675,8 +768,9 @@ Your question (15 words max):"""
                 except Exception as e:
                     print(f"    ⚠️ Failed to generate host question: {e}")
             
-            # Private messaging with back-and-forth (90% chance - agents love to DM!)
-            if random.random() < 0.90 and len(participants) >= 2:
+            # Private messaging (always try if 2+ participants)
+            if len(participants) >= 2:
+                print(f"   📨 Attempting private messaging for {agent_name}...")
                 other_agents = [
                     (p.get('agent_config') or {}).get('name') or p.get('role_name')
                     for p in participants
@@ -754,8 +848,13 @@ Your question (15 words max):"""
                                 'payload': content
                             }
                             await websocket_manager.broadcast_to_debate(debate_id, event)
+            
+            print(f"✅ [ASYNC] Autonomous behaviors COMPLETED for {agent_name}\n")
+            
         except Exception as e:
-            print(f"⚠️ Autonomous behaviors error: {e}")
+            print(f"❌ [ASYNC] Autonomous behaviors ERROR: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _write_to_document_sections(
         self,
@@ -769,6 +868,12 @@ Your question (15 words max):"""
         """
         Write agent content to assigned document sections
         """
+        print(f"\n📝 DOCUMENT WRITE TRIGGERED:")
+        print(f"   Agent: {agent_name}")
+        print(f"   Agent ID: {agent_id}")
+        print(f"   Debate: {debate_id}")
+        print(f"   Message length: {len(agent_message)} chars\n")
+        
         try:
             with get_db_connection() as conn:
                 cursor = get_cursor(conn)

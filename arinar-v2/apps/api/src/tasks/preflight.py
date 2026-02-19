@@ -315,40 +315,95 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                     if distinctive_traits:
                         persona_keywords = " ".join(distinctive_traits[:3])  # Use up to 3 distinctive traits
                 
-                # Create UNIQUE search angle based on persona AND distinctive traits
-                # This ensures each agent searches with their own lens, getting different sources
+                # Convert question to declarative topic (remove "What", "How", etc.)
+                query_base = problem_statement
+                question_words = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are', 'does', 'do', 'can', 'should']
+                query_lower = query_base.lower().strip()
+                
+                # Strip question words to get the actual topic
+                for qword in question_words:
+                    if query_lower.startswith(qword + ' '):
+                        parts = query_base.split(None, 5)
+                        topic_parts = [p for p in parts if p.lower() not in question_words + ['the', 'a', 'an']]
+                        if topic_parts:
+                            query_base = ' '.join(topic_parts)
+                        break
+                
+                # Create persona-specific search with clean topic (use 120 chars instead of 60)
                 if persona_keywords:
-                    search_query = f"{problem_statement[:60]} {persona_keywords} {role_name} analysis research"
+                    search_query = f"{query_base[:120]} {role_name} {persona_keywords}"
                 else:
-                    search_query = f"{problem_statement[:60]} {role_name} expert perspective analysis recent"
+                    search_query = f"{query_base[:120]} {role_name} expert analysis"
                 
                 print(f"    🔍 Persona-specific web search ({role_name})")
                 print(f"    📝 Query: {search_query[:150]}")
                 
                 with DDGS() as ddgs:
-                    # Search for 10-15 results to get comprehensive coverage
-                    results = list(ddgs.text(search_query, max_results=15))
+                    # Search for top results
+                    results = list(ddgs.text(search_query, max_results=5))  # Get 5 best results
                     
                     if results:
-                        web_research_results = "\n**Web Research Results** (Top 10 sources for your analysis):\n"
+                        web_research_results = "\n**Web Research Results** (Full content from top sources):\n"
                         
-                        # Use top 10 results for comprehensive research
-                        sources_to_use = min(10, len(results))
-                        for i, result in enumerate(results[:sources_to_use], 1):
+                        # Use Jina Reader to fetch FULL content from top 3 sources
+                        import requests
+                        jina_api_key = "jina_cc6446808d1742868f3d236b28ce09408nTRb3eRDPWIDA6ePEXFgKpHty2a"
+                        sources_fetched = 0
+                        
+                        for i, result in enumerate(results[:3], 1):  # Top 3 for full content
                             title = result.get('title', 'N/A')
-                            snippet = result.get('body', '')[:250]  # More context per source
-                            link = result.get('href', '')
-                            web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {link}\n\n"
+                            snippet = result.get('body', '')[:200]
+                            url = result.get('href', '')
+                            
+                            # Try to fetch full content with Jina Reader
+                            try:
+                                print(f"    📖 Reading full content from: {url[:60]}...")
+                                headers = {
+                                    'Authorization': f'Bearer {jina_api_key}',
+                                    'X-Return-Format': 'markdown',
+                                    'X-Timeout': '5'  # 5 second timeout
+                                }
+                                jina_response = requests.get(
+                                    f'https://r.jina.ai/{url}',
+                                    headers=headers,
+                                    timeout=6
+                                )
+                                
+                                if jina_response.status_code == 200:
+                                    full_content = jina_response.text[:3000]  # First 3000 chars
+                                    web_research_results += f"{i}. **{title}**\n   URL: {url}\n\n{full_content}\n\n---\n\n"
+                                    sources_fetched += 1
+                                else:
+                                    # Fallback to snippet
+                                    web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {url}\n\n"
+                                    print(f"       ⚠️ Jina fetch failed ({jina_response.status_code}), using snippet")
+                            except Exception as e:
+                                # Fallback to snippet if Jina fails
+                                web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {url}\n\n"
+                                print(f"       ⚠️ Jina error: {str(e)[:50]}, using snippet")
                             
                             # Store structured data
-                            web_search_urls.append(link)
+                            web_search_urls.append(url)
                             web_search_data.append({
                                 'title': title,
-                                'snippet': snippet[:250],
-                                'url': link
+                                'snippet': snippet,
+                                'url': url
                             })
                         
-                        print(f"    ✅ Found {len(results)} total results, providing top {sources_to_use} sources")
+                        # Add remaining results as snippets only
+                        for i, result in enumerate(results[3:], 4):
+                            title = result.get('title', 'N/A')
+                            snippet = result.get('body', '')[:200]
+                            url = result.get('href', '')
+                            web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {url}\n\n"
+                            web_search_urls.append(url)
+                            web_search_data.append({
+                                'title': title,
+                                'snippet': snippet,
+                                'url': url
+                            })
+                        
+                        print(f"    ✅ Fetched full content from {sources_fetched}/3 sources, {len(results)} total results")
                         print(f"    🔗 First 3 URLs: {', '.join(web_search_urls[:3])}")
                     else:
                         print(f"    ℹ️ No web search results found")
