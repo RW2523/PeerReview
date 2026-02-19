@@ -315,25 +315,45 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                     if distinctive_traits:
                         persona_keywords = " ".join(distinctive_traits[:3])  # Use up to 3 distinctive traits
                 
-                # Convert question to declarative topic (remove "What", "How", etc.)
+                # Clean and enhance query for better search results
                 query_base = problem_statement
-                question_words = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are', 'does', 'do', 'can', 'should']
-                query_lower = query_base.lower().strip()
                 
-                # Strip question words to get the actual topic
-                for qword in question_words:
-                    if query_lower.startswith(qword + ' '):
-                        parts = query_base.split(None, 5)
-                        topic_parts = [p for p in parts if p.lower() not in question_words + ['the', 'a', 'an']]
-                        if topic_parts:
-                            query_base = ' '.join(topic_parts)
-                        break
+                # Remove question words and generic adjectives that confuse search
+                words_to_remove = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are', 
+                                  'does', 'do', 'can', 'should', 'would', 'could',
+                                  'the', 'a', 'an', 'most', 'best', 'likely', 'potential',
+                                  'effective', 'good', 'better', 'ideal', 'optimal']
                 
-                # Create persona-specific search with clean topic (use 120 chars instead of 60)
+                # Split into words and filter
+                words = query_base.split()
+                cleaned_words = [w for w in words if w.lower() not in words_to_remove]
+                query_base = ' '.join(cleaned_words)
+                
+                # Add context hints for better results
+                # Detect common patterns and add specificity
+                query_lower = query_base.lower()
+                context_hints = []
+                
+                # Political/election context
+                if any(term in query_lower for term in ['president', 'election', 'candidate', 'nomination', 'campaign']):
+                    import datetime
+                    current_year = datetime.datetime.now().year
+                    context_hints.append(f"USA {current_year} {current_year+1}")
+                
+                # Medical/health context  
+                if any(term in query_lower for term in ['patient', 'disease', 'treatment', 'medical', 'health']):
+                    context_hints.append("medical research clinical guidelines")
+                
+                # Tech context
+                if any(term in query_lower for term in ['software', 'ai', 'technology', 'algorithm', 'code']):
+                    context_hints.append("technology industry latest")
+                
+                # Build final search query with context
+                context_str = ' '.join(context_hints)
                 if persona_keywords:
-                    search_query = f"{query_base[:120]} {role_name} {persona_keywords}"
+                    search_query = f"{query_base[:100]} {context_str} {role_name} {persona_keywords}"
                 else:
-                    search_query = f"{query_base[:120]} {role_name} expert analysis"
+                    search_query = f"{query_base[:100]} {context_str} {role_name} analysis"
                 
                 print(f"    🔍 Persona-specific web search ({role_name})")
                 print(f"    📝 Query: {search_query[:150]}")

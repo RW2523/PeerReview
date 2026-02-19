@@ -291,7 +291,7 @@ Now analyze the given debate topic:"""
 
         try:
             response = self.openrouter_client.chat_completion(
-                model='google/gemini-flash-1.5',
+                model='openai/gpt-4o-mini',
                 messages=[
                     {"role": "system", "content": "You analyze debate topics and extract key dimensions for structured disagreement."},
                     {"role": "user", "content": prompt}

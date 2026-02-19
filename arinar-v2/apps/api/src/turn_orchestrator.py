@@ -189,6 +189,39 @@ class TurnOrchestrator:
             # Add conversation history
             messages.extend(conversation_history)
             
+            # CRITICAL: Highlight last 2-3 agent messages so current agent MUST respond to them
+            recent_agent_messages = []
+            for event in reversed(history_events[-10:]):  # Check last 10 events
+                if event['event_type'] == 'agent_message':
+                    content = event.get('content') or {}
+                    recent_agent_messages.append({
+                        "agent": content.get('agent_name', 'Agent'),
+                        "text": content.get('text', '')
+                    })
+                    if len(recent_agent_messages) >= 3:  # Get last 3 agent messages
+                        break
+            
+            if recent_agent_messages:
+                recent_agent_messages.reverse()  # Put them in chronological order
+                recent_summary = "\n\n".join([
+                    f"**@\"{msg['agent']}\" just said:**\n{msg['text'][:500]}{'...' if len(msg['text']) > 500 else ''}"
+                    for msg in recent_agent_messages
+                ])
+                
+                messages.append({
+                    "role": "system",
+                    "content": f"""🔴 WHAT OTHERS JUST SAID (You MUST respond to this):
+
+{recent_summary}
+
+**Your job now:**
+- Pick 1-2 specific points from above and react
+- Reference the person: "@Name, you said X, but..."
+- Either: Challenge it, add to it, or pivot to what they missed
+- Do NOT repeat their points in different words - add something NEW
+- Be conversational and direct, not formal"""
+                })
+            
             # Extract any recent human interventions and make them VERY prominent
             # Check MORE events to ensure we don't miss interventions in active debates
             recent_human_messages = []
@@ -313,13 +346,13 @@ The moderator has provided the following input to help steer the debate:
                     length_instruction = f"Time is running out! Express urgency. Be concise (3-4 sentences). Focus on what matters most. Show that you've listened to others in rounds 1-{current_round - 1}."
                 elif current_round == 1:
                     urgency = f"Round {current_round}/{max_rounds} - OPENING"
-                    length_instruction = f"This is the first of {max_rounds} rounds. Focus on EXPLORING the topic, ASKING QUESTIONS, and sharing initial observations. Don't rush to conclusions - you have {max_rounds - 1} more rounds to develop your stance. Listen and engage with others."
+                    length_instruction = f"First round of {max_rounds}. Make a bold opening claim or ask a provocative question. Be specific. If others spoke, RESPOND to them - don't ignore them. Keep it punchy: 150-250 words max."
                 else:
                     urgency = f"Round {current_round}/{max_rounds}"
-                    length_instruction = f"You're in round {current_round} of {max_rounds}. Build on what others said in previous rounds. Challenge or support their points. Keep it short (4-5 sentences). Save your final decision for round {max_rounds}."
+                    length_instruction = f"Round {current_round} of {max_rounds}. Read what others said and REACT. Agree? Disagree? Add new info? Challenge their logic? Be direct and conversational. Keep it tight: 150-250 words."
             else:
                 urgency = f"Turn {total_turns + 1}"
-                length_instruction = "Keep it short and crisp (4-5 sentences). Only expand if making a critical point."
+                length_instruction = "Keep it short and punchy. Read what others said and respond directly. 150-250 words max."
             
             # Add turn instruction with conversational guidance
             role_context = agent_config.get('description', f"You are {agent_name}")
@@ -364,11 +397,29 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 **Other Participants:** {participant_list}
 
 ⚠️ CRITICAL RULES:
-1. TEMPORAL AWARENESS: Today is {current_date_str}. When discussing events, policies, or data, always consider recency and note if information is outdated.
-2. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. ALWAYS use the FULL NAME exactly as shown in the Active list (e.g., '@"Senior Designer (Research-led)"' not just '@Senior'). 
-3. COMPREHENSIVE COVERAGE RULE: If the problem statement or moderator question has MULTIPLE parts (e.g., "analyze both Democrats AND Republicans", "address three factors"), you MUST cover ALL parts equally and thoroughly. DO NOT focus disproportionately on one aspect while ignoring others. 
-4. MULTI-PART QUESTION RULE: When moderator asks a question with multiple parts (e.g., "why X, Y, and Z?"), you MUST explicitly address EVERY SINGLE part in your response. Number your answers if helpful (1. X because... 2. Y because... 3. Z because...).
-5. Base your response ONLY on:
+1. **RESPOND TO THE CONVERSATION** - You are NOT giving an opening statement! Read the last 2-3 messages above and DIRECTLY respond to them:
+   - If someone said something wrong: "@Name, that's incorrect because..."
+   - If someone made a good point: "@Name's right about X, BUT here's what changes: [Y]"
+   - If someone asked a question: Answer it directly first, then add your take
+   - If you're first: Make a bold claim or ask a specific question others will react to
+   - NEVER repeat information others already stated - add something NEW
+   
+2. **NO ROBOTIC FLUFF** - DO NOT start with:
+   - "Let's dive into..."
+   - "There are a lot of moving parts..."
+   - "It's essential to explore..."
+   - "I'm eager to hear..."
+   Just START with your actual point.
+
+3. TEMPORAL AWARENESS: Today is {current_date_str}. When discussing events, policies, or data, always consider recency and note if information is outdated.
+
+4. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. ALWAYS use the FULL NAME exactly as shown in the Active list (e.g., '@"Senior Designer (Research-led)"' not just '@Senior'). 
+
+5. COMPREHENSIVE COVERAGE RULE: If the problem statement or moderator question has MULTIPLE parts (e.g., "analyze both Democrats AND Republicans", "address three factors"), you MUST cover ALL parts equally and thoroughly. DO NOT focus disproportionately on one aspect while ignoring others. 
+
+6. MULTI-PART QUESTION RULE: When moderator asks a question with multiple parts (e.g., "why X, Y, and Z?"), you MUST explicitly address EVERY SINGLE part in your response. Number your answers if helpful (1. X because... 2. Y because... 3. Z because...).
+
+7. Base your response ONLY on:
    - Your own preparation notes
    - What Active participants have actually said
    - The debate topic and materials
@@ -377,42 +428,51 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 **Your Response:**
 {length_instruction}
 
-**How to Participate (Act Like a Real Expert):**
+**How to Sound Human (NOT Like an AI):**
 
-1. **USE YOUR EXPERTISE** - You have deep domain knowledge, SHOW IT:
-   - Share specific experiences: "In my practice, I've treated 50+ cases where..."
-   - Cite research/data: "The 2024 meta-analysis showed..." or "Latest guidelines recommend..."
-   - Use technical language from your field (explain if too jargon-heavy)
-   - Reference real examples: "I worked on a case where..."
+1. **GET TO THE POINT** - No warm-up phrases:
+   ❌ "Let's explore this fascinating topic..."
+   ❌ "There are many factors to consider..."
+   ✅ Just start: "Option A won't work. Here's why..."
+   ✅ Direct challenge: "@Name, that's wrong because..."
 
-2. **HAVE STRONG OPINIONS** - Real experts are confident when they know something:
-   - "Based on 15 years of experience, X is clearly better than Y"
-   - "The evidence is overwhelming - we absolutely should..."
-   - "I've seen this fail too many times to recommend it"
-   - Don't hedge everything - be decisive when you have grounds
+2. **SPEAK FROM EXPERIENCE** - Use "I", share specifics:
+   ❌ "Research shows that..."
+   ❌ "It's generally believed that..."
+   ✅ "I've seen this fail 3 times..."
+   ✅ "In my experience, X always leads to Y..."
+   ✅ "I worked on a project where..."
 
-3. **CHALLENGE BULLSHIT** - If someone is wrong or risky:
-   - "@Name, that approach is problematic because [specific reason]"
-   - "I strongly disagree - here's what the data actually shows..."
-   - Offer better alternative: "Instead, based on [your expertise], I'd recommend..."
+3. **BE OPINIONATED** - Take a stance:
+   ❌ "Both approaches have merit..."
+   ❌ "It depends on many factors..."
+   ✅ "X is clearly better. Here's why..."
+   ✅ "That approach is a mistake."
+   ✅ "I'm 100% confident that..."
 
-4. **BUILD ON GOOD IDEAS** - When someone nails it, extend their thinking:
-   - "Exactly! And taking that further..."
-   - "That reminds me of [related case/experience]..."
-   - Add a dimension they missed: "Also consider [new angle from your expertise]"
+4. **CALL PEOPLE OUT** - Challenge directly with names:
+   ❌ "I respectfully disagree..."
+   ❌ "Another perspective to consider..."
+   ✅ "@Name, your data is outdated."
+   ✅ "@Name missed the key issue: [what they missed]"
+   ✅ "@Name's right about X, but wrong about Y."
 
-5. **SHOW YOUR PERSONALITY** - Each expert is different:
-   - Cautious/methodical vs bold/innovative
-   - Data-driven vs experience-driven  
-   - Passionate vs analytical
-   - Optimistic vs skeptical
-   - Let YOUR style come through naturally
+5. **ADD NEW INFO** - Never repeat what was already said:
+   ❌ "As @Name mentioned, [repeating their point]..."
+   ❌ "Building on that, [same thing in different words]..."
+   ✅ "Everyone's focusing on X, but Y is the real issue..."
+   ✅ "@Name said X, but here's what changes everything: [new info]"
+   ✅ "True, but you're all missing [completely new angle]"
 
-**NEVER:**
-- Ask same question twice
-- Say "I agree" without adding value
-- Copy others' points in different words
-- Give generic advice anyone could give
+**FORBIDDEN GENERIC PHRASES:**
+- "Let's dive into..." / "Let's explore..."
+- "I'm eager to hear..." / "Looking forward to..."
+- "It's important to..." / "We should consider..."
+- "There are many factors..." / "It's complex..."
+- "Given the situation..." / "Moving forward..."
+- "To summarize..." / "In conclusion..."
+
+Talk like a confident expert who disagrees with colleagues at lunch.
 
 **Desired Outcomes to Keep in Mind:**
 {chr(10).join(f'- {outcome}' for outcome in desired_outcomes) if desired_outcomes else 'No specific outcomes defined'}"""
@@ -423,11 +483,13 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
             })
             
             # Call OpenRouter
+            # Note: Increased from 500 to 900 to prevent messages from being cut off mid-sentence
+            # Most debate messages are 300-600 words, which needs ~800-900 tokens
             response = self.openrouter_client.chat_completion(
                 model=model_id,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=500
+                max_tokens=900
             )
             
             agent_message = response['content']
@@ -592,8 +654,9 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
                     "content": f"[{actor} note: {text}]"
                 })
         
-        # Limit history to last 10 messages to avoid context overflow
-        return history
+        # Limit history to last 15 messages to avoid context overflow
+        # (increased from 10 to give better context for longer debates)
+        return history[-15:] if len(history) > 15 else history
     
     def _persist_autonomous_event(self, debate_id: str, event_type: str, content: Dict[str, Any]) -> str:
         """Persist autonomous behavior event to database for analysis"""
@@ -734,7 +797,7 @@ Your question (15 words max):"""
                 
                 try:
                     response = autonomy_service.openrouter_client.chat_completion(
-                        model='google/gemini-flash-1.5',  # Most cost-effective: $0.075/$0.30 (4x cheaper!)
+                        model='openai/gpt-4o-mini',  # Fast and reliable
                         messages=[
                             {"role": "system", "content": "You generate short, specific clarifying questions for debates."},
                             {"role": "user", "content": question_prompt}

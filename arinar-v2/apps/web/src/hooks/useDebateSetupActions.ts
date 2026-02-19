@@ -134,6 +134,12 @@ export function useDebateSetupActions(
   };
 
   const handleLaunchDebate = async (debateId: string, apiKey: string | null) => {
+    // Prevent double-clicks causing duplicate launches
+    if (isLoading) {
+      console.log('⚠️ Launch already in progress, ignoring duplicate click');
+      return;
+    }
+
     // Validate auth token before launching (required for WebSocket connection)
     try {
       const authToken = await getAccessToken();
@@ -157,14 +163,18 @@ export function useDebateSetupActions(
     }
 
     // Test API key validity by making a quick validation call
-    try {
-      await api.getOpenRouterAccount(apiKey);
-    } catch (err: any) {
-      alert(
-        `⚠️ Invalid OpenRouter API Key\n\nYour API key failed validation: ${err.message}\n\nPlease update your API key in Settings before launching the debate.`
-      );
-      return;
-    }
+    // SKIP validation for now - it's timing out and blocking launches
+    // The debate will fail naturally if API key is invalid
+    console.log('⚠️ Skipping API key validation (was causing timeouts)');
+    
+    // try {
+    //   await api.getOpenRouterAccount(apiKey);
+    // } catch (err: any) {
+    //   alert(
+    //     `⚠️ Invalid OpenRouter API Key\n\nYour API key failed validation: ${err.message}\n\nPlease update your API key in Settings before launching the debate.`
+    //   );
+    //   return;
+    // }
 
     if (!debateId) {
       alert('No debate created yet. Please complete the setup first.');
