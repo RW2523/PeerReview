@@ -94,7 +94,7 @@ export class WSClient {
     reject: (error: WSErrorMessage | Error) => void;
     timeout: NodeJS.Timeout;
   }> = new Map();
-  private commandTimeout = 15000; // 15s timeout for commands
+  private commandTimeout = 180000; // 3 minutes timeout for commands (users take time to read)
   private isManualDisconnect = false;
 
   constructor(config: WSClientConfig) {
@@ -105,7 +105,7 @@ export class WSClient {
       onEvent: config.onEvent,
       onConnectionChange: config.onConnectionChange,
       sinceSequence: config.sinceSequence ?? 0,
-      heartbeatInterval: config.heartbeatInterval ?? 30000,
+      heartbeatInterval: config.heartbeatInterval ?? 20000, // Ping every 20s (more frequent to keep alive)
       reconnectDelays: config.reconnectDelays ?? [1000, 2000, 4000, 8000, 16000, 30000],
       onError: config.onError ?? ((err) => console.error('[WSClient]', err)),
     };

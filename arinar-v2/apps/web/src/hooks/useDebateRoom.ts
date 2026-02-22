@@ -83,14 +83,32 @@ export function useDebateRoom(options: UseDebateRoomOptions): UseDebateRoomResul
     };
   }, [debateId, enabled, sinceSequence, getAuthToken, handleEvent, handleConnectionChange, handleError]);
 
-  // Command dispatcher
+  // Command dispatcher with auto-reconnect
   const sendCommand = useCallback(async (command: WSCommandType, payload?: Record<string, any>): Promise<WSAckMessage> => {
     if (!clientRef.current) {
       throw new Error('WebSocket client not initialized');
     }
     
+    // Auto-reconnect if disconnected (user took time to read)
     if (clientRef.current.getStatus() !== 'connected') {
-      throw new Error('WebSocket not connected');
+      console.log(`⚠️ WebSocket disconnected, reconnecting before sending ${command}...`);
+      try {
+        await clientRef.current.connect();
+        
+        // Wait up to 10 seconds for connection
+        const startTime = Date.now();
+        while (clientRef.current.getStatus() !== 'connected' && Date.now() - startTime < 10000) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        if (clientRef.current.getStatus() !== 'connected') {
+          throw new Error('Failed to reconnect - please refresh the page');
+        }
+        
+        console.log('✅ Reconnected successfully, sending command...');
+      } catch (err) {
+        throw new Error(`Failed to reconnect: ${err}`);
+      }
     }
 
     return clientRef.current.sendCommand(command, payload);

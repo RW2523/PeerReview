@@ -584,8 +584,8 @@ Talk like a confident expert who disagrees with colleagues at lunch.
             except Exception as e:
                 print(f"    ⚠️ Failed to schedule document writing: {e}")
             
-            # Post-turn autonomous behaviors (95% chance, starts from turn 0)
-            should_trigger_autonomy = random.random() < 0.95 and total_turns >= 0
+            # Post-turn autonomous behaviors (ALWAYS - need agent messaging!)
+            should_trigger_autonomy = True  # ALWAYS trigger (removed random chance)
             if should_trigger_autonomy:
                 print(f"    🎭 Triggering autonomous behaviors for {agent_name}...")
                 try:
@@ -831,22 +831,21 @@ Your question (15 words max):"""
                 except Exception as e:
                     print(f"    ⚠️ Failed to generate host question: {e}")
             
-            # Private messaging (always try if 2+ participants)
+            # Private messaging (CRITICAL - agents must talk!)
+            print(f"\n   🔊 PRIVATE MESSAGING CHECK for {agent_name}:")
+            print(f"      Participants count: {len(participants)}")
+            
             if len(participants) >= 2:
-                print(f"   📨 Attempting private messaging for {agent_name}...")
+                print(f"   📨 ✅ 2+ participants, attempting private messaging...")
                 other_agents = [
                     (p.get('agent_config') or {}).get('name') or p.get('role_name')
                     for p in participants
                     if ((p.get('agent_config') or {}).get('name') or p.get('role_name')) != agent_name
                 ]
                 
+                print(f"      Other agents available: {other_agents}")
+                
                 if other_agents:
-                    target = random.choice(other_agents)
-                    context = "\n".join([
-                        f"{e.get('content', {}).get('agent_name')}: {e.get('content', {}).get('text', '')[:80]}"
-                        for e in history_events[-3:] if e.get('event_type') == 'agent_message'
-                    ])
-                    
                     # Check for previous DM from target to current agent (unreplied)
                     from .database import get_db_connection, get_cursor
                     previous_dm = None
@@ -854,40 +853,58 @@ Your question (15 words max):"""
                     with get_db_connection() as conn:
                         cursor = get_cursor(conn)
                         try:
+                            # Find ALL unreplied DMs sent TO this agent
                             cursor.execute("""
-                                SELECT content FROM events
-                                WHERE debate_id = %s AND event_type = 'private_message'
-                                  AND content->>'from_agent' = %s
+                                SELECT DISTINCT content->>'from_agent' as sender, content->>'message' as message
+                                FROM events
+                                WHERE debate_id = %s 
+                                  AND event_type = 'private_message'
                                   AND content->>'to_agent' = %s
-                                ORDER BY sequence_number DESC LIMIT 1
-                            """, (debate_id, target, agent_name))
+                                  AND content->>'from_agent' != %s
+                                  AND NOT EXISTS (
+                                    SELECT 1 FROM events e2
+                                    WHERE e2.debate_id = %s
+                                      AND e2.event_type = 'private_message'
+                                      AND e2.content->>'from_agent' = %s
+                                      AND e2.content->>'to_agent' = content->>'from_agent'
+                                      AND e2.sequence_number > events.sequence_number
+                                  )
+                                ORDER BY events.sequence_number DESC
+                                LIMIT 1
+                            """, (debate_id, agent_name, agent_name, debate_id, agent_name))
                             
                             result = cursor.fetchone()
                             if result:
-                                # Check if current agent already replied
-                                cursor.execute("""
-                                    SELECT COUNT(*) as count FROM events
-                                    WHERE debate_id = %s AND event_type = 'private_message'
-                                      AND content->>'from_agent' = %s
-                                      AND content->>'to_agent' = %s
-                                      AND sequence_number > (
-                                        SELECT sequence_number FROM events
-                                        WHERE debate_id = %s AND event_type = 'private_message'
-                                          AND content->>'from_agent' = %s
-                                          AND content->>'to_agent' = %s
-                                        ORDER BY sequence_number DESC LIMIT 1
-                                      )
-                                """, (debate_id, agent_name, target, debate_id, target, agent_name))
-                                
-                                if cursor.fetchone()['count'] == 0:
-                                    previous_dm = result['content'].get('message')
+                                # We have an unreplied DM! Reply to it
+                                target = result['sender']
+                                previous_dm = result['message']
+                                print(f"    🔔 Found unreplied DM from {target} to {agent_name}")
+                            else:
+                                # No unreplied DMs, pick a random target for new conversation
+                                target = random.choice(other_agents)
+                                print(f"    ✉️  No unreplied DMs, starting new conversation with {target}")
                         finally:
                             cursor.close()
                     
+                    # Build context from recent messages
+                    context = "\n".join([
+                        f"{e.get('content', {}).get('agent_name')}: {e.get('content', {}).get('text', '')[:100]}"
+                        for e in history_events[-3:] if e.get('event_type') == 'agent_message'
+                    ])
+                    
                     # Generate message (reply if previous_dm exists, otherwise initial)
-                    message = autonomy_service.generate_private_message(
-                        debate_id, agent_name, target, context, desired_outcomes, previous_dm
-                    )
+                    print(f"      🤖 Calling LLM to generate DM from {agent_name} to {target}...")
+                    print(f"         Model: openai/gpt-oss-20b:free")
+                    print(f"         Is Reply: {bool(previous_dm)}")
+                    
+                    try:
+                        message = autonomy_service.generate_private_message(
+                            debate_id, agent_name, target, context, desired_outcomes, previous_dm
+                        )
+                        print(f"      ✅ LLM returned message: {message[:80] if message else 'None'}...")
+                    except Exception as e:
+                        print(f"      ❌ LLM call FAILED: {e}")
+                        message = None
                     
                     if message:
                         content = {
@@ -911,6 +928,12 @@ Your question (15 words max):"""
                                 'payload': content
                             }
                             await websocket_manager.broadcast_to_debate(debate_id, event)
+                            print(f"    ✅✅✅ DM SUCCESSFULLY SENT: {agent_name} → {target} {'(REPLY)' if previous_dm else '(NEW)'}")
+                            print(f"           Message: {message}")
+                    else:
+                        print(f"      ❌ Message generation returned None/empty - FAILED")
+            else:
+                print(f"   ❌ Not enough participants for DMs (need 2+, have {len(participants)})")
             
             print(f"✅ [ASYNC] Autonomous behaviors COMPLETED for {agent_name}\n")
             

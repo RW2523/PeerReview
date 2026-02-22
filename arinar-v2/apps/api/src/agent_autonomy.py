@@ -127,40 +127,44 @@ class AgentAutonomyService:
         if previous_dm:
             previous_context = f"\n**Previous message from {to_agent}:**\n{previous_dm}\n\n(You're REPLYING to this message)\n"
         
-        message_prompt = f"""You are {from_agent}. Send a HUMAN-LIKE private DM to {to_agent}.
+        message_prompt = f"""You are {from_agent}. Send a PRIVATE direct message to {to_agent}. This is just between you two.
 {previous_context}
-**Recent conversation:**
-{conversation_context[:300]}
+**What's happening in the debate:**
+{conversation_context[:400]}
 
-**Your Options (pick ONE tone):**
-1. Supportive: "Great point about X! I'm with you on that."
-2. Critical: "That reasoning was weak - you missed Y entirely."
-3. Sarcastic: "Oh wow, brilliant logic there"
-4. Strategic: "Let's team up on Z - they're not seeing it."
-5. Trolling: "Did you really just say that? Come on"
-6. Friendly: "Yo, I like your thinking here!"
-7. Confrontational: "You're dead wrong about X"
+**How to DM like a real person:**
+- React to what THEY specifically said or did
+- Be direct and casual - this is private
+- Pick a vibe: supportive, critical, strategic, sarcastic, friendly, or confrontational
+- Keep it 15-30 words MAX
 
-**Rules:**
-- BE HONEST AND HUMAN: React genuinely to what they said
-- MAX 25 WORDS: Keep it punchy
-- NO CORPORATE SPEAK: Talk like a real person
-- This is PRIVATE - other agents cannot see it
+**Good examples:**
+- "Yo, I see what you're doing with X. Smart move."
+- "That point you made about Y was weak, honestly."
+- "Let's team up - they're missing the obvious."
+- "Did you seriously just argue for Z? Come on."
+- "You nailed it with that example. Nice."
+- "Your logic on X has holes. Think it through."
 
-**Respond with ONLY the message text:**"""
+**Bad examples (too formal/generic):**
+- "I appreciate your contribution to the discussion."
+- "Let's collaborate on this matter going forward."
+- "I respectfully disagree with your position."
+
+Write ONLY the message (no quotes, no explanation):**"""
         
         try:
             response = self.openrouter_client.chat_completion(
-                model='openai/gpt-4o-mini',  # Fast and reliable
+                model='openai/gpt-oss-20b:free',  # Free, fast, more conversational
                 messages=[
                     {"role": "system", "content": "You are a human with personality. Be genuine, witty, or critical as needed."},
                     {"role": "user", "content": message_prompt}
                 ],
-                temperature=0.8,  # High temp for more personality
-                max_tokens=60
+                temperature=0.9,  # Higher temp for more personality and variety
+                max_tokens=80  # Increased for better responses
             )
             
-            message = response['content'].strip().strip('"\'')[:200]  # Cap at 200 chars, remove quotes
+            message = response['content'].strip().strip('"\'')[:250]  # Cap at 250 chars, remove quotes
             print(f"    💬 Private message: {from_agent} → {to_agent}: {message[:60]}...")
             return message
         except Exception as e:
