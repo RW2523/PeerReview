@@ -2,12 +2,17 @@
 import uuid
 import random
 import asyncio
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import psycopg2.extras
 from .database import get_db_connection, get_cursor
 from .openrouter_client import OpenRouterClient
 from .agent_autonomy import AgentAutonomyService
+from .agent_memory import AgentMemory
+from .agent_reasoning import AgentReasoningEngine
+from .agent_response_generator import AgentResponseGenerator
+from .agent_constitutional_validator import ConstitutionalValidator
 
 
 class TurnOrchestrator:
@@ -23,6 +28,12 @@ class TurnOrchestrator:
     
     def __init__(self, openrouter_api_key: str):
         self.openrouter_client = OpenRouterClient(openrouter_api_key)
+        # Constitutional AI pipeline (Anthropic-style)
+        self.use_constitutional_pipeline = os.getenv('USE_CONSTITUTIONAL_AI', 'true').lower() == 'true'
+        if self.use_constitutional_pipeline:
+            self.reasoning_engine = AgentReasoningEngine(openrouter_api_key)
+            self.response_generator = AgentResponseGenerator(openrouter_api_key)
+            self.constitutional_validator = ConstitutionalValidator()
     
     def trigger_next_turn(self, debate_id: str) -> Dict[str, Any]:
         """
@@ -587,18 +598,46 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                 "content": conversational_instruction
             })
             
-            # Call OpenRouter
-            # Note: Increased from 500 to 900 to prevent messages from being cut off mid-sentence
-            # Most debate messages are 300-600 words, which needs ~800-900 tokens
-            # Temperature at 0.9 for more natural, less robotic, more personality
-            response = self.openrouter_client.chat_completion(
-                model=model_id,
-                messages=messages,
-                temperature=0.9,
-                max_tokens=900
-            )
-            
-            agent_message = response['content']
+            # Generate agent response using Constitutional AI pipeline or legacy approach
+            if self.use_constitutional_pipeline:
+                print(f"\n🧠 CONSTITUTIONAL AI PIPELINE for {agent_name}")
+                agent_message = self._generate_with_constitutional_pipeline(
+                    debate_id=debate_id,
+                    agent_name=agent_name,
+                    agent_config=agent_config,
+                    model_id=model_id,
+                    conversation_history=conversation_history,
+                    messages=messages,
+                    debate_context={
+                        "title": debate['title'],
+                        "description": debate['description'],
+                        "agenda": agenda,
+                        "desired_outcomes": desired_outcomes
+                    },
+                    turn_info={
+                        "urgency": urgency,
+                        "current_round": current_round,
+                        "max_rounds": max_rounds,
+                        "length_instruction": length_instruction
+                    },
+                    participants=participants,
+                    history_events=history_events
+                )
+                # For consistency with legacy, create a mock response dict
+                response = {
+                    'content': agent_message,
+                    'model': model_id
+                }
+            else:
+                # Legacy: Single LLM call
+                print(f"\n📞 LEGACY SINGLE LLM CALL for {agent_name}")
+                response = self.openrouter_client.chat_completion(
+                    model=model_id,
+                    messages=messages,
+                    temperature=0.9,
+                    max_tokens=900
+                )
+                agent_message = response['content']
             
             # Quick repetition check - warn if message is too similar to recent ones
             if history_events and len(history_events) >= 2:
@@ -1333,3 +1372,134 @@ Requirements:
         except Exception as e:
             print(f"⚠️ Section content generation error: {e}")
             return ""
+    
+    def _generate_with_constitutional_pipeline(
+        self,
+        debate_id: str,
+        agent_name: str,
+        agent_config: Dict[str, Any],
+        model_id: str,
+        conversation_history: List[Dict[str, str]],
+        messages: List[Dict[str, str]],
+        debate_context: Dict[str, Any],
+        turn_info: Dict[str, Any],
+        participants: List[Dict[str, Any]],
+        history_events: List[Dict[str, Any]]
+    ) -> str:
+        """
+        Generate agent response using 3-stage Constitutional AI pipeline
+        
+        Stage 1: Reasoning - Agent evaluates stance
+        Stage 2: Response - Generate message
+        Stage 3: Validation - Constitutional checks
+        
+        Returns:
+            Final validated agent message
+        """
+        try:
+            # Get agent memory
+            agent_memory = AgentMemory(debate_id, agent_name)
+            past_messages = agent_memory.get_past_messages(limit=3)
+            past_messages_text = [msg["text"] for msg in past_messages]
+            memory_context = agent_memory.build_memory_context()
+            
+            # Get user interventions
+            user_interventions = agent_memory.get_user_interventions()
+            latest_intervention = user_interventions[0]["text"] if user_interventions else None
+            
+            # Extract recent conversation for reasoning
+            recent_conversation = "\n".join([
+                f"{msg['role']}: {msg['content'][:300]}..."
+                for msg in conversation_history[-5:]
+                if msg['role'] in ['user', 'assistant']
+            ])
+            
+            # Get list of active participants (who have spoken)
+            active_participants = list(set(
+                event.get('content', {}).get('agent_name')
+                for event in history_events
+                if event.get('event_type') == 'agent_message' and event.get('content', {}).get('agent_name')
+            ))
+            
+            # STAGE 1: REASONING
+            print(f"  Stage 1: Reasoning...")
+            reasoning = self.reasoning_engine.evaluate_stance(
+                agent_name=agent_name,
+                agent_role=agent_config.get('description', agent_config.get('system_prompt', '')[:100]),
+                past_positions=memory_context,
+                recent_conversation=recent_conversation,
+                user_intervention=latest_intervention
+            )
+            print(f"    Stance: {reasoning['current_stance'][:60]}...")
+            print(f"    Confidence: {reasoning['confidence']}")
+            print(f"    Changed: {reasoning['stance_changed']}")
+            
+            # STAGE 2: RESPONSE GENERATION
+            print(f"  Stage 2: Generating response...")
+            agent_message = self.response_generator.generate_response(
+                agent_name=agent_name,
+                agent_role_description=agent_config.get('system_prompt', ''),
+                reasoning=reasoning,
+                conversation_history=conversation_history,
+                debate_context=debate_context,
+                turn_info=turn_info
+            )
+            print(f"    Generated {len(agent_message)} chars")
+            
+            # STAGE 3: CONSTITUTIONAL VALIDATION
+            print(f"  Stage 3: Validating...")
+            validation = self.constitutional_validator.validate(
+                message=agent_message,
+                reasoning=reasoning,
+                agent_name=agent_name,
+                agent_role=agent_config.get('description', ''),
+                past_messages=past_messages_text,
+                active_participants=active_participants
+            )
+            
+            if not validation["valid"]:
+                print(f"    ⚠️ Constitutional violations:")
+                for violation in validation["violations"]:
+                    print(f"      - {violation['rule']}: {violation['details']}")
+                
+                # Use corrected message if available
+                if validation["corrected_message"]:
+                    print(f"    ✅ Auto-corrected")
+                    agent_message = validation["corrected_message"]
+                elif validation["needs_regeneration"]:
+                    print(f"    🔄 Needs regeneration - using constrained retry")
+                    # Fallback: Use legacy approach with strong constraints
+                    response = self.openrouter_client.chat_completion(
+                        model=model_id,
+                        messages=messages + [{
+                            "role": "system",
+                            "content": f"""CRITICAL CONSTRAINT:
+Your previous message violated: {', '.join(v['rule'] for v in validation['violations'])}
+
+You MUST:
+- Maintain your previous position unless you explicitly justify changes
+- Only reference participants from this list: {', '.join(active_participants)}
+- Follow your role as {agent_config.get('description', 'agent')}
+
+Regenerate your response following these rules."""
+                        }],
+                        temperature=0.7,  # Lower temp for constrained regeneration
+                        max_tokens=900
+                    )
+                    agent_message = response['content']
+            else:
+                print(f"    ✅ Validation passed")
+            
+            return agent_message
+            
+        except Exception as e:
+            print(f"  ⚠️ Constitutional pipeline error: {e}")
+            print(f"  📞 Falling back to legacy approach")
+            # Fallback to legacy single LLM call
+            response = self.openrouter_client.chat_completion(
+                model=model_id,
+                messages=messages,
+                temperature=0.9,
+                max_tokens=900
+            )
+            return response['content']
