@@ -28,6 +28,10 @@ class ConstitutionalValidator:
             "rule": "Don't reference agents who haven't spoken",
             "severity": "critical"
         },
+        "no_repetition": {
+            "rule": "Don't repeat what others just said - add NEW information or disagree",
+            "severity": "high"
+        },
         "no_self_contradiction": {
             "rule": "Don't contradict your previous messages",
             "severity": "high"
@@ -52,7 +56,8 @@ class ConstitutionalValidator:
         agent_name: str,
         agent_role: str,
         past_messages: List[str],
-        active_participants: List[str]
+        active_participants: List[str],
+        recent_other_messages: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Validate message against constitutional rules
@@ -64,6 +69,7 @@ class ConstitutionalValidator:
             agent_role: Agent's role (for role-specific rules)
             past_messages: Agent's previous messages
             active_participants: Names of agents who have spoken
+            recent_other_messages: Last 2-3 messages from OTHER agents (for repetition check)
         
         Returns:
             {
@@ -100,7 +106,17 @@ class ConstitutionalValidator:
         if contradiction_violation:
             violations.append(contradiction_violation)
         
-        # Rule 4: Check role consistency
+        # Rule 4: Check for repetition (NEW - Anthropic-style)
+        if recent_other_messages and reasoning.get("am_i_repeating") == "repeat":
+            repetition_violation = self._check_repetition(
+                message,
+                recent_other_messages,
+                reasoning
+            )
+            if repetition_violation:
+                violations.append(repetition_violation)
+        
+        # Rule 5: Check role consistency
         role_violation = self._check_role_consistency(
             message,
             agent_role,
@@ -109,7 +125,7 @@ class ConstitutionalValidator:
         if role_violation:
             violations.append(role_violation)
         
-        # Rule 5: Check engagement (must address others if they exist)
+        # Rule 6: Check engagement (must address others if they exist)
         if active_participants:
             engagement_violation = self._check_engagement(
                 message,
@@ -303,6 +319,47 @@ class ConstitutionalValidator:
                 "severity": "medium",
                 "details": "Agent should engage with other participants"
             }
+        
+        return None
+    
+    def _check_repetition(
+        self,
+        message: str,
+        recent_other_messages: List[str],
+        reasoning: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Check if agent is repeating what others just said
+        
+        This is an Anthropic-style constitutional check: agents must add NEW information,
+        not just rephrase what others said.
+        """
+        # If reasoning stage flagged this as repetition, it's a violation
+        if reasoning.get("am_i_repeating") == "repeat":
+            return {
+                "rule": "no_repetition",
+                "severity": "high",
+                "details": f"Agent is repeating what others said: '{reasoning.get('what_others_said', 'N/A')[:100]}...'. Must add NEW information or disagree."
+            }
+        
+        # Additional check: keyword overlap with recent messages
+        message_words = set(w.lower() for w in message.split() if len(w) > 4)
+        
+        for other_msg in recent_other_messages[-2:]:  # Check last 2 messages
+            other_words = set(w.lower() for w in other_msg.split() if len(w) > 4)
+            overlap = len(message_words & other_words)
+            total = len(message_words)
+            
+            if total > 0:
+                overlap_ratio = overlap / total
+                
+                # If >60% overlap, it's likely repetition
+                if overlap_ratio > 0.6:
+                    return {
+                        "rule": "no_repetition",
+                        "severity": "high",
+                        "details": f"Message has {overlap_ratio*100:.0f}% word overlap with recent message. Must add unique perspective."
+                    }
         
         return None
     

@@ -82,6 +82,12 @@ class AgentReasoningEngine:
             if not all(key in reasoning for key in required_keys):
                 raise ValueError(f"Missing required keys in reasoning output: {reasoning.keys()}")
             
+            # Check for repetition (enterprise safeguard)
+            if reasoning.get("am_i_repeating") == "repeat":
+                print(f"    ⚠️ REPETITION DETECTED in reasoning stage")
+                print(f"    What others said: {reasoning.get('what_others_said', 'N/A')[:100]}")
+                print(f"    Agent is repeating, not adding new info")
+            
             return reasoning
             
         except json.JSONDecodeError as e:
@@ -140,8 +146,16 @@ STEP 1: What's your current stance? (one clear sentence)
 STEP 2: What's your confidence? (0.0 to 1.0)
 STEP 3: Has your stance changed since your last message? (true/false)
 STEP 4: If changed, why? What NEW evidence/reasoning justifies it?
-STEP 5: What are your 3 key points to make in your response?
-STEP 6: Should you disagree with anyone? (list agent names or [])
+STEP 5: What did others JUST say in recent conversation? (1 sentence summary)
+STEP 6: Am I about to REPEAT what they said, or add NEW information? (repeat/new/build_on)
+STEP 7: What are my 3 UNIQUE points that others haven't made yet?
+STEP 8: Should you disagree with anyone? (list agent names or [])
+
+CRITICAL - AVOID REPETITION:
+- If others just said "X needs actionable policies", DON'T say "X needs specific policies"
+- If others said "Y is popular with youth", DON'T say "Y appeals to young voters"
+- EITHER: Add NEW data/reasoning, OR disagree and explain why they're wrong
+- Your unique_contribution must be DIFFERENT from what others just said
 
 RULES FOR STANCE CHANGES:
 - If moderator asks "what about X?", evaluate X objectively - don't auto-switch to X
@@ -155,6 +169,9 @@ OUTPUT (valid JSON only):
   "confidence": 0.85,
   "stance_changed": false,
   "reason_for_change": null,
+  "what_others_said": "summary of recent points from others",
+  "am_i_repeating": "repeat/new/build_on",
+  "unique_contribution": "what I'm adding that's NEW",
   "key_points": ["point 1", "point 2", "point 3"],
   "should_disagree_with": []
 }}"""

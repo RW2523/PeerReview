@@ -1448,13 +1448,26 @@ Requirements:
             
             # STAGE 3: CONSTITUTIONAL VALIDATION
             print(f"  Stage 3: Validating...")
+            
+            # Get recent messages from OTHER agents (for repetition check)
+            recent_other_messages = []
+            for event in reversed(history_events[-5:]):
+                if event.get('event_type') == 'agent_message':
+                    other_agent = event.get('content', {}).get('agent_name')
+                    if other_agent and other_agent != agent_name:
+                        recent_other_messages.append(event.get('content', {}).get('text', ''))
+                        if len(recent_other_messages) >= 3:
+                            break
+            recent_other_messages.reverse()  # Chronological order
+            
             validation = self.constitutional_validator.validate(
                 message=agent_message,
                 reasoning=reasoning,
                 agent_name=agent_name,
                 agent_role=agent_config.get('description', ''),
                 past_messages=past_messages_text,
-                active_participants=active_participants
+                active_participants=active_participants,
+                recent_other_messages=recent_other_messages
             )
             
             if not validation["valid"]:
@@ -1468,20 +1481,41 @@ Requirements:
                     agent_message = validation["corrected_message"]
                 elif validation["needs_regeneration"]:
                     print(f"    🔄 Needs regeneration - using constrained retry")
+                    
+                    # Build specific constraint based on violation type
+                    violation_rules = [v['rule'] for v in validation['violations']]
+                    constraints = [
+                        f"Your previous message violated: {', '.join(violation_rules)}",
+                        "",
+                        "You MUST:"
+                    ]
+                    
+                    if 'no_repetition' in violation_rules:
+                        constraints.extend([
+                            "- DO NOT repeat what others just said",
+                            "- Add NEW data, evidence, or reasoning that others haven't mentioned",
+                            "- OR disagree and explain WHY they're wrong",
+                            f"- Others said: {reasoning.get('what_others_said', 'see above')}"
+                        ])
+                    
+                    if 'no_flip_flop' in violation_rules:
+                        constraints.append("- Maintain your previous position unless you explicitly justify changes")
+                    
+                    if 'no_hallucination' in violation_rules:
+                        constraints.append(f"- Only reference participants from this list: {', '.join(active_participants)}")
+                    
+                    constraints.extend([
+                        f"- Follow your role as {agent_config.get('description', 'agent')}",
+                        "",
+                        "Regenerate your response following these rules."
+                    ])
+                    
                     # Fallback: Use legacy approach with strong constraints
                     response = self.openrouter_client.chat_completion(
                         model=model_id,
                         messages=messages + [{
                             "role": "system",
-                            "content": f"""CRITICAL CONSTRAINT:
-Your previous message violated: {', '.join(v['rule'] for v in validation['violations'])}
-
-You MUST:
-- Maintain your previous position unless you explicitly justify changes
-- Only reference participants from this list: {', '.join(active_participants)}
-- Follow your role as {agent_config.get('description', 'agent')}
-
-Regenerate your response following these rules."""
+                            "content": "\n".join(constraints)
                         }],
                         temperature=0.7,  # Lower temp for constrained regeneration
                         max_tokens=900
