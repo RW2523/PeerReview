@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styles from './DebateControls.module.css';
 import * as api from '@/lib/api';
 import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
@@ -28,6 +28,26 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
   const [triggeringTurn, setTriggeringTurn] = useState(false);
   const [extending, setExtending] = useState(false);
   const [pausingYolo, setPausingYolo] = useState(false);
+
+  // Keyboard shortcut: Space or Enter to trigger next turn (power user feature)
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only if running, not in input field, and not triggering already
+      if (
+        currentState === 'running' &&
+        !isYoloMode &&
+        !triggeringTurn &&
+        (e.key === ' ' || e.key === 'Enter') &&
+        !(e.target as HTMLElement).matches('input, textarea, [contenteditable]')
+      ) {
+        e.preventDefault();
+        handleNextTurn();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentState, isYoloMode, triggeringTurn, apiKey, debateId]);
 
   const handleStart = async () => {
     setLoading(true);
@@ -285,7 +305,7 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
             className={shouldConclude ? styles.btnConclude : (canTriggerTurn ? styles.btnPrimary : '')}
             title={shouldConclude ? (policyConfig?.enable_host ? 'Host will provide final conclusion' : 'All rounds complete - End meeting') : (!apiKey ? 'Add OpenRouter API key in Settings' : 'Trigger next agent to speak')}
           >
-            {triggeringTurn ? 'Agent thinking...' : shouldConclude ? '🏁 Conclude Meeting' : '▶ Next Turn'}
+            {triggeringTurn ? '🤔 Agent thinking...' : shouldConclude ? '🏁 Conclude Meeting' : '▶ Next Turn'} {!triggeringTurn && !shouldConclude && currentState === 'running' && !isYoloMode ? <span style={{opacity: 0.6, fontSize: '0.85em'}}>(Space)</span> : null}
           </button>
         )}
 

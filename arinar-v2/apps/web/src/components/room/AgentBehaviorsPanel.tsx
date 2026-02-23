@@ -8,6 +8,7 @@ interface Coalition {
   members: string[];
   formed_at: string;
   strategy?: string;
+  goal?: string;
   type?: 'alliance' | 'rivalry';
 }
 
@@ -27,6 +28,21 @@ interface SubTask {
   timestamp: string;
 }
 
+interface StrategicAction {
+  id: string;
+  agent: string;
+  move: {
+    action: string;
+    question?: string;
+    options?: string[];
+    sub_topics?: string[];
+    what_needed?: string;
+    proposal?: string;
+    reason?: string;
+  };
+  timestamp: string;
+}
+
 interface AgentBehaviorsPanelProps {
   debateId: string;
   events: any[];
@@ -37,11 +53,13 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
   const [coalitions, setCoalitions] = useState<Coalition[]>([]);
   const [privateMessages, setPrivateMessages] = useState<PrivateMessage[]>([]);
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
+  const [strategicActions, setStrategicActions] = useState<StrategicAction[]>([]);
   const [activeTab, setActiveTab] = useState<'coalitions' | 'messages' | 'questions' | 'tasks'>('coalitions');
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [replyTexts, setReplyTexts] = useState<Map<string, string>>(new Map());
   const [seenQuestionIds, setSeenQuestionIds] = useState<Set<string>>(new Set());
+  const [hasNewMessages, setHasNewMessages] = useState(false);
   
   // Filter messages sent to Host
   const questionsToHost = privateMessages.filter(msg => msg.to === 'Host');
@@ -94,6 +112,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
     const newCoalitions: Coalition[] = [];
     const newMessages: PrivateMessage[] = [];
     const newTasks: SubTask[] = [];
+    const newStrategicActions: StrategicAction[] = [];
     const newQuestionIds: string[] = [];
 
     events.forEach(event => {
@@ -104,6 +123,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           members: event.payload?.members || [],
           formed_at: event.occurred_at || event.payload?.timestamp,
           strategy: event.payload?.strategy,
+          goal: event.payload?.goal,
           type: event.payload?.type || 'alliance'
         });
       } else if (event.type === 'private_message') {
@@ -128,6 +148,14 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           status: event.payload?.status,
           timestamp: event.occurred_at || event.payload?.timestamp
         });
+      } else if (event.type === 'strategic_action') {
+        console.log('🎯 Strategic action event:', event);
+        newStrategicActions.push({
+          id: event.event_id,
+          agent: event.payload?.agent,
+          move: event.payload?.move || {},
+          timestamp: event.occurred_at || event.payload?.timestamp
+        });
       }
     });
 
@@ -137,9 +165,15 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
       tasks: newTasks
     });
 
+    // Detect new messages for notification pulse
+    if (newMessages.length > privateMessages.length && !isOpen) {
+      setHasNewMessages(true);
+    }
+    
     setCoalitions(newCoalitions);
     setPrivateMessages(newMessages);
     setSubTasks(newTasks);
+    setStrategicActions(newStrategicActions);
     
     // Auto-open panel ONLY for truly NEW questions (not seen before)
     const unseenQuestions = newQuestionIds.filter(id => !seenQuestionIds.has(id));
@@ -154,10 +188,12 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
         return next;
       });
     }
-  }, [events, isOpen, seenQuestionIds]);
+  }, [events, isOpen, seenQuestionIds, privateMessages.length]);
 
   // Calculate unread counts
   const unreadQuestionsCount = questionsToHost.length;
+  const totalActivity = coalitions.length + privateMessages.length + subTasks.length;
+  const hasActivity = totalActivity > 0;
   const hasUnreadQuestions = unreadQuestionsCount > 0;
 
   return (
@@ -165,13 +201,18 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
       {/* Floating Toggle Button */}
       {!isOpen && (
         <button 
-          className={`${styles.floatingToggle} ${hasUnreadQuestions ? styles.hasNotifications : ''}`}
-          onClick={() => setIsOpen(true)}
-          title={hasUnreadQuestions ? `${unreadQuestionsCount} question(s) from agents` : 'Agent Behaviors & Questions'}
+          className={`${styles.floatingToggle} ${hasNewMessages || hasUnreadQuestions ? styles.hasNotifications : ''}`}
+          onClick={() => {
+            setIsOpen(true);
+            setHasNewMessages(false);
+          }}
+          title={hasActivity ? `${totalActivity} agent activities (${agentToAgentMessages.length} DMs, ${questionsToHost.length} questions)` : 'Agent Behaviors'}
         >
           🎭
-          {hasUnreadQuestions && (
-            <span className={styles.notificationBadge}>{unreadQuestionsCount}</span>
+          {hasActivity && (
+            <span className={`${styles.notificationBadge} ${hasNewMessages ? styles.badgePulse : ''}`}>
+              {totalActivity}
+            </span>
           )}
         </button>
       )}
@@ -235,11 +276,18 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           💬 <span className={styles.tabLabel}>Agent DMs</span> <span className={styles.count}>{agentToAgentMessages.length}</span>
         </button>
         <button
+          className={`${styles.tab} ${activeTab === 'actions' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('actions')}
+          title="Strategic proposals"
+        >
+          🎯 <span className={styles.tabLabel}>Strategic</span> <span className={styles.count}>{strategicActions.length}</span>
+        </button>
+        <button
           className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('tasks')}
           title="Agent autonomous actions"
         >
-          🎯 <span className={styles.count}>{subTasks.length}</span>
+          📋 <span className={styles.count}>{subTasks.length}</span>
         </button>
       </div>
 
@@ -414,12 +462,92 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           </div>
         )}
 
+        {activeTab === 'actions' && (
+          <div className={styles.section}>
+            {strategicActions.length === 0 ? (
+              <div className={styles.empty}>
+                <span className={styles.emptyIcon}>🎯</span>
+                <p>No strategic proposals yet</p>
+                <p className={styles.emptyHint}>Agents can propose votes, format changes, etc.</p>
+              </div>
+            ) : (
+              strategicActions.map(action => {
+                const move = action.move;
+                const actionIcons: Record<string, string> = {
+                  'vote': '🗳️',
+                  'narrow': '🎯',
+                  'breakdown': '📋',
+                  'evidence': '📊',
+                  'restructure': '🔄',
+                  'interrupt': '⚠️'
+                };
+                const icon = actionIcons[move.action] || '🎯';
+                
+                return (
+                  <div key={action.id} className={styles.actionCard}>
+                    <div className={styles.actionHeader}>
+                      <span className={styles.actionBadge}>
+                        {icon} {move.action.toUpperCase()}
+                      </span>
+                      <span className={styles.actionTime}>
+                        {new Date(action.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <div className={styles.actionAgent}>by {action.agent}</div>
+                    
+                    {move.question && (
+                      <div className={styles.actionDetail}>
+                        <strong>Question:</strong> {move.question}
+                      </div>
+                    )}
+                    
+                    {move.options && (
+                      <div className={styles.actionOptions}>
+                        {move.options.map((opt, i) => (
+                          <span key={i} className={styles.actionOption}>• {opt}</span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {move.sub_topics && (
+                      <div className={styles.actionDetail}>
+                        <strong>Sub-topics:</strong>
+                        {move.sub_topics.map((topic, i) => (
+                          <div key={i}>→ {topic}</div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {move.what_needed && (
+                      <div className={styles.actionDetail}>
+                        <strong>Evidence needed:</strong> {move.what_needed}
+                      </div>
+                    )}
+                    
+                    {move.proposal && (
+                      <div className={styles.actionDetail}>
+                        <strong>Proposal:</strong> {move.proposal}
+                      </div>
+                    )}
+                    
+                    {move.reason && (
+                      <div className={styles.actionDetail}>
+                        <strong>Reason:</strong> {move.reason}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
         {activeTab === 'tasks' && (
           <div className={styles.section}>
             {subTasks.length === 0 ? (
               <div className={styles.emptyCompact}>
-                <span className={styles.emptyIcon}>🎯</span>
-                <p>No actions yet</p>
+                <span className={styles.emptyIcon}>📋</span>
+                <p>No tasks yet</p>
               </div>
             ) : (
               subTasks.map(task => (

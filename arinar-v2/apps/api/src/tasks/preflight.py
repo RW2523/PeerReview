@@ -336,8 +336,7 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                 
                 # Political/election context
                 if any(term in query_lower for term in ['president', 'election', 'candidate', 'nomination', 'campaign']):
-                    import datetime
-                    current_year = datetime.datetime.now().year
+                    current_year = datetime.now().year
                     context_hints.append(f"USA {current_year} {current_year+1}")
                 
                 # Medical/health context  
@@ -365,42 +364,46 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                     if results:
                         web_research_results = "\n**Web Research Results** (Full content from top sources):\n"
                         
-                        # Use Jina Reader to fetch FULL content from top 3 sources
+                        # Use Jina Reader to fetch FULL content from top 3 sources (PARALLEL for speed)
                         import requests
+                        import asyncio
+                        import aiohttp
                         jina_api_key = "jina_cc6446808d1742868f3d236b28ce09408nTRb3eRDPWIDA6ePEXFgKpHty2a"
-                        sources_fetched = 0
                         
-                        for i, result in enumerate(results[:3], 1):  # Top 3 for full content
-                            title = result.get('title', 'N/A')
-                            snippet = result.get('body', '')[:200]
-                            url = result.get('href', '')
-                            
-                            # Try to fetch full content with Jina Reader
+                        async def fetch_with_jina(url: str, title: str, snippet: str):
+                            """Async fetch for speed"""
                             try:
-                                print(f"    📖 Reading full content from: {url[:60]}...")
                                 headers = {
                                     'Authorization': f'Bearer {jina_api_key}',
                                     'X-Return-Format': 'markdown',
-                                    'X-Timeout': '5'  # 5 second timeout
+                                    'X-Timeout': '4'
                                 }
-                                jina_response = requests.get(
-                                    f'https://r.jina.ai/{url}',
-                                    headers=headers,
-                                    timeout=6
-                                )
-                                
-                                if jina_response.status_code == 200:
-                                    full_content = jina_response.text[:3000]  # First 3000 chars
-                                    web_research_results += f"{i}. **{title}**\n   URL: {url}\n\n{full_content}\n\n---\n\n"
-                                    sources_fetched += 1
-                                else:
-                                    # Fallback to snippet
-                                    web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {url}\n\n"
-                                    print(f"       ⚠️ Jina fetch failed ({jina_response.status_code}), using snippet")
-                            except Exception as e:
-                                # Fallback to snippet if Jina fails
-                                web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {url}\n\n"
-                                print(f"       ⚠️ Jina error: {str(e)[:50]}, using snippet")
+                                async with aiohttp.ClientSession() as session:
+                                    async with session.get(f'https://r.jina.ai/{url}', headers=headers, timeout=5) as resp:
+                                        if resp.status == 200:
+                                            content = await resp.text()
+                                            return ('success', title, url, content[:3000])
+                                        else:
+                                            return ('fallback', title, url, snippet)
+                            except:
+                                return ('fallback', title, url, snippet)
+                        
+                        # Fetch top 3 in parallel (faster!)
+                        top_results = results[:3]
+                        fetch_tasks = [
+                            fetch_with_jina(r.get('href', ''), r.get('title', 'N/A'), r.get('body', '')[:200])
+                            for r in top_results
+                        ]
+                        
+                        fetched = asyncio.run(asyncio.gather(*fetch_tasks))
+                        sources_fetched = 0
+                        
+                        for i, (status, title, url, content) in enumerate(fetched, 1):
+                            if status == 'success':
+                                web_research_results += f"{i}. **{title}**\n   URL: {url}\n\n{content}\n\n---\n\n"
+                                sources_fetched += 1
+                            else:
+                                web_research_results += f"{i}. **{title}**\n   {content}...\n   Source: {url}\n\n"
                             
                             # Store structured data
                             web_search_urls.append(url)
@@ -528,7 +531,7 @@ When preparing for this debate:
                 # Adjust model config for longer, more detailed output
                 enhanced_config = model_config.copy()
                 enhanced_config['max_tokens'] = 2000  # Allow longer prep packs
-                enhanced_config['temperature'] = 0.7  # Balanced creativity
+                enhanced_config['temperature'] = 0.8  # Higher for more personality in prep
                 
                 print(f"    🎭 Using persona: {role_description[:50]}...")
                 

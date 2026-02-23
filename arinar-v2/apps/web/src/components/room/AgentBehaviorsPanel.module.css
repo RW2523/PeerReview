@@ -42,6 +42,36 @@
   }
 }
 
+/* Pulsing badge for new notifications */
+.badgePulse {
+  animation: badgePulse 1.5s infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    background: #0070F3;
+  }
+  50% {
+    transform: scale(1.15);
+    background: #00A3FF;
+  }
+}
+
+/* Notification state for toggle button */
+.hasNotification {
+  animation: buttonPulse 2s infinite;
+}
+
+@keyframes buttonPulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(0, 112, 243, 0.3);
+  }
+  50% {
+    box-shadow: 0 2px 20px rgba(0, 112, 243, 0.8);
+  }
+}
+
 .notificationBadge {
   position: absolute;
   top: -4px;
@@ -422,6 +452,81 @@
   margin-top: 8px;
   line-height: 1.4;
   border-left: 2px solid #0070F3;
+}
+
+.coalitionGoal {
+  font-size: 12px;
+  color: #fff;
+  padding: 8px 10px;
+  background: #1a4d8f;
+  border-left: 3px solid #0070f3;
+  border-radius: 6px;
+  margin-top: 6px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Strategic Action Cards */
+.actionCard {
+  background: linear-gradient(135deg, #0a0a0a, #1a1a2e);
+  border: 2px solid #667eea;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.actionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.actionBadge {
+  background: #667eea;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.actionAgent {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.actionTime {
+  font-size: 11px;
+  color: #777;
+}
+
+.actionDetail {
+  margin-top: 8px;
+  padding: 8px;
+  background: #0a0a0a;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #ededed;
+  line-height: 1.5;
+}
+
+.actionOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.actionOption {
+  background: #2a2a3e;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #ededed;
+  font-weight: 500;
 }
 
 /* Message Cards */

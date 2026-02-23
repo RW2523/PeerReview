@@ -240,8 +240,52 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
     if (type === 'turn_start') return '▶️ Turn Start';
     if (type === 'turn_end') return '⏸️ Turn End';
     if (type === 'state_update') return '📊 State';
+    if (type === 'strategic_action') return '🎯 Strategic Move';
     if (type === 'error') return '❌ Error';
     return type.replace(/_/g, ' ');
+  };
+  
+  const renderStrategicAction = (payload: any) => {
+    const move = payload?.move;
+    const agent = payload?.agent;
+    
+    if (!move) return null;
+    
+    const actionIcons = {
+      'vote': '🗳️',
+      'narrow': '🎯',
+      'evidence': '📊',
+      'restructure': '🔄',
+      'interrupt': '⚠️'
+    };
+    
+    const icon = actionIcons[move.action as keyof typeof actionIcons] || '🎯';
+    
+    return (
+      <div className={styles.strategicAction}>
+        <div className={styles.strategicHeader}>
+          {icon} <strong>{agent}</strong> proposes: <strong>{move.action.toUpperCase()}</strong>
+        </div>
+        {move.question && <div className={styles.strategicDetail}>❓ "{move.question}"</div>}
+        {move.options && (
+          <div className={styles.strategicOptions}>
+            {move.options.map((opt: string, i: number) => (
+              <span key={i} className={styles.option}>• {opt}</span>
+            ))}
+          </div>
+        )}
+        {move.sub_questions && (
+          <div className={styles.strategicDetail}>
+            {move.sub_questions.map((q: string, i: number) => (
+              <div key={i}>→ {q}</div>
+            ))}
+          </div>
+        )}
+        {move.what_needed && <div className={styles.strategicDetail}>📊 {move.what_needed}</div>}
+        {move.proposal && <div className={styles.strategicDetail}>💡 {move.proposal}</div>}
+        {move.reason && <div className={styles.strategicDetail}>⚠️ {move.reason}</div>}
+      </div>
+    );
   };
 
   return (
@@ -264,11 +308,13 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
           </span>
         </div>
 
-        {getMessage() && (
+        {event.type === 'strategic_action' ? (
+          renderStrategicAction(event.payload)
+        ) : getMessage() ? (
           <div className={styles.message}>
             {parseMarkdown(getMessage()!)}
           </div>
-        )}
+        ) : null}
 
         <button
           className={styles.expandBtn}

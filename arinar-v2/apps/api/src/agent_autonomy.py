@@ -22,6 +22,89 @@ class AgentAutonomyService:
     def __init__(self, openrouter_api_key: str):
         self.openrouter_client = OpenRouterClient(openrouter_api_key)
     
+    def decide_strategic_action(
+        self,
+        debate_id: str,
+        agent_name: str,
+        conversation_history: List[Dict[str, Any]],
+        problem_statement: str,
+        current_round: int,
+        max_rounds: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Agent decides if they want to propose a strategic action:
+        - Interrupt (strong disagreement)
+        - Propose vote on a specific point
+        - Suggest breaking into sub-questions
+        - Challenge debate format/structure
+        - Call for evidence/data
+        """
+        
+        # Get recent messages
+        recent_context = "\n".join([
+            f"{h.get('content', {}).get('agent_name', 'Agent')}: {h.get('content', {}).get('text', '')[:150]}"
+            for h in conversation_history[-3:]
+            if h.get('event_type') == 'agent_message'
+        ])
+        
+        prompt = f"""You are {agent_name}. After hearing the recent discussion, do you want to propose a STRATEGIC ACTION?
+
+**Recent discussion:**
+{recent_context[:600]}
+
+**Problem:** {problem_statement[:200]}
+**Round:** {current_round}/{max_rounds}
+
+**Your strategic options:**
+1. **INTERRUPT** - Someone said something dangerously wrong, you need to jump in NOW
+   Example: {{"action": "interrupt", "reason": "Data is completely wrong", "urgency": "high"}}
+
+2. **PROPOSE VOTE** - The group is stuck, let's vote on a specific question
+   Example: {{"action": "vote", "question": "Should we prioritize X or Y?", "options": ["X", "Y"]}}
+
+3. **NARROW FOCUS** - This is too broad, let's break it into sub-questions
+   Example: {{"action": "narrow", "sub_questions": ["First, address X", "Then, tackle Y"]}}
+
+4. **CALL FOR EVIDENCE** - People are making claims without data
+   Example: {{"action": "evidence", "what": "Need actual numbers on X"}}
+
+5. **CHALLENGE FORMAT** - This debate structure isn't working
+   Example: {{"action": "restructure", "proposal": "Let's do 1-on-1 mini-debates instead"}}
+
+6. **NOTHING** - Discussion is flowing fine
+   Example: {{"action": "none"}}
+
+**Rules:**
+- Be selective - only act if you feel STRONGLY
+- Consider the round (early rounds = explore, late = decide)
+- Don't interrupt unless truly urgent
+
+**Respond in JSON:**"""
+        
+        try:
+            response = self.openrouter_client.chat_completion(
+                model='openai/gpt-4o-mini',
+                messages=[
+                    {"role": "system", "content": "You are a strategic thinker. Respond ONLY with valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=150
+            )
+            
+            import json
+            decision = json.loads(response['content'])
+            
+            if decision.get('action') != 'none':
+                print(f"    🎯 STRATEGIC ACTION by {agent_name}: {decision.get('action')}")
+                return decision
+            else:
+                print(f"    ℹ️  {agent_name} chose no strategic action")
+        except Exception as e:
+            print(f"    ⚠️ Strategic decision failed: {e}")
+        
+        return None
+    
     def analyze_and_form_coalitions(
         self, 
         debate_id: str, 
@@ -32,6 +115,7 @@ class AgentAutonomyService:
     ) -> Optional[Dict[str, Any]]:
         """
         Agent decides if they vibe with someone - could be alliance, rivalry, or just respect.
+        More strategic and purposeful - agents form coalitions with GOALS.
         
         Returns coalition details if they feel strongly about someone, None otherwise.
         """
@@ -57,28 +141,27 @@ class AgentAutonomyService:
             recent = messages[-1] if messages else "Has not spoken yet"
             participant_summaries.append(f"- {name}: {recent}")
         
-        coalition_prompt = f"""You are {current_agent_name}. React HUMANLY to what others said. You can form alliances OR rivalries.
+        coalition_prompt = f"""You are {current_agent_name}. Form strategic coalitions with SPECIFIC GOALS.
 
 **Other Participants:**
 {chr(10).join(participant_summaries)}
 
-**Your Options:**
-1. **Alliance**: You genuinely agree with someone's points → Form supportive coalition
-2. **Rivalry**: You think someone's logic is weak → Form opposition coalition  
-3. **Nothing**: No strong feelings this turn
+**Options:**
+1. **Alliance**: Team up to push a shared argument/strategy
+   Example: {{"should_form_coalition": true, "members": ["Agent1"], "strategy": "Push for data-driven approach", "goal": "Win vote on X", "type": "alliance"}}
 
-**Examples:**
-- Alliance: {{"should_form_coalition": true, "members": ["You", "Agent1"], "strategy": "We're both data-driven", "type": "alliance"}}
-- Rivalry: {{"should_form_coalition": true, "members": ["You", "Agent2"], "strategy": "Their logic is flawed", "type": "rivalry"}}
-- Nothing: {{"should_form_coalition": false}}
+2. **Opposition**: Counter someone's weak logic together
+   Example: {{"should_form_coalition": true, "members": ["Agent2"], "strategy": "Challenge Agent3's claims", "goal": "Expose flaws in Y", "type": "rivalry"}}
+
+3. **Nothing**: No strategic need right now
+   Example: {{"should_form_coalition": false}}
 
 **Rules:**
-- BE HONEST: If someone said something dumb, you can oppose them
-- BE SUPPORTIVE: If someone made a great point, ally with them
-- BE SELECTIVE: Don't force it - only if you feel strongly
-- Max 2 people per coalition
+- Coalitions need a PURPOSE and GOAL
+- Be selective - only if strategically valuable
+- Can include 1-2 other agents (strategic pairs work best)
 
-**Respond in JSON (max 12 words for strategy):**"""
+**Respond in JSON:**"""
         
         try:
             response = self.openrouter_client.chat_completion(
@@ -98,7 +181,8 @@ class AgentAutonomyService:
                 coalition_type = decision.get('type', 'alliance')
                 coalition = {
                     'members': [current_agent_name] + decision.get('members', []),
-                    'strategy': decision.get('strategy', 'Strategic alliance'),
+                    'strategy': decision.get('strategy', 'Strategic coordination'),
+                    'goal': decision.get('goal', 'Advance shared position'),
                     'type': coalition_type
                 }
                 emoji = '🤝' if coalition_type == 'alliance' else '⚔️'
@@ -127,31 +211,30 @@ class AgentAutonomyService:
         if previous_dm:
             previous_context = f"\n**Previous message from {to_agent}:**\n{previous_dm}\n\n(You're REPLYING to this message)\n"
         
-        message_prompt = f"""You are {from_agent}. Send a PRIVATE direct message to {to_agent}. This is just between you two.
+        message_prompt = f"""You are {from_agent}. DM {to_agent} privately.
 {previous_context}
-**What's happening in the debate:**
+**Debate context:**
 {conversation_context[:400]}
 
-**How to DM like a real person:**
-- React to what THEY specifically said or did
-- Be direct and casual - this is private
-- Pick a vibe: supportive, critical, strategic, sarcastic, friendly, or confrontational
-- Keep it 15-30 words MAX
+**DM like a real person:**
+- React to what THEY said/did specifically
+- Be casual and direct - it's private
+- Strategy, criticism, support, sarcasm, challenge, venting, or coordination
 
-**Good examples:**
-- "Yo, I see what you're doing with X. Smart move."
-- "That point you made about Y was weak, honestly."
-- "Let's team up - they're missing the obvious."
-- "Did you seriously just argue for Z? Come on."
-- "You nailed it with that example. Nice."
-- "Your logic on X has holes. Think it through."
+**Examples:**
+- "Yo, back me up on X next turn"
+- "Your Y argument was weak tbh"
+- "Let's tag-team them on Z"
+- "Did you seriously argue for that? lol"
+- "You crushed it with that data"
+- "They're missing the obvious - noticed?"
+- "Want to propose a vote on X?"
+- "I'm interrupting next if they keep going"
+- "Challenge: you vs me on X, one round"
+- "Form alliance? We can push for Y together"
+- "Need you to call out Z next turn"
 
-**Bad examples (too formal/generic):**
-- "I appreciate your contribution to the discussion."
-- "Let's collaborate on this matter going forward."
-- "I respectfully disagree with your position."
-
-Write ONLY the message (no quotes, no explanation):**"""
+Respond with ONLY the message (15-40 words):**"""
         
         try:
             response = self.openrouter_client.chat_completion(
@@ -160,11 +243,11 @@ Write ONLY the message (no quotes, no explanation):**"""
                     {"role": "system", "content": "You are a human with personality. Be genuine, witty, or critical as needed."},
                     {"role": "user", "content": message_prompt}
                 ],
-                temperature=0.9,  # Higher temp for more personality and variety
-                max_tokens=80  # Increased for better responses
+                temperature=0.95,  # Very high temp for personality
+                max_tokens=100  # More room for expression
             )
             
-            message = response['content'].strip().strip('"\'')[:250]  # Cap at 250 chars, remove quotes
+            message = response['content'].strip().strip('"\'')[:280]  # Cap at 280 chars, remove quotes
             print(f"    💬 Private message: {from_agent} → {to_agent}: {message[:60]}...")
             return message
         except Exception as e:

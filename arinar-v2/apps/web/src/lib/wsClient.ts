@@ -16,6 +16,7 @@ export type WSEventType =
   | 'presence_update'
   | 'typing'
   | 'state_update'
+  | 'strategic_action'
   | 'ack'
   | 'error';
 

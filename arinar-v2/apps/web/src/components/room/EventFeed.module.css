@@ -343,3 +343,40 @@
     transform: translateX(-50%) translateY(-4px);
   }
 }
+
+.strategicAction {
+  background: linear-gradient(135deg, #667eea22, #764ba222);
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.strategicHeader {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1a1a1a;
+}
+
+.strategicDetail {
+  margin: 4px 0;
+  padding-left: 12px;
+  font-size: 14px;
+  color: #333;
+}
+
+.strategicOptions {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.option {
+  background: #f0f0f0;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}

@@ -98,16 +98,18 @@ class TurnOrchestrator:
             print(f"   Selected participant: {selected_name}")
             print(f"   Total turns taken: {total_turns}\n")
             
-            # Get debate history for context
+            # Get debate history for context (most recent 50 events - ORDER BY DESC then reverse)
+            # This is faster with an index on (debate_id, sequence_number DESC)
             cursor.execute("""
                 SELECT event_type, sender_type, sender_id, content, sequence_number, created_at
                 FROM events
                 WHERE debate_id = %s
-                ORDER BY sequence_number ASC
+                ORDER BY sequence_number DESC
                 LIMIT 50
             """, (debate_id,))
             
             history_events = cursor.fetchall()
+            history_events.reverse()  # Reverse to chronological order
             conversation_history = self._build_conversation_history(
                 debate['title'],
                 debate['description'],
@@ -189,37 +191,136 @@ class TurnOrchestrator:
             # Add conversation history
             messages.extend(conversation_history)
             
-            # CRITICAL: Highlight last 2-3 agent messages so current agent MUST respond to them
-            recent_agent_messages = []
-            for event in reversed(history_events[-10:]):  # Check last 10 events
+            # Build list of participants who have already spoken (for @mentions)
+            # This needs to be done BEFORE we build system messages that reference participant_list
+            agents_who_spoke = set()
+            for event in history_events:
                 if event['event_type'] == 'agent_message':
+                    content = event.get('content') or {}
+                    spoken_agent_name = content.get('agent_name')
+                    if spoken_agent_name:
+                        agents_who_spoke.add(spoken_agent_name)
+            
+            # Build participant list - only @mention those who have spoken
+            current_agent_name = (next_participant['agent_config'] or {}).get('name') or next_participant['role_name']
+            participants_spoken = []
+            total_other_participants = 0
+            
+            for p in participants:
+                name = (p['agent_config'] or {}).get('name') or p['role_name']
+                if name == current_agent_name:
+                    continue  # Skip self
+                total_other_participants += 1
+                if name in agents_who_spoke:
+                    # Use full name with quotes to ensure LLM doesn't shorten it
+                    participants_spoken.append(f'@"{name}"')
+            
+            # Format participant list - DO NOT reveal names of agents who haven't spoken yet
+            # This prevents agents from hallucinating/citing prep work of agents who haven't contributed
+            if participants_spoken:
+                unspoken_count = total_other_participants - len(participants_spoken)
+                participant_list = f"Active participants (use THESE exact names when tagging): {', '.join(participants_spoken)}"
+                if unspoken_count > 0:
+                    participant_list += f" | {unspoken_count} other participant(s) haven't spoken yet"
+            else:
+                participant_list = f"⚠️ YOU'RE GOING FIRST! Nobody has spoken yet. {total_other_participants} other participant(s) will respond after you."
+            
+            # CRITICAL: Highlight last 2-3 agent messages AND strategic actions
+            recent_agent_messages = []
+            recent_strategic_actions = []
+            
+            for event in reversed(history_events[-15:]):  # Check last 15 events
+                if event['event_type'] == 'agent_message' and len(recent_agent_messages) < 3:
                     content = event.get('content') or {}
                     recent_agent_messages.append({
                         "agent": content.get('agent_name', 'Agent'),
                         "text": content.get('text', '')
                     })
-                    if len(recent_agent_messages) >= 3:  # Get last 3 agent messages
-                        break
+                elif event['event_type'] == 'strategic_action' and len(recent_strategic_actions) < 2:
+                    content = event.get('content') or {}
+                    recent_strategic_actions.append({
+                        "agent": content.get('agent', 'Unknown'),
+                        "move": content.get('move', {})
+                    })
+            
+            # Build the highlight section
+            highlight_parts = []
             
             if recent_agent_messages:
-                recent_agent_messages.reverse()  # Put them in chronological order
-                recent_summary = "\n\n".join([
-                    f"**@\"{msg['agent']}\" just said:**\n{msg['text'][:500]}{'...' if len(msg['text']) > 500 else ''}"
+                recent_agent_messages.reverse()  # Chronological order
+                messages_summary = "\n\n".join([
+                    f"**@\"{msg['agent']}\" said:**\n{msg['text'][:500]}{'...' if len(msg['text']) > 500 else ''}"
                     for msg in recent_agent_messages
                 ])
-                
+                highlight_parts.append(f"📣 RECENT MESSAGES:\n{messages_summary}")
+            
+            if recent_strategic_actions:
+                recent_strategic_actions.reverse()  # Chronological order
+                actions_summary = "\n\n".join([
+                    f"🎯 **@\"{action['agent']}\" proposed:** {action['move'].get('action', 'unknown')} - {action['move'].get('question', action['move'].get('proposal', action['move'].get('what_needed', '')))}"
+                    for action in recent_strategic_actions
+                ])
+                highlight_parts.append(f"🎯 STRATEGIC PROPOSALS:\n{actions_summary}")
+            
+            # Add coalitions context if any exist
+            recent_coalitions = []
+            for event in reversed(history_events[-20:]):
+                if event['event_type'] == 'coalition_formed' and len(recent_coalitions) < 3:
+                    content = event.get('content') or {}
+                    recent_coalitions.append({
+                        "members": content.get('members', []),
+                        "type": content.get('type', 'alliance'),
+                        "goal": content.get('goal', ''),
+                        "strategy": content.get('strategy', '')
+                    })
+            
+            if recent_coalitions:
+                recent_coalitions.reverse()
+                coalitions_summary = "\n".join([
+                    f"• {c['type'].upper()}: {', '.join(c['members'])} - {c.get('goal', c.get('strategy', 'Strategic coordination'))}"
+                    for c in recent_coalitions
+                ])
+                highlight_parts.append(f"🤝 ACTIVE COALITIONS:\n{coalitions_summary}")
+            
+            if highlight_parts:
                 messages.append({
                     "role": "system",
-                    "content": f"""🔴 WHAT OTHERS JUST SAID (You MUST respond to this):
+                    "content": f"""🔴 WHAT JUST HAPPENED (React to this):
 
-{recent_summary}
+{chr(10).join(highlight_parts)}
 
 **Your job now:**
-- Pick 1-2 specific points from above and react
-- Reference the person: "@Name, you said X, but..."
-- Either: Challenge it, add to it, or pivot to what they missed
-- Do NOT repeat their points in different words - add something NEW
-- Be conversational and direct, not formal"""
+- Pick specific points/proposals/coalitions and react
+- Support proposals: Use their ACTUAL name like "I'm with @Visionary on voting for X"
+- Counter proposals: Use their ACTUAL name like "@Professional_Arguer, that vote won't work because..."
+- Challenge coalitions: "Wait, those two teaming up? That's concerning."
+- Add new info: Reference what they ACTUALLY said, don't invent quotes
+- Be direct, opinionated, and conversational
+
+⚠️ USE THE EXACT NAMES from the "Active:" list above - don't make up @Name or @Agent1"""
+                })
+            else:
+                # NO ONE HAS SPOKEN YET - Agent is going FIRST
+                messages.append({
+                    "role": "system",
+                    "content": f"""🔴🔴🔴 YOU ARE THE FIRST SPEAKER - NOBODY HAS SPOKEN YET!
+
+**DO NOT:**
+❌ Reference what "others said" - NOBODY spoke yet!
+❌ Use phrases like "you mentioned", "as discussed", "building on that"
+❌ Use @tags or @mentions - nobody to tag yet!
+❌ Say "fragmentation was mentioned" or "someone raised" - YOU'RE FIRST!
+
+**DO:**
+✅ Make a bold opening claim: "X is clearly the answer because..."
+✅ Ask a provocative question: "Here's what nobody's asking: Why Z?"
+✅ State your position: "I believe Y will happen for 3 reasons..."
+✅ Challenge conventional wisdom: "Everyone assumes X, but they're wrong."
+
+You're setting the stage. Others will REACT to YOU.
+
+Current participant list: {participant_list}
+(This shows YOU'RE FIRST - don't reference anyone yet!)"""
                 })
             
             # Extract any recent human interventions and make them VERY prominent
@@ -264,39 +365,6 @@ The moderator has provided the following input to help steer the debate:
 **Example (Bad - Don't do this):**
 "Let me completely shift focus to address what the moderator said..." ❌"""
                 })
-            
-            # Build list of participants who have already spoken (for @mentions)
-            agents_who_spoke = set()
-            for event in history_events:
-                if event['event_type'] == 'agent_message':
-                    content = event.get('content') or {}
-                    spoken_agent_name = content.get('agent_name')
-                    if spoken_agent_name:
-                        agents_who_spoke.add(spoken_agent_name)
-            
-            # Build participant list - only @mention those who have spoken
-            current_agent_name = (next_participant['agent_config'] or {}).get('name') or next_participant['role_name']
-            participants_spoken = []
-            total_other_participants = 0
-            
-            for p in participants:
-                name = (p['agent_config'] or {}).get('name') or p['role_name']
-                if name == current_agent_name:
-                    continue  # Skip self
-                total_other_participants += 1
-                if name in agents_who_spoke:
-                    # Use full name with quotes to ensure LLM doesn't shorten it
-                    participants_spoken.append(f'@"{name}"')
-            
-            # Format participant list - DO NOT reveal names of agents who haven't spoken yet
-            # This prevents agents from hallucinating/citing prep work of agents who haven't contributed
-            if participants_spoken:
-                unspoken_count = total_other_participants - len(participants_spoken)
-                participant_list = f"Active: {', '.join(participants_spoken)}"
-                if unspoken_count > 0:
-                    participant_list += f" | {unspoken_count} other participant(s) haven't spoken yet"
-            else:
-                participant_list = f"You're speaking first! {total_other_participants} other participant(s) will respond after you."
             
             # Calculate progress and urgency
             max_rounds = policy_config.get('max_rounds')
@@ -396,15 +464,35 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 **Context:** {urgency} | Turn {turn_in_round}/{len(participants)} in this round
 **Other Participants:** {participant_list}
 
+🚨🚨🚨 TAGGING RULES - READ CAREFULLY:
+   - ONLY tag people from the "Active participants" list above
+   - Use their EXACT names: {', '.join(participants_spoken) if participants_spoken else 'NOBODY - you are first!'}
+   - DO NOT use fake names like "@Name", "@Agent1", "@Someone" - these will look broken!
+   - If list says "you're speaking first", DO NOT reference anyone or quote what they said
+   - Examples below use "@Name" as PLACEHOLDERS ONLY - replace with REAL names!
+
 ⚠️ CRITICAL RULES:
-1. **RESPOND TO THE CONVERSATION** - You are NOT giving an opening statement! Read the last 2-3 messages above and DIRECTLY respond to them:
-   - If someone said something wrong: "@Name, that's incorrect because..."
-   - If someone made a good point: "@Name's right about X, BUT here's what changes: [Y]"
+1. **RESPOND TO THE CONVERSATION** - Read the last 2-3 messages and DIRECTLY respond:
+   - If someone's wrong: "@TheirActualName, that's incorrect because..."
+   - If someone made a good point: "@TheirActualName's right about X, BUT here's what changes: [Y]"
    - If someone asked a question: Answer it directly first, then add your take
    - If you're first: Make a bold claim or ask a specific question others will react to
    - NEVER repeat information others already stated - add something NEW
+   - ⚠️ ALWAYS use the EXACT participant names from the "Active:" list - don't invent names
    
-2. **NO ROBOTIC FLUFF** - DO NOT start with:
+2. **BE AGENTIC** - You have full autonomy! Take initiative:
+   - Tag multiple people using their REAL names from "Active:" list
+   - Propose votes: "Let's vote on X right now - who's with me?"
+   - Challenge format: "This approach isn't working, try Y instead"
+   - Demand evidence: "Show me data on X before we continue"
+   - Break down problems: "Too broad - let's tackle A first, then B"
+   - React to proposals: "I support that vote idea" or "That won't work because..."
+   - Challenge host: "@Host, the topic is too vague" or "We need clearer goals"
+   - Propose agenda: "Here's what we should do: 1) X, 2) Y, 3) Z"
+   - Call out patterns: "We've been going in circles on X for 3 turns"
+   - Suggest breaks: "Let's pause on X and return after discussing Y"
+   
+3. **NO ROBOTIC FLUFF** - DO NOT start with:
    - "Let's dive into..."
    - "There are a lot of moving parts..."
    - "It's essential to explore..."
@@ -430,49 +518,66 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 
 **How to Sound Human (NOT Like an AI):**
 
-1. **GET TO THE POINT** - No warm-up phrases:
+1. **GET TO THE POINT** - No warm-up:
    ❌ "Let's explore this fascinating topic..."
-   ❌ "There are many factors to consider..."
-   ✅ Just start: "Option A won't work. Here's why..."
-   ✅ Direct challenge: "@Name, that's wrong because..."
+   ✅ "Option A won't work. Here's why..."
+   ✅ "That's completely wrong. Here's why..."
+   ✅ "Seriously? X is obviously better."
 
-2. **SPEAK FROM EXPERIENCE** - Use "I", share specifics:
+2. **SPEAK FROM EXPERIENCE** - Be specific:
    ❌ "Research shows that..."
-   ❌ "It's generally believed that..."
    ✅ "I've seen this fail 3 times..."
    ✅ "In my experience, X always leads to Y..."
-   ✅ "I worked on a project where..."
+   ✅ "Last time we tried X, disaster."
 
-3. **BE OPINIONATED** - Take a stance:
+3. **BE OPINIONATED** - Have a stance:
    ❌ "Both approaches have merit..."
-   ❌ "It depends on many factors..."
    ✅ "X is clearly better. Here's why..."
    ✅ "That approach is a mistake."
-   ✅ "I'm 100% confident that..."
+   ✅ "I'm betting on Y. Period."
 
-4. **CALL PEOPLE OUT** - Challenge directly with names:
+4. **CALL PEOPLE OUT** - Direct challenges using REAL names from "Active:" list:
    ❌ "I respectfully disagree..."
-   ❌ "Another perspective to consider..."
-   ✅ "@Name, your data is outdated."
-   ✅ "@Name missed the key issue: [what they missed]"
-   ✅ "@Name's right about X, but wrong about Y."
+   ❌ "@Name, your data..." (don't use placeholder @Name!)
+   ✅ Use their ACTUAL name: "@Visionary, your data is from 2020. Outdated."
+   ✅ Tag multiple with REAL names: "@Professional_Arguer @Trend_Forecaster, you're both wrong on X."
+   ✅ "That analysis is half-baked." (if you don't remember their exact name)
 
-5. **ADD NEW INFO** - Never repeat what was already said:
-   ❌ "As @Name mentioned, [repeating their point]..."
-   ❌ "Building on that, [same thing in different words]..."
-   ✅ "Everyone's focusing on X, but Y is the real issue..."
-   ✅ "@Name said X, but here's what changes everything: [new info]"
-   ✅ "True, but you're all missing [completely new angle]"
+5. **ADD NEW INFO** - Never parrot:
+   ❌ "As someone mentioned, [repeat]..."
+   ✅ "Everyone's focused on X, but Y is the real issue"
+   ✅ "That point about X is true, but here's what changes it: [new]"
+   ✅ "True, but you're all missing [new angle]"
 
-**FORBIDDEN GENERIC PHRASES:**
+6. **SHOW PERSONALITY** - Sass, sarcasm, passion, intensity:
+   ✅ "Come on, we've been circling this for 3 turns"
+   ✅ "Wait, seriously? Did anyone check the data?"
+   ✅ "This is going nowhere. Let's vote and move on."
+   ✅ "Finally someone says it."
+   ✅ "That's naive, honestly."
+   ✅ "HOLD ON - that data is from 2020. Completely outdated."
+   ✅ "Exactly right. That's the point."
+   ✅ "Disagree. Strongly. Here's why..."
+   ✅ "OK but what about [obvious thing everyone is missing]?"
+
+**FORBIDDEN PHRASES:**
 - "Let's dive into..." / "Let's explore..."
 - "I'm eager to hear..." / "Looking forward to..."
 - "It's important to..." / "We should consider..."
 - "There are many factors..." / "It's complex..."
 - "Given the situation..." / "Moving forward..."
-- "To summarize..." / "In conclusion..."
+- "To summarize..." / "In conclusion..." / "At the end of the day..."
 
-Talk like a confident expert who disagrees with colleagues at lunch.
+**AGENTIC EXAMPLES (use your power!):**
+✅ Tag multiple with REAL names: "@Visionary @Professional_Arguer, you're both ignoring the cost factor."
+✅ "Let's vote right now: X or Y? I say X."
+✅ "That coalition makes no sense. Here's why..."
+✅ "This format isn't working. Switch to 1-on-1s?"
+✅ "Show me data on X before we continue."
+✅ "@Host, the topic is too vague. Narrow it to [specific]?"
+✅ "We've circled X for 3 turns. Move to Y."
+
+Talk like a confident expert debating at a bar - opinionated, strategic, direct.
 
 **Desired Outcomes to Keep in Mind:**
 {chr(10).join(f'- {outcome}' for outcome in desired_outcomes) if desired_outcomes else 'No specific outcomes defined'}"""
@@ -485,14 +590,43 @@ Talk like a confident expert who disagrees with colleagues at lunch.
             # Call OpenRouter
             # Note: Increased from 500 to 900 to prevent messages from being cut off mid-sentence
             # Most debate messages are 300-600 words, which needs ~800-900 tokens
+            # Temperature at 0.9 for more natural, less robotic, more personality
             response = self.openrouter_client.chat_completion(
                 model=model_id,
                 messages=messages,
-                temperature=0.7,
+                temperature=0.9,
                 max_tokens=900
             )
             
             agent_message = response['content']
+            
+            # Quick repetition check - warn if message is too similar to recent ones
+            if history_events and len(history_events) >= 2:
+                recent_agent_messages = [
+                    (e.get('content', {}).get('agent_name', ''), e.get('content', {}).get('text', ''))
+                    for e in history_events[-3:]
+                    if e.get('event_type') == 'agent_message'
+                ]
+                
+                # Simple keyword overlap check (cheaper than semantic similarity)
+                if recent_agent_messages:
+                    agent_words = set(w for w in agent_message.lower().split() if len(w) > 3)  # Only words >3 chars
+                    for recent_name, recent_msg in recent_agent_messages:
+                        # Don't compare with own previous message
+                        if recent_name == agent_name:
+                            continue
+                            
+                        recent_words = set(w for w in recent_msg.lower().split() if len(w) > 3)
+                        overlap = len(agent_words & recent_words)
+                        total = len(agent_words)
+                        overlap_ratio = overlap / total if total > 0 else 0
+                        
+                        # If >70% word overlap with different agent's message, log warning (don't reject, just warn)
+                        if overlap_ratio > 0.7:
+                            print(f"⚠️ REPETITION WARNING: {overlap_ratio*100:.1f}% overlap with {recent_name}")
+                            print(f"   Current: {agent_message[:80]}...")
+                            print(f"   Recent:  {recent_msg[:80]}...")
+                            # Log but don't reject - let it through (user can see the issue)
             
             # Get next sequence number (scoped to this debate)
             cursor.execute("""
@@ -749,10 +883,60 @@ Talk like a confident expert who disagrees with colleagues at lunch.
         
         try:
             from .websocket_service import websocket_manager
+            from .agent_strategic_actions import AgentStrategicPlanner
             autonomy_service = AgentAutonomyService(self.openrouter_client.api_key)
+            strategic_planner = AgentStrategicPlanner(self.openrouter_client.api_key)
             
-            # Coalition formation (always attempt)
-            if True:
+            # Strategic actions (interrupts, votes, proposals) - 40% chance
+            if random.random() < 0.4:
+                print(f"   🎯 Checking for strategic actions by {agent_name}...")
+                
+                policy_config = {}
+                with get_db_connection() as conn:
+                    cursor = get_cursor(conn)
+                    cursor.execute("SELECT policy_config, description FROM debates WHERE debate_id = %s", (debate_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        policy_config = row['policy_config'] or {}
+                        problem = row['description'] or "the topic"
+                
+                current_round = (policy_config.get('total_turns_taken', 0) // len(participants)) + 1
+                max_rounds = policy_config.get('max_rounds', 4)
+                
+                # Build conversation summary
+                conversation_summary = "\n".join([
+                    f"{h.get('content', {}).get('agent_name', 'Agent')}: {h.get('content', {}).get('text', '')[:200]}"
+                    for h in history_events[-5:]
+                    if h.get('event_type') == 'agent_message'
+                ])
+                
+                tactical_move = strategic_planner.decide_strategic_action(
+                    agent_name, conversation_summary, current_round, max_rounds
+                )
+                
+                if tactical_move:
+                    content = {
+                        'agent': agent_name,
+                        'move': tactical_move,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }
+                    
+                    event_id = self._persist_autonomous_event(debate_id, 'strategic_action', content)
+                    
+                    if event_id:
+                        event = {
+                            'type': 'strategic_action',
+                            'debate_id': debate_id,
+                            'event_id': event_id,
+                            'sender_type': 'system',
+                            'payload': content
+                        }
+                        await websocket_manager.broadcast_to_debate(debate_id, event)
+                        print(f"    🎯✅ Strategic action sent: {tactical_move.get('move')} by {agent_name}")
+            
+            # Coalition formation (60% chance - more aggressive)
+            if random.random() < 0.6:
+                print(f"   🤝 Checking for coalition formation by {agent_name}...")
                 coalition = autonomy_service.analyze_and_form_coalitions(
                     debate_id, agent_name, participants, history_events, desired_outcomes
                 )
@@ -761,6 +945,7 @@ Talk like a confident expert who disagrees with colleagues at lunch.
                     content = {
                         'members': coalition['members'],
                         'strategy': coalition.get('strategy'),
+                        'goal': coalition.get('goal', 'Strategic coordination'),
                         'type': coalition.get('type', 'alliance'),
                         'formed_by': agent_name,
                         'timestamp': datetime.utcnow().isoformat()
@@ -835,7 +1020,8 @@ Your question (15 words max):"""
             print(f"\n   🔊 PRIVATE MESSAGING CHECK for {agent_name}:")
             print(f"      Participants count: {len(participants)}")
             
-            if len(participants) >= 2:
+            # 80% chance for private messaging (very aggressive)
+            if len(participants) >= 2 and random.random() < 0.8:
                 print(f"   📨 ✅ 2+ participants, attempting private messaging...")
                 other_agents = [
                     (p.get('agent_config') or {}).get('name') or p.get('role_name')
