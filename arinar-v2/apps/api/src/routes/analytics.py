@@ -1,156 +1,181 @@
-"""Analytics endpoints for debate analysis"""
-from fastapi import APIRouter, Header, HTTPException
-from typing import Dict, Any, List
-from ..database import get_db_connection, get_cursor
+"""
+Analytics API Routes - Novel features endpoints
 
-router = APIRouter()
+All endpoints are additive, non-breaking. Feature-flagged for gradual rollout.
+"""
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
+import os
+
+from ..debate_progress_tracker import DebateProgressTracker
+from ..strategic_host_agent import StrategicHostAgent
+from ..agent_memory_system import AgentMemorySystem
+from ..evidence_grounding import EvidenceGroundingValidator
+
+router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+# Feature flags
+ENABLE_PROGRESS_TRACKING = os.getenv('ENABLE_PROGRESS_TRACKING', 'true').lower() == 'true'
+ENABLE_AGENT_MEMORY = os.getenv('ENABLE_AGENT_MEMORY', 'true').lower() == 'true'
+ENABLE_EVIDENCE_GROUNDING = os.getenv('ENABLE_EVIDENCE_GROUNDING', 'true').lower() == 'true'
+ENABLE_STRATEGIC_HOST = os.getenv('ENABLE_STRATEGIC_HOST', 'true').lower() == 'true'
 
 
-@router.get("/debates/{debate_id}/analytics/autonomous-behaviors")
-async def get_autonomous_behaviors(
-    debate_id: str,
-    authorization: str = Header(None)
-):
-    """Get all autonomous behaviors (coalitions, private messages) for a debate"""
+@router.get("/debates/{debate_id}/progress")
+async def get_debate_progress(debate_id: str):
+    """
+    Get real-time debate progress metrics
     
-    with get_db_connection() as conn:
-        cursor = get_cursor(conn)
-        try:
-            # Get coalitions
-            cursor.execute("""
-                SELECT event_id, sequence_number, content, created_at
-                FROM events
-                WHERE debate_id = %s AND event_type = 'coalition_formed'
-                ORDER BY sequence_number
-            """, (debate_id,))
-            
-            coalitions = cursor.fetchall()
-            
-            # Get private messages
-            cursor.execute("""
-                SELECT event_id, sequence_number, content, created_at
-                FROM events
-                WHERE debate_id = %s AND event_type = 'private_message'
-                ORDER BY sequence_number
-            """, (debate_id,))
-            
-            private_messages = cursor.fetchall()
-            
-            # Get subtasks if any
-            cursor.execute("""
-                SELECT event_id, sequence_number, content, created_at
-                FROM events
-                WHERE debate_id = %s AND event_type = 'agent_subtask'
-                ORDER BY sequence_number
-            """, (debate_id,))
-            
-            subtasks = cursor.fetchall()
-            
-            return {
-                "debate_id": debate_id,
-                "coalitions": [{
-                    "event_id": c['event_id'],
-                    "sequence": c['sequence_number'],
-                    "members": c['content'].get('members', []),
-                    "type": c['content'].get('type', 'alliance'),
-                    "strategy": c['content'].get('strategy'),
-                    "formed_by": c['content'].get('formed_by'),
-                    "timestamp": c['content'].get('timestamp'),
-                    "created_at": c['created_at'].isoformat() if c['created_at'] else None
-                } for c in coalitions],
-                "private_messages": [{
-                    "event_id": pm['event_id'],
-                    "sequence": pm['sequence_number'],
-                    "from_agent": pm['content'].get('from_agent'),
-                    "to_agent": pm['content'].get('to_agent'),
-                    "message": pm['content'].get('message'),
-                    "timestamp": pm['content'].get('timestamp'),
-                    "created_at": pm['created_at'].isoformat() if pm['created_at'] else None
-                } for pm in private_messages],
-                "subtasks": [{
-                    "event_id": st['event_id'],
-                    "sequence": st['sequence_number'],
-                    "agent_name": st['content'].get('agent_name'),
-                    "subtask": st['content'].get('subtask'),
-                    "timestamp": st['content'].get('timestamp'),
-                    "created_at": st['created_at'].isoformat() if st['created_at'] else None
-                } for st in subtasks],
-                "summary": {
-                    "total_coalitions": len(coalitions),
-                    "total_private_messages": len(private_messages),
-                    "total_subtasks": len(subtasks),
-                    "alliances": len([c for c in coalitions if c['content'].get('type') == 'alliance']),
-                    "rivalries": len([c for c in coalitions if c['content'].get('type') == 'rivalry'])
-                }
-            }
-            
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch analytics: {str(e)}")
-        finally:
-            cursor.close()
-
-
-@router.get("/debates/{debate_id}/analytics/scope-tracking")
-async def get_scope_tracking(
-    debate_id: str,
-    authorization: str = Header(None)
-):
-    """Analyze if agents stayed on topic / met original goals"""
+    Returns:
+        - coverage_score: How many desired outcomes covered (0-1)
+        - depth_score: How deeply explored (0-1)
+        - new_info_rate: % of recent messages adding new info (0-1)
+        - consensus_level: Agreement level (0-1)
+        - polarization: Disagreement level (0-1)
+        - health: "poor/fair/good/excellent"
+        - action_items: Actionable recommendations
+    """
+    if not ENABLE_PROGRESS_TRACKING:
+        raise HTTPException(status_code=501, detail="Progress tracking not enabled")
     
-    with get_db_connection() as conn:
-        cursor = get_cursor(conn)
-        try:
-            # Get debate goals
-            cursor.execute("""
-                SELECT title, desired_outcomes, agenda
-                FROM debates
-                WHERE debate_id = %s
-            """, (debate_id,))
-            
-            debate = cursor.fetchone()
-            
-            if not debate:
-                raise HTTPException(status_code=404, detail="Debate not found")
-            
-            # Get all agent messages
-            cursor.execute("""
-                SELECT sequence_number, content
-                FROM events
-                WHERE debate_id = %s AND event_type = 'agent_message'
-                ORDER BY sequence_number
-            """, (debate_id,))
-            
-            messages = cursor.fetchall()
-            
-            # Get host conclusion
-            cursor.execute("""
-                SELECT content
-                FROM events
-                WHERE debate_id = %s AND sender_type = 'host'
-                ORDER BY sequence_number DESC
-                LIMIT 1
-            """, (debate_id,))
-            
-            host = cursor.fetchone()
-            
-            return {
-                "debate_id": debate_id,
-                "title": debate['title'],
-                "desired_outcomes": debate['desired_outcomes'] or [],
-                "agenda": debate['agenda'] or [],
-                "message_count": len(messages),
-                "has_host_conclusion": host is not None,
-                "messages": [{
-                    "sequence": m['sequence_number'],
-                    "agent": m['content'].get('agent_name'),
-                    "preview": m['content'].get('text', '')[:150]
-                } for m in messages],
-                "host_conclusion_preview": host['content'].get('text', '')[:500] if host else None
-            }
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch scope tracking: {str(e)}")
-        finally:
-            cursor.close()
+    try:
+        tracker = DebateProgressTracker(debate_id)
+        progress = tracker.analyze()
+        return {
+            "success": True,
+            "debate_id": debate_id,
+            "progress": progress
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to analyze progress: {str(e)}")
+
+
+@router.get("/debates/{debate_id}/host-decision")
+async def get_host_intervention_decision(debate_id: str):
+    """
+    Check if strategic host should intervene
+    
+    Returns:
+        - should_intervene: bool
+        - action: "redirect", "conclude", "seek_common_ground", etc.
+        - message: What host would say
+        - urgency: "low/medium/high"
+        - reason: Why this decision was made
+    """
+    if not ENABLE_STRATEGIC_HOST:
+        raise HTTPException(status_code=501, detail="Strategic host not enabled")
+    
+    try:
+        host = StrategicHostAgent(debate_id)
+        decision = host.should_intervene()
+        return {
+            "success": True,
+            "debate_id": debate_id,
+            "decision": decision
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to check host decision: {str(e)}")
+
+
+@router.get("/agents/{agent_role}/memories")
+async def get_agent_memories(
+    agent_role: str,
+    workspace_id: str = Query(..., description="Workspace ID"),
+    memory_type: Optional[str] = Query(None, description="Filter by memory type"),
+    limit: int = Query(10, ge=1, le=50)
+):
+    """
+    Get agent's learned memories
+    
+    Returns list of memories with effectiveness scores
+    """
+    if not ENABLE_AGENT_MEMORY:
+        raise HTTPException(status_code=501, detail="Agent memory not enabled")
+    
+    try:
+        memory_system = AgentMemorySystem(workspace_id)
+        memories = memory_system.recall_memories(
+            agent_role=agent_role,
+            memory_type=memory_type,
+            limit=limit
+        )
+        return {
+            "success": True,
+            "agent_role": agent_role,
+            "memories": memories,
+            "count": len(memories)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to recall memories: {str(e)}")
+
+
+@router.get("/agents/{agent_role}/stats")
+async def get_agent_statistics(
+    agent_role: str,
+    workspace_id: str = Query(..., description="Workspace ID")
+):
+    """
+    Get agent's learning statistics
+    
+    Returns:
+        - total_memories: How many memories stored
+        - avg_confidence: Average confidence in memories
+        - avg_effectiveness: How effective learned patterns are
+        - debates_learned_from: Number of debates contributed to learning
+    """
+    if not ENABLE_AGENT_MEMORY:
+        raise HTTPException(status_code=501, detail="Agent memory not enabled")
+    
+    try:
+        memory_system = AgentMemorySystem(workspace_id)
+        stats = memory_system.get_agent_stats(agent_role)
+        return {
+            "success": True,
+            **stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+
+@router.post("/validate/evidence")
+async def validate_evidence_grounding(
+    message: str,
+    agent_name: str
+):
+    """
+    Validate that a message has properly grounded factual claims
+    
+    Used during message generation to check for unsubstantiated facts
+    
+    Returns:
+        - valid: bool
+        - violations: List of ungrounded claims
+        - grounding_rate: % of claims that are grounded
+    """
+    if not ENABLE_EVIDENCE_GROUNDING:
+        raise HTTPException(status_code=501, detail="Evidence grounding not enabled")
+    
+    try:
+        validator = EvidenceGroundingValidator()
+        result = validator.validate(message, agent_name)
+        return {
+            "success": True,
+            "agent_name": agent_name,
+            **result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to validate evidence: {str(e)}")
+
+
+@router.get("/health")
+async def analytics_health():
+    """Health check for analytics features"""
+    return {
+        "status": "healthy",
+        "features": {
+            "progress_tracking": ENABLE_PROGRESS_TRACKING,
+            "agent_memory": ENABLE_AGENT_MEMORY,
+            "evidence_grounding": ENABLE_EVIDENCE_GROUNDING,
+            "strategic_host": ENABLE_STRATEGIC_HOST
+        }
+    }

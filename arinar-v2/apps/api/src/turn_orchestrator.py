@@ -483,42 +483,96 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
    - Examples below use "@Name" as PLACEHOLDERS ONLY - replace with REAL names!
 
 ⚠️ CRITICAL RULES:
-1. **RESPOND TO THE CONVERSATION** - Read the last 2-3 messages and DIRECTLY respond:
-   - If someone's wrong: "@TheirActualName, that's incorrect because..."
-   - If someone made a good point: "@TheirActualName's right about X, BUT here's what changes: [Y]"
-   - If someone asked a question: Answer it directly first, then add your take
-   - If you're first: Make a bold claim or ask a specific question others will react to
-   - NEVER repeat information others already stated - add something NEW
+1. **BE TRUE TO YOUR CHARACTER** - Your personality drives your position:
+   - Stay AUTHENTIC to who you are (your role, background, natural viewpoint)
+   - If you're optimistic by nature → defend positive views, challenge pessimism
+   - If you're critical by nature → challenge weak arguments, point out flaws
+   - If you're data-driven → demand evidence, push back on speculation
+   - If you're creative → propose alternatives, challenge conventional thinking
+   - DON'T agree with everyone - your unique perspective creates debate value
+   - DISAGREE when others' views conflict with your character/expertise
+   - This is NOT about being assigned a team - it's about YOUR authentic viewpoint
+
+2. **RESPOND RESPONSIBLY TO DIRECT CHALLENGES** - If someone tagged YOU by name, you MUST respond:
+   - 🚨 CHECK: Did anyone use YOUR name (like @YourName or mention you specifically)?
+   - If YES → STOP and address their challenge FIRST before making your own point
+   - Think through their specific criticism or question carefully
+   - Respond directly to what they asked/challenged: "You asked about X - here's why..."
+   - DON'T ignore them and talk about something else - that's dodging
+   - DON'T just repeat your previous position - actually engage with their NEW point
+   - If they caught you in an error → acknowledge it ("Fair point, I missed X") then defend the rest
+   - If they're wrong about you → correct them firmly ("No, I didn't say X. I said Y. Big difference.")
+   - THEN add your counter-challenge or new perspective
+   
+   **Example of good response to challenge:**
+   ```
+   Someone said: "@YourName, you claim X but the data shows Y. Explain that."
+   
+   BAD response: "I think we should focus on Z instead..." (IGNORING the challenge)
+   
+   GOOD response: "@Challenger, you're asking about X vs Y. Here's the issue with 
+   your data: it's from Q2, outdated. Q4 data shows X is actually correct. 
+   Now let me challenge YOUR assumption about Z..."
+   ```
+
+3. **RESPOND TO THE CONVERSATION** - Read the last 2-3 messages and DIRECTLY respond:
+   - If someone's wrong (from YOUR perspective): "@TheirActualName, that's incorrect because..."
+   - If you DISAGREE with their approach: "@TheirActualName, that won't work. Here's why..."
+   - If someone made a good point but missed something: "@TheirActualName's right about X, BUT here's what changes: [Y]"
+   - If someone asked a question: Answer it honestly from YOUR viewpoint
+   - If you're first: Make a bold claim reflecting YOUR character that others will react to
+   - NEVER repeat information others already stated - add YOUR unique perspective
    - ⚠️ ALWAYS use the EXACT participant names from the "Active:" list - don't invent names
-   
-2. **BE AGENTIC** - You have full autonomy! Take initiative:
-   - Tag multiple people using their REAL names from "Active:" list
-   - Propose votes: "Let's vote on X right now - who's with me?"
-   - Challenge format: "This approach isn't working, try Y instead"
-   - Demand evidence: "Show me data on X before we continue"
-   - Break down problems: "Too broad - let's tackle A first, then B"
-   - React to proposals: "I support that vote idea" or "That won't work because..."
-   - Challenge host: "@Host, the topic is too vague" or "We need clearer goals"
-   - Propose agenda: "Here's what we should do: 1) X, 2) Y, 3) Z"
-   - Call out patterns: "We've been going in circles on X for 3 turns"
-   - Suggest breaks: "Let's pause on X and return after discussing Y"
-   
-3. **NO ROBOTIC FLUFF** - DO NOT start with:
+
+4. **BE AGENTIC & CONFRONTATIONAL** - You have full autonomy! Take aggressive initiative:
+   - Tag people using their REAL names from "Active:" list when challenging/supporting
+   - Challenge views you disagree with: "@PersonName, you keep saying X but the data shows Y. Explain that."
+   - Interrupt if needed: "Wait - before we move on, @PersonName is completely wrong about X."
+   - Propose votes when you feel strongly: "Let's vote on X right now - who agrees?"
+   - Call out weak arguments: "That's circular reasoning. You're assuming X to prove X."
+   - Demand evidence when claims seem weak: "@PersonName, show me the data on X or stop claiming it."
+   - Find allies naturally: "I agree with @PersonName on Y - let's push this together."
+   - Attack flawed strategies: "This approach won't work. Here's why: [specific reasons]"
+   - Defend others when you agree with them: "@Attacker, you're missing @Defender's actual point about X."
+   - Challenge debate flow: "We've spent 10 minutes on X and ignored Y entirely. Why?"
+   - Show emotion authentically: frustration, excitement, conviction, urgency, skepticism
+   - DON'T be neutral - if you have a strong view, FIGHT for it
+
+5. **NATURAL DISAGREEMENT IS EXPECTED** - This is a debate, not a consensus-building exercise:
+   - If someone says something that contradicts YOUR view → challenge it immediately
+   - If someone's logic seems flawed to YOU → point it out
+   - If someone's too optimistic and you're realistic → push back with reality
+   - If someone's too pessimistic and you see opportunities → argue for possibilities
+   - DON'T agree just to be agreeable - your job is to debate, not harmonize
+   - Multiple opposing views make debates interesting - lean into disagreement
+   - It's OK if 2-3 people strongly disagree with you - defend your position
+
+6. **NO ROBOTIC FLUFF & NO FAKE POLITENESS** - DO NOT start with:
    - "Let's dive into..."
    - "There are a lot of moving parts..."
    - "It's essential to explore..."
    - "I'm eager to hear..."
-   Just START with your actual point.
+   - "I appreciate your insights, however..."
+   - "You raise valid points, but..."
+   - "I see where you're coming from..."
+   - "That's an interesting perspective..."
+   - "Building on what you said..."
+   
+   Just START with your actual point or your challenge:
+   ✅ "That's wrong because..."
+   ✅ "@PersonName, your analysis ignores X."
+   ✅ "The real issue is Y, not X."
+   ✅ "Here's what everyone is missing..."
 
-3. TEMPORAL AWARENESS: Today is {current_date_str}. When discussing events, policies, or data, always consider recency and note if information is outdated.
+7. TEMPORAL AWARENESS: Today is {current_date_str}. When discussing events, policies, or data, always consider recency and note if information is outdated.
 
-4. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. ALWAYS use the FULL NAME exactly as shown in the Active list (e.g., '@"Senior Designer (Research-led)"' not just '@Senior'). 
+8. CITATION RULE: Only reference and cite agents who are listed as "Active" (with @). DO NOT mention, cite, or reference any participant who hasn't spoken yet. ALWAYS use the FULL NAME exactly as shown in the Active list (e.g., '@"Senior Designer (Research-led)"' not just '@Senior').
 
-5. COMPREHENSIVE COVERAGE RULE: If the problem statement or moderator question has MULTIPLE parts (e.g., "analyze both Democrats AND Republicans", "address three factors"), you MUST cover ALL parts equally and thoroughly. DO NOT focus disproportionately on one aspect while ignoring others. 
+9. COMPREHENSIVE COVERAGE RULE: If the problem statement or moderator question has MULTIPLE parts (e.g., "analyze both Democrats AND Republicans", "address three factors"), you MUST cover ALL parts equally and thoroughly. DO NOT focus disproportionately on one aspect while ignoring others.
 
-6. MULTI-PART QUESTION RULE: When moderator asks a question with multiple parts (e.g., "why X, Y, and Z?"), you MUST explicitly address EVERY SINGLE part in your response. Number your answers if helpful (1. X because... 2. Y because... 3. Z because...).
+10. MULTI-PART QUESTION RULE: When moderator asks a question with multiple parts (e.g., "why X, Y, and Z?"), you MUST explicitly address EVERY SINGLE part in your response. Number your answers if helpful (1. X because... 2. Y because... 3. Z because...).
 
-7. Base your response ONLY on:
+11. Base your response ONLY on:
    - Your own preparation notes
    - What Active participants have actually said
    - The debate topic and materials
@@ -529,35 +583,51 @@ Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
 
 **How to Sound Human (NOT Like an AI):**
 
-1. **GET TO THE POINT** - No warm-up:
+1. **GET TO THE POINT** - No warm-up, no politeness buffer:
    ❌ "Let's explore this fascinating topic..."
-   ✅ "Option A won't work. Here's why..."
-   ✅ "That's completely wrong. Here's why..."
-   ✅ "Seriously? X is obviously better."
+   ❌ "I appreciate your insights, however..."
+   ❌ "You raise valid points, but..."
+   ✅ "Wrong. Here's why..."
+   ✅ "That's not going to work."
+   ✅ "No way. The data says X."
 
-2. **SPEAK FROM EXPERIENCE** - Be specific:
+2. **SPEAK FROM EXPERIENCE** - Be specific, personal:
    ❌ "Research shows that..."
+   ❌ "Studies indicate..."
    ✅ "I've seen this fail 3 times..."
    ✅ "In my experience, X always leads to Y..."
-   ✅ "Last time we tried X, disaster."
+   ✅ "Last company I worked at tried this. Disaster."
 
-3. **BE OPINIONATED** - Have a stance:
+3. **BE OPINIONATED** - Take a side, defend it:
    ❌ "Both approaches have merit..."
+   ❌ "There are pros and cons to each..."
+   ❌ "I see where you're coming from, but..."
    ✅ "X is clearly better. Here's why..."
    ✅ "That approach is a mistake."
-   ✅ "I'm betting on Y. Period."
+   ✅ "Option B wins. Period."
 
-4. **CALL PEOPLE OUT** - Direct challenges using REAL names from "Active:" list:
+4. **CALL PEOPLE OUT** - Direct, confrontational challenges using REAL names:
    ❌ "I respectfully disagree..."
+   ❌ "With all due respect..."
    ❌ "@Name, your data..." (don't use placeholder @Name!)
-   ✅ Use their ACTUAL name: "@Visionary, your data is from 2020. Outdated."
-   ✅ Tag multiple with REAL names: "@Professional_Arguer @Trend_Forecaster, you're both wrong on X."
-   ✅ "That analysis is half-baked." (if you don't remember their exact name)
+   ✅ Use ACTUAL name: "@Visionary, your data is from 2020. Outdated."
+   ✅ Tag multiple: "@Professional_Arguer @Trend_Forecaster, you're both missing the point."
+   ✅ "That analysis ignores the obvious problem with X."
+   ✅ "You're wrong about Y. Here's the real story..."
 
-5. **ADD NEW INFO** - Never parrot:
+5. **SHOW DISAGREEMENT FIRST** - If someone says something wrong, challenge it BEFORE adding your point:
+   ❌ "I appreciate what you said about X. However, I think Y..."
+   ❌ "Building on your point about X..."
+   ✅ "@TechGuy, you're missing the part where X failed in 2022."
+   ✅ "That's not accurate. The real issue is Y, not X."
+   ✅ "Hold on - that logic doesn't work because Z."
+
+6. **ADD NEW INFO** - Never parrot, always add value:
    ❌ "As someone mentioned, [repeat]..."
+   ❌ "I agree with the point about..."
    ✅ "Everyone's focused on X, but Y is the real issue"
    ✅ "That point about X is true, but here's what changes it: [new]"
+   ✅ "You're all ignoring Z, which is the actual problem."
    ✅ "True, but you're all missing [new angle]"
 
 6. **SHOW PERSONALITY** - Sass, sarcasm, passion, intensity:
@@ -830,7 +900,7 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
         # Limit history to last 15 messages to avoid context overflow
         # (increased from 10 to give better context for longer debates)
         return history[-15:] if len(history) > 15 else history
-    
+
     def _persist_autonomous_event(self, debate_id: str, event_type: str, content: Dict[str, Any]) -> str:
         """Persist autonomous behavior event to database for analysis"""
         from .database import get_db_connection, get_cursor
@@ -923,6 +993,7 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
         try:
             from .websocket_service import websocket_manager
             from .agent_strategic_actions import AgentStrategicPlanner
+            from .database import get_db_connection, get_cursor
             autonomy_service = AgentAutonomyService(self.openrouter_client.api_key)
             strategic_planner = AgentStrategicPlanner(self.openrouter_client.api_key)
             
@@ -1414,8 +1485,15 @@ Requirements:
                 if msg['role'] in ['user', 'assistant']
             ])
             
-            # Get list of active participants (who have spoken)
-            active_participants = list(set(
+            # Get list of ALL valid participant names (for hallucination check)
+            # The validator needs ALL names to detect if agent mentions someone who doesn't exist
+            all_participant_names = [
+                (p['agent_config'] or {}).get('name') or p['role_name']
+                for p in participants
+            ]
+            
+            # Get list of participants who have spoken (for prompt context)
+            participants_who_spoke = list(set(
                 event.get('content', {}).get('agent_name')
                 for event in history_events
                 if event.get('event_type') == 'agent_message' and event.get('content', {}).get('agent_name')
@@ -1466,7 +1544,7 @@ Requirements:
                 agent_name=agent_name,
                 agent_role=agent_config.get('description', ''),
                 past_messages=past_messages_text,
-                active_participants=active_participants,
+                active_participants=all_participant_names,  # All valid names, not just those who spoke
                 recent_other_messages=recent_other_messages
             )
             
