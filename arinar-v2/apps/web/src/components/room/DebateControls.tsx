@@ -28,6 +28,9 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
   const [triggeringTurn, setTriggeringTurn] = useState(false);
   const [extending, setExtending] = useState(false);
   const [pausingYolo, setPausingYolo] = useState(false);
+  
+  // Debug: Log API key status
+  console.log('🔑 DebateControls API Key:', apiKey ? `EXISTS (${apiKey.substring(0, 15)}...)` : 'NOT FOUND');
 
   // Keyboard shortcut: Space or Enter to trigger next turn (power user feature)
   useEffect(() => {
@@ -262,6 +265,9 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
   const canEnd = currentState === 'running' || currentState === 'paused';
   const canTriggerTurn = currentState === 'running' && apiKey;
   const canExtend = (currentState === 'running' || currentState === 'paused') && policyConfig && (policyConfig.max_rounds || policyConfig.timebox_minutes);
+  
+  // Debug: Log button state
+  console.log('🎮 Button States:', { currentState, apiKey: !!apiKey, canTriggerTurn, sendCommand: !!sendCommand });
 
   return (
     <div className={styles.controls}>

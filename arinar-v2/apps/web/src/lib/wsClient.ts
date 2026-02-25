@@ -17,6 +17,7 @@ export type WSEventType =
   | 'typing'
   | 'state_update'
   | 'strategic_action'
+  | 'agent_thinking'
   | 'ack'
   | 'error';
 

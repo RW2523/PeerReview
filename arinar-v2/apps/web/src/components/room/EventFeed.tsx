@@ -94,14 +94,22 @@ export default function EventFeed({ events: wsEvents, connectionStatus, onPresen
   const feedRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  // Filter and process WebSocket events
+  // Group thinking events with their corresponding agent messages
   useEffect(() => {
+    // Debug: Log all thinking events
+    const thinkingEvents = wsEvents.filter(e => e.type === 'agent_thinking');
+    if (thinkingEvents.length > 0) {
+      console.log('🧠 Found thinking events:', thinkingEvents.length, thinkingEvents);
+    }
+    
+    const shouldFilterOut = [
+      'state_update',
+      'typing',
+      'presence_update',
+      'agent_thinking', // Filter out - we'll attach to agent messages
+    ];
+    
     const filtered = wsEvents.filter((event) => {
-      const shouldFilterOut = [
-        'state_update',
-        'typing',
-        'presence_update',
-      ];
 
       // Handle side-effect events but don't display them
       if (event.type === 'presence_update' && onPresenceUpdate) {
@@ -121,8 +129,29 @@ export default function EventFeed({ events: wsEvents, connectionStatus, onPresen
 
       return !shouldFilterOut.includes(event.type);
     });
+    
+    // Group thinking events with agent messages
+    const withThinking = filtered.map(event => {
+      if (event.type === 'agent_message') {
+        // Find all thinking events for this agent from recent events
+        const agentName = event.payload?.agent_name;
+        const thinkingEvents = wsEvents.filter(e =>
+          e.type === 'agent_thinking' &&
+          e.payload?.agent_name === agentName &&
+          e.sequence_number < event.sequence_number &&
+          e.sequence_number > (event.sequence_number - 10) // Only recent thinking
+        );
+        
+        if (thinkingEvents.length > 0) {
+          console.log(`🧠 Attaching ${thinkingEvents.length} thinking events to message from ${agentName}`);
+        }
+        
+        return { ...event, thinkingEvents };
+      }
+      return { ...event, thinkingEvents: [] };
+    });
 
-    setDisplayEvents(filtered);
+    setDisplayEvents(withThinking);
   }, [wsEvents, onPresenceUpdate, onTyping]);
 
   // Auto-scroll on new events
@@ -209,6 +238,7 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
   const [expanded, setExpanded] = useState(false);
 
   const getEventColor = (type: string) => {
+    if (type.includes('agent_thinking')) return '#8b5cf6'; // Purple for thinking
     if (type.includes('agent_message')) return '#0070F3';
     if (type.includes('human_message')) return '#0070F3';
     if (type.includes('intervention')) return '#0070F3';
@@ -218,6 +248,10 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
   };
 
   const getActor = () => {
+    // For thinking events, show the agent who is thinking
+    if (event.type === 'agent_thinking' && event.payload?.agent_name) {
+      return `${event.payload.agent_name} (thinking)`;
+    }
     if (event.payload?.agent_name) return event.payload.agent_name;
     if (event.payload?.actor) return event.payload.actor;
     if (event.sender_type === 'agent') return 'Agent';
@@ -241,8 +275,46 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
     if (type === 'turn_end') return '⏸️ Turn End';
     if (type === 'state_update') return '📊 State';
     if (type === 'strategic_action') return '🎯 Strategic Move';
+    if (type === 'agent_thinking') return '🧠 Thinking';
     if (type === 'error') return '❌ Error';
     return type.replace(/_/g, ' ');
+  };
+  
+  const renderThinkingBlock = (payload: any) => {
+    const stage = payload?.stage || 'Processing';
+    const status = payload?.status || 'Thinking...';
+    const details = payload?.details || [];
+    const thinkingType = payload?.thinking_type || '';
+    
+    // Icon based on thinking type
+    const getThinkingIcon = () => {
+      if (thinkingType.includes('reasoning')) return '🤔';
+      if (thinkingType.includes('generating')) return '✍️';
+      if (thinkingType.includes('validating')) return '✅';
+      if (thinkingType.includes('issues')) return '⚠️';
+      if (thinkingType.includes('corrected')) return '🔧';
+      if (thinkingType.includes('regenerating')) return '🔄';
+      return '💭';
+    };
+    
+    return (
+      <div className={styles.thinkingBlock}>
+        <div className={styles.thinkingHeader}>
+          <span className={styles.thinkingIcon}>{getThinkingIcon()}</span>
+          <span className={styles.thinkingStage}>{stage}</span>
+        </div>
+        <div className={styles.thinkingStatus}>{status}</div>
+        {details.length > 0 && (
+          <div className={styles.thinkingDetails}>
+            {details.map((detail: string, i: number) => (
+              <div key={i} className={styles.thinkingDetail}>
+                {detail}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
   
   const renderStrategicAction = (payload: any) => {
@@ -311,17 +383,46 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
         {event.type === 'strategic_action' ? (
           renderStrategicAction(event.payload)
         ) : getMessage() ? (
-          <div className={styles.message}>
-            {parseMarkdown(getMessage()!)}
-          </div>
+          <>
+            <div className={styles.message}>
+              {parseMarkdown(getMessage()!)}
+            </div>
+            
+            {/* Show thinking process if available */}
+            {(event as any).thinkingEvents && (event as any).thinkingEvents.length > 0 && (
+              <div className={styles.thinkingSection}>
+                <button
+                  className={styles.showThinkingBtn}
+                  onClick={() => setExpanded(!expanded)}
+                  type="button"
+                  data-expanded={expanded}
+                >
+                  <span style={{ opacity: 0.7, marginRight: '6px' }}>💭</span>
+                  {expanded ? 'Hide' : 'View'} reasoning · {(event as any).thinkingEvents.length} {(event as any).thinkingEvents.length === 1 ? 'step' : 'steps'}
+                </button>
+                
+                {expanded && (
+                  <div className={styles.thinkingSteps}>
+                    {(event as any).thinkingEvents.map((thinkEvent: any, idx: number) => (
+                      <div key={idx} className={styles.thinkingStep}>
+                        {renderThinkingBlock(thinkEvent.payload)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         ) : null}
 
-        <button
-          className={styles.expandBtn}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? 'Hide details' : 'Show details'}
-        </button>
+        {event.type !== 'agent_thinking' && (
+          <button
+            className={styles.expandBtn}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? 'Hide details' : 'Show details'}
+          </button>
+        )}
 
         {expanded && (
           <div className={styles.details}>

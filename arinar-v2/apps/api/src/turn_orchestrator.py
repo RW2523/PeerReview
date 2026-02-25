@@ -13,6 +13,7 @@ from .agent_memory import AgentMemory
 from .agent_reasoning import AgentReasoningEngine
 from .agent_response_generator import AgentResponseGenerator
 from .agent_constitutional_validator import ConstitutionalValidator
+from .agent_thinking_service import AgentThinkingService
 
 
 class TurnOrchestrator:
@@ -34,6 +35,8 @@ class TurnOrchestrator:
             self.reasoning_engine = AgentReasoningEngine(openrouter_api_key)
             self.response_generator = AgentResponseGenerator(openrouter_api_key)
             self.constitutional_validator = ConstitutionalValidator()
+        # Thinking service for visibility and persistence
+        self.thinking_service = AgentThinkingService()
     
     def trigger_next_turn(self, debate_id: str) -> Dict[str, Any]:
         """
@@ -1499,8 +1502,26 @@ Requirements:
                 if event.get('event_type') == 'agent_message' and event.get('content', {}).get('agent_name')
             ))
             
+            # Start thinking session
+            turn_num = turn_info.get('turn_number', 0)
+            print(f"\n🧠🧠🧠 STARTING THINKING SESSION FOR {agent_name} 🧠🧠🧠")
+            session_id = self.thinking_service.start_thinking_session(debate_id, agent_name, turn_num)
+            print(f"    Session ID: {session_id}")
+            
             # STAGE 1: REASONING
             print(f"  Stage 1: Reasoning...")
+            print(f"🧠 About to emit reasoning thinking step...")
+            self.thinking_service.emit_thinking_step(debate_id, agent_name, "reasoning", {
+                "stage": "Stage 1: Reasoning",
+                "status": "Evaluating stance and analyzing recent messages...",
+                "details": [
+                    f"Reading {len(past_messages)} past messages from this agent",
+                    f"Analyzing {len(conversation_history[-5:])} recent conversation turns",
+                    f"Checking for user interventions: {'Yes' if latest_intervention else 'None'}",
+                    f"Comparing with {len(participants_who_spoke)} agents who have spoken"
+                ]
+            })
+            
             reasoning = self.reasoning_engine.evaluate_stance(
                 agent_name=agent_name,
                 agent_role=agent_config.get('description', agent_config.get('system_prompt', '')[:100]),
@@ -1512,8 +1533,30 @@ Requirements:
             print(f"    Confidence: {reasoning['confidence']}")
             print(f"    Changed: {reasoning['stance_changed']}")
             
+            self.thinking_service.emit_thinking_step(debate_id, agent_name, "reasoning_complete", {
+                "stage": "Stage 1: Complete",
+                "status": "Reasoning complete",
+                "details": [
+                    f"Stance: {reasoning['current_stance'][:80]}...",
+                    f"Confidence: {reasoning['confidence']}",
+                    f"Stance changed: {reasoning['stance_changed']}",
+                    f"Key points identified: {len(reasoning.get('key_points', []))}"
+                ]
+            })
+            
             # STAGE 2: RESPONSE GENERATION
             print(f"  Stage 2: Generating response...")
+            self.thinking_service.emit_thinking_step(debate_id, agent_name, "generating", {
+                "stage": "Stage 2: Generating Response",
+                "status": "Crafting message based on reasoning...",
+                "details": [
+                    f"Using stance: {reasoning['current_stance'][:60]}...",
+                    f"Incorporating debate rules and personality",
+                    f"Checking for direct challenges to respond to",
+                    f"Ensuring authentic character voice"
+                ]
+            })
+            
             agent_message = self.response_generator.generate_response(
                 agent_name=agent_name,
                 agent_role_description=agent_config.get('system_prompt', ''),
@@ -1523,6 +1566,16 @@ Requirements:
                 turn_info=turn_info
             )
             print(f"    Generated {len(agent_message)} chars")
+            
+            self.thinking_service.emit_thinking_step(debate_id, agent_name, "generating_complete", {
+                "stage": "Stage 2: Complete",
+                "status": "Response generated",
+                "details": [
+                    f"Message length: {len(agent_message)} characters",
+                    f"Estimated words: ~{len(agent_message.split())}",
+                    f"Contains citations: {'Yes' if '[' in agent_message or '(' in agent_message else 'No'}"
+                ]
+            })
             
             # STAGE 3: CONSTITUTIONAL VALIDATION
             print(f"  Stage 3: Validating...")
@@ -1537,6 +1590,18 @@ Requirements:
                         if len(recent_other_messages) >= 3:
                             break
             recent_other_messages.reverse()  # Chronological order
+            
+            self.thinking_service.emit_thinking_step(debate_id, agent_name, "validating", {
+                "stage": "Stage 3: Validation",
+                "status": "Checking message against constitutional rules...",
+                "details": [
+                    "Checking for hallucinations (invalid participant mentions)",
+                    "Checking for flip-flopping (consistency with past stance)",
+                    "Checking for repetition (echoing other agents)",
+                    "Checking for self-contradiction",
+                    f"Validating against {len(all_participant_names)} valid participants"
+                ]
+            })
             
             validation = self.constitutional_validator.validate(
                 message=agent_message,
@@ -1553,12 +1618,28 @@ Requirements:
                 for violation in validation["violations"]:
                     print(f"      - {violation['rule']}: {violation['details']}")
                 
+                self.thinking_service.emit_thinking_step(debate_id, agent_name, "validation_issues", {
+                    "stage": "Stage 3: Issues Found",
+                    "status": "Constitutional violations detected",
+                    "details": [f"⚠️ {v['rule']}: {v['details']}" for v in validation["violations"][:3]]
+                })
+                
                 # Use corrected message if available
                 if validation["corrected_message"]:
                     print(f"    ✅ Auto-corrected")
                     agent_message = validation["corrected_message"]
+                    self.thinking_service.emit_thinking_step(debate_id, agent_name, "auto_corrected", {
+                        "stage": "Stage 3: Auto-Corrected",
+                        "status": "Message automatically fixed",
+                        "details": ["Applied automatic corrections", "Message ready to send"]
+                    })
                 elif validation["needs_regeneration"]:
                     print(f"    🔄 Needs regeneration - using constrained retry")
+                    self.thinking_service.emit_thinking_step(debate_id, agent_name, "regenerating", {
+                        "stage": "Stage 3: Regenerating",
+                        "status": "Creating new message with stricter constraints...",
+                        "details": ["Previous message violated rules", "Regenerating with specific fixes"]
+                    })
                     
                     # Build specific constraint based on violation type
                     violation_rules = [v['rule'] for v in validation['violations']]
@@ -1601,6 +1682,19 @@ Requirements:
                     agent_message = response['content']
             else:
                 print(f"    ✅ Validation passed")
+                self.thinking_service.emit_thinking_step(debate_id, agent_name, "validation_complete", {
+                    "stage": "Stage 3: Complete",
+                    "status": "✅ All checks passed",
+                    "details": [
+                        "No hallucinations detected",
+                        "Consistent with past stance",
+                        "Not repeating others",
+                        "Message approved"
+                    ]
+                })
+            
+            # Complete thinking session and persist summary
+            self.thinking_service.complete_thinking_session()
             
             return agent_message
             

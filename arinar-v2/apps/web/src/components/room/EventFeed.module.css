@@ -380,3 +380,179 @@
   font-size: 13px;
   font-weight: 500;
 }
+
+/* Thinking blocks - Anthropic/Vercel dark style */
+.thinkingBlock {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), rgba(124, 58, 237, 0.04));
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-left: 2px solid rgba(139, 92, 246, 0.5);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.thinkingBlock:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.09), rgba(124, 58, 237, 0.06));
+  border-color: rgba(139, 92, 246, 0.25);
+  border-left-color: rgba(139, 92, 246, 0.7);
+}
+
+.thinkingHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.thinkingIcon {
+  font-size: 15px;
+  opacity: 0.8;
+}
+
+.thinkingStage {
+  color: #c4b5fd;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.thinkingStatus {
+  color: #9ca3af;
+  font-size: 11px;
+  margin-bottom: 6px;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.thinkingDetails {
+  margin-top: 8px;
+  padding-left: 22px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.thinkingDetail {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 3px 0;
+  line-height: 1.5;
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+.thinkingDetail::before {
+  content: "•";
+  color: #8b5cf6;
+  margin-right: 8px;
+  opacity: 0.5;
+}
+
+/* Thinking section attached to agent message */
+.thinkingSection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(139, 92, 246, 0.1);
+}
+
+.showThinkingBtn {
+  background: rgba(139, 92, 246, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.showThinkingBtn:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #ddd6fe;
+  transform: translateX(2px);
+}
+
+.showThinkingBtn::before {
+  content: "▸";
+  font-size: 10px;
+  transition: transform 0.2s;
+  opacity: 0.6;
+}
+
+.showThinkingBtn[data-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
+.thinkingSteps {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thinkingStep {
+  opacity: 0;
+  animation: slideInThinking 0.3s ease-out forwards;
+}
+
+.thinkingStep:nth-child(1) { animation-delay: 0.05s; }
+.thinkingStep:nth-child(2) { animation-delay: 0.1s; }
+.thinkingStep:nth-child(3) { animation-delay: 0.15s; }
+.thinkingStep:nth-child(4) { animation-delay: 0.2s; }
+.thinkingStep:nth-child(5) { animation-delay: 0.25s; }
+.thinkingStep:nth-child(6) { animation-delay: 0.3s; }
+
+@keyframes slideInThinking {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.thinkingExpandBtn {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(124, 58, 237, 0.1));
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #c4b5fd;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+}
+
+.thinkingExpandBtn:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(124, 58, 237, 0.15));
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+  transform: translateY(-1px);
+  color: #ddd6fe;
+}
