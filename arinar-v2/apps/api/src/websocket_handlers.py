@@ -90,10 +90,20 @@ class WebSocketCommandHandlers:
             
             print(f"✅ OpenRouter key found, triggering turn orchestrator...")
             from .turn_orchestrator import TurnOrchestrator
+            from .agent_thinking_service import AgentThinkingService
+            import asyncio
+            import threading
             
-            # TurnOrchestrator.trigger_next_turn persists the event and returns event details
-            orchestrator = TurnOrchestrator(openrouter_key)
-            result = orchestrator.trigger_next_turn(debate_id)
+            # Pass manager and loop to thinking service for live broadcast
+            loop = asyncio.get_running_loop()
+            AgentThinkingService.set_broadcast_context(self.manager, loop)
+            
+            # Run turn in thread pool so it doesn't block event loop
+            def run_turn():
+                orchestrator = TurnOrchestrator(openrouter_key)
+                return orchestrator.trigger_next_turn(debate_id)
+            
+            result = await asyncio.to_thread(run_turn)
             print(f"✅ Turn orchestrator returned successfully!")
             
             # Broadcast using the ALREADY PERSISTED event (no duplicate insert)

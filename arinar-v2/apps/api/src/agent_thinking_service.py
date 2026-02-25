@@ -21,6 +21,15 @@ class AgentThinkingService:
     Service for managing agent thinking process visibility and persistence
     """
     
+    _websocket_manager = None
+    _event_loop = None
+    
+    @classmethod
+    def set_broadcast_context(cls, manager, loop):
+        """Set the WebSocket manager and event loop for broadcasting"""
+        cls._websocket_manager = manager
+        cls._event_loop = loop
+    
     def __init__(self):
         self.current_thinking_session = None
     
@@ -73,12 +82,13 @@ class AgentThinkingService:
         if self.current_thinking_session:
             self.current_thinking_session["steps"].append(step)
         
-        # Broadcast via WebSocket
-        self._broadcast_thinking(debate_id, agent_name, step)
-        
-        # Persist to database
+        # Persist to database first to get sequence_number
+        sequence_number = None
         if persist:
-            self._persist_thinking_step(debate_id, agent_name, step)
+            sequence_number = self._persist_thinking_step(debate_id, agent_name, step)
+        
+        # Broadcast via WebSocket with actual sequence_number
+        self._broadcast_thinking(debate_id, agent_name, step, sequence_number)
     
     def complete_thinking_session(self) -> Dict[str, Any]:
         """
@@ -101,7 +111,7 @@ class AgentThinkingService:
         self.current_thinking_session = None
         return result
     
-    def _broadcast_thinking(self, debate_id: str, agent_name: str, step: Dict[str, Any]):
+    def _broadcast_thinking(self, debate_id: str, agent_name: str, step: Dict[str, Any], sequence_number: int = None):
         """Send thinking step via WebSocket (non-blocking)"""
         try:
             from .websocket_service import websocket_manager
@@ -110,7 +120,7 @@ class AgentThinkingService:
             envelope = {
                 "type": "agent_thinking",
                 "debate_id": debate_id,
-                "sequence_number": None,  # Thinking events don't need sequence
+                "sequence_number": sequence_number,  # Use actual DB sequence number
                 "event_id": step.get("step_id"),
                 "occurred_at": step.get("timestamp"),
                 "sender_type": "agent",
@@ -131,39 +141,33 @@ class AgentThinkingService:
             active_count = len(websocket_manager.active_connections.get(debate_id, []))
             print(f"   Active WebSocket connections for debate: {active_count}")
             
-            # Send via WebSocket (non-blocking)
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # Use run_coroutine_threadsafe for synchronous-to-async bridge
+            # Broadcast via WebSocket using the event loop from the WS handler
+            if self._websocket_manager and self._event_loop:
+                try:
                     future = asyncio.run_coroutine_threadsafe(
-                        websocket_manager.broadcast_to_debate(debate_id, envelope),
-                        loop
+                        self._websocket_manager.broadcast_to_debate(debate_id, envelope),
+                        self._event_loop
                     )
-                    print(f"✅ Thinking broadcast scheduled (threadsafe)")
-                else:
-                    loop.run_until_complete(
-                        websocket_manager.broadcast_to_debate(debate_id, envelope)
-                    )
-                    print(f"✅ Thinking broadcast completed (sync)")
-            except Exception as loop_err:
-                print(f"⚠️ Event loop error: {loop_err}, skipping broadcast (will retry from DB)")
-                # Don't try to create new loop - just persist to DB
-                # Frontend will fetch from DB if WebSocket fails
-                pass
+                    future.result(timeout=5.0)
+                    print(f"✅ Thinking broadcast via WebSocket")
+                except Exception as e:
+                    print(f"⚠️ Thinking broadcast failed: {e}")
+            else:
+                print(f"⚠️ No broadcast context set (manager={self._websocket_manager is not None}, loop={self._event_loop is not None})")
                 
         except Exception as e:
             print(f"❌ Thinking broadcast error: {e}")
             import traceback
             traceback.print_exc()
     
-    def _persist_thinking_step(self, debate_id: str, agent_name: str, step: Dict[str, Any]):
-        """Persist individual thinking step to events table"""
+    def _persist_thinking_step(self, debate_id: str, agent_name: str, step: Dict[str, Any]) -> int:
+        """Persist individual thinking step to events table. Returns sequence_number."""
         try:
             with get_db_connection() as conn:
                 cursor = get_cursor(conn)
                 
-                event_id = str(uuid.uuid4())
+                # Use step_id as event_id to prevent duplicates between WS and DB
+                event_id = step.get("step_id", str(uuid.uuid4()))
                 
                 # Get next sequence number
                 cursor.execute("""
@@ -193,11 +197,13 @@ class AgentThinkingService:
                     }),
                     datetime.now(timezone.utc)
                 ))
-                
+
                 conn.commit()
-                
+                return next_seq  # Return sequence_number for WebSocket broadcast
+
         except Exception as e:
             print(f"⚠️ Thinking persistence error: {e}")
+            return None
     
     def _persist_thinking_session(self, session: Dict[str, Any]):
         """Persist complete thinking session summary to agent_memories table"""

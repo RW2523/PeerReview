@@ -27,9 +27,64 @@ export function useDebateRoom(options: UseDebateRoomOptions): UseDebateRoomResul
   const [events, setEvents] = useState<WSEventEnvelope[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const clientRef = useRef<WSClient | null>(null);
+  const lastSeenSequenceRef = useRef<number>(0);
+
+  // Poll for new thinking events from DB every 1 second
+  useEffect(() => {
+    if (!enabled || !debateId) return;
+
+    const pollThinkingEvents = async () => {
+      try {
+        const token = await getAccessToken();
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/debates/${debateId}/events?event_type=agent_thinking&limit=20&since=${lastSeenSequenceRef.current}`,
+          {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          }
+        );
+        if (response.ok) {
+          const dbEvents = await response.json();
+          
+          // Add events that we don't already have
+          setEvents(prev => {
+            const existingIds = new Set(prev.map(e => e.event_id));
+            const newEvents = dbEvents.filter((e: any) => !existingIds.has(e.event_id));
+            
+            if (newEvents.length > 0) {
+              console.log(`📥 Polled ${newEvents.length} new thinking events from DB (since seq ${lastSeenSequenceRef.current})`);
+              
+              // Update lastSeenSequence to highest sequence number
+              const maxSeq = Math.max(...newEvents.map((e: any) => e.sequence_number || 0));
+              if (maxSeq > lastSeenSequenceRef.current) {
+                lastSeenSequenceRef.current = maxSeq;
+              }
+              
+              return [...prev, ...newEvents];
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        // Silent fail
+      }
+    };
+
+    const interval = setInterval(pollThinkingEvents, 1000);
+    pollThinkingEvents(); // Initial poll
+
+    return () => clearInterval(interval);
+  }, [enabled, debateId]);
 
   // Event handler
   const handleEvent = useCallback((event: WSEventEnvelope) => {
+    // Debug: Log thinking events
+    if (event.type === 'agent_thinking') {
+      console.log('🟢 THINKING EVENT RECEIVED:', event.payload?.stage, 'at', new Date().toLocaleTimeString());
+    }
+    if (event.type === 'agent_message') {
+      console.log('💬 MESSAGE EVENT RECEIVED at', new Date().toLocaleTimeString());
+    }
+    
     setEvents((prev) => {
       // Deduplicate by event_id (belt and suspenders with client-side dedupe)
       if (event.event_id && prev.some(e => e.event_id === event.event_id)) {

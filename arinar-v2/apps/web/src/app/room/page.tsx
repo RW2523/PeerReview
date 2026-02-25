@@ -11,7 +11,6 @@ import AgentBehaviorsPanel from '@/components/room/AgentBehaviorsPanel';
 import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
 import DocumentPanel from './DocumentPanel';
-import ThinkingIndicator from '@/components/room/ThinkingIndicator';
 import { useDebateRoom } from '@/hooks/useDebateRoom';
 import * as api from '@/lib/api';
 import styles from './room.module.css';

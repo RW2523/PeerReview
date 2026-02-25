@@ -96,17 +96,10 @@ export default function EventFeed({ events: wsEvents, connectionStatus, onPresen
 
   // Group thinking events with their corresponding agent messages
   useEffect(() => {
-    // Debug: Log all thinking events
-    const thinkingEvents = wsEvents.filter(e => e.type === 'agent_thinking');
-    if (thinkingEvents.length > 0) {
-      console.log('🧠 Found thinking events:', thinkingEvents.length, thinkingEvents);
-    }
-    
     const shouldFilterOut = [
       'state_update',
       'typing',
       'presence_update',
-      'agent_thinking', // Filter out - we'll attach to agent messages
     ];
     
     const filtered = wsEvents.filter((event) => {
@@ -130,28 +123,63 @@ export default function EventFeed({ events: wsEvents, connectionStatus, onPresen
       return !shouldFilterOut.includes(event.type);
     });
     
-    // Group thinking events with agent messages
-    const withThinking = filtered.map(event => {
+    // Get all thinking events
+    const allThinking = wsEvents.filter(e => e.type === 'agent_thinking');
+    
+    // Get all messages
+    const allMessages = filtered.filter(e => e.type === 'agent_message');
+    
+    // Process events
+    const processed: any[] = [];
+    
+    filtered.forEach(event => {
       if (event.type === 'agent_message') {
-        // Find all thinking events for this agent from recent events
+        // Attach thinking that came before this message
         const agentName = event.payload?.agent_name;
-        const thinkingEvents = wsEvents.filter(e =>
-          e.type === 'agent_thinking' &&
-          e.payload?.agent_name === agentName &&
-          e.sequence_number < event.sequence_number &&
-          e.sequence_number > (event.sequence_number - 10) // Only recent thinking
+        const thinkingForMessage = allThinking.filter(t => 
+          t.payload?.agent_name === agentName &&
+          t.sequence_number < event.sequence_number &&
+          t.sequence_number > (event.sequence_number - 80)
         );
         
-        if (thinkingEvents.length > 0) {
-          console.log(`🧠 Attaching ${thinkingEvents.length} thinking events to message from ${agentName}`);
+        processed.push({ ...event, thinkingEvents: thinkingForMessage });
+      } else if (event.type !== 'agent_thinking') {
+        processed.push({ ...event, thinkingEvents: [] });
+      }
+    });
+    
+    // Show ALL thinking events that don't have a message yet (live)
+    allThinking.forEach(thinkEvent => {
+      const agentName = thinkEvent.payload?.agent_name;
+      if (!agentName) return;
+      
+      // Check if this agent has a message AFTER this thinking event
+      const hasLaterMessage = allMessages.some(m => {
+        if (m.payload?.agent_name !== agentName) return false;
+        
+        // If thinking event has no sequence_number, fall back to timestamp comparison
+        if (thinkEvent.sequence_number == null) {
+          const thinkTime = thinkEvent.occurred_at ? new Date(thinkEvent.occurred_at).getTime() : 0;
+          const msgTime = m.occurred_at ? new Date(m.occurred_at).getTime() : 0;
+          return msgTime > thinkTime;
         }
         
-        return { ...event, thinkingEvents };
+        // Normal sequence number comparison
+        return m.sequence_number != null && m.sequence_number > thinkEvent.sequence_number;
+      });
+      
+      // Show inline if no later message exists
+      if (!hasLaterMessage) {
+        processed.push({
+          ...thinkEvent,
+          isLiveThinking: true,
+          thinkingEvents: []
+        });
       }
-      return { ...event, thinkingEvents: [] };
     });
-
-    setDisplayEvents(withThinking);
+    
+    processed.sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
+    setDisplayEvents(processed);
   }, [wsEvents, onPresenceUpdate, onTyping]);
 
   // Auto-scroll on new events
@@ -235,15 +263,18 @@ export default function EventFeed({ events: wsEvents, connectionStatus, onPresen
 }
 
 function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnvelope; showTurnSeparator?: boolean; turnNumber?: number }) {
+  // Thinking collapsed by default to avoid spam
+  const hasThinking = (event as any).thinkingEvents?.length > 0;
   const [expanded, setExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   const getEventColor = (type: string) => {
-    if (type.includes('agent_thinking')) return '#8b5cf6'; // Purple for thinking
-    if (type.includes('agent_message')) return '#0070F3';
-    if (type.includes('human_message')) return '#0070F3';
-    if (type.includes('intervention')) return '#0070F3';
-    if (type.includes('summary')) return '#0070F3';
-    if (type.includes('error')) return '#E00';
+    if (type === 'agent_thinking') return '#8b5cf6'; // Purple for thinking
+    if (type === 'agent_message') return '#0070F3';
+    if (type === 'human_message') return '#0070F3';
+    if (type === 'intervention') return '#0070F3';
+    if (type === 'summary') return '#0070F3';
+    if (type === 'error') return '#E00';
     return '#0070F3';
   };
 
@@ -275,7 +306,7 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
     if (type === 'turn_end') return '⏸️ Turn End';
     if (type === 'state_update') return '📊 State';
     if (type === 'strategic_action') return '🎯 Strategic Move';
-    if (type === 'agent_thinking') return '🧠 Thinking';
+    if (type === 'agent_thinking') return ''; // No label, just show content
     if (type === 'error') return '❌ Error';
     return type.replace(/_/g, ' ');
   };
@@ -369,18 +400,26 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
           <div className={styles.turnLine} />
         </div>
       ) : null}
-      <div className={styles.event} style={{ '--event-color': getEventColor(event.type) } as any}>
-        <div className={styles.eventHeader}>
-          <div className={styles.eventMeta}>
-            <span className={styles.actor}>{getActor()}</span>
-            <span className={styles.eventType}>{getEventTypeLabel(event.type)}</span>
+      <div className={`${styles.event} ${event.type === 'agent_thinking' && (event as any).isLiveThinking ? styles.thinkingEventCard : ''}`} style={{ '--event-color': getEventColor(event.type) } as any}>
+        {/* Hide header for live thinking events */}
+        {!(event.type === 'agent_thinking' && (event as any).isLiveThinking) && (
+          <div className={styles.eventHeader}>
+            <div className={styles.eventMeta}>
+              <span className={styles.actor}>{getActor()}</span>
+              <span className={styles.eventType}>{getEventTypeLabel(event.type)}</span>
+            </div>
+            <span className={styles.timestamp}>
+              {event.occurred_at ? new Date(event.occurred_at).toLocaleTimeString() : 'N/A'}
+            </span>
           </div>
-          <span className={styles.timestamp}>
-            {event.occurred_at ? new Date(event.occurred_at).toLocaleTimeString() : 'N/A'}
-          </span>
-        </div>
+        )}
 
-        {event.type === 'strategic_action' ? (
+        {/* Live thinking (individual steps, real-time) */}
+        {event.type === 'agent_thinking' && (event as any).isLiveThinking ? (
+          <div className={styles.liveThinkingStep}>
+            {renderThinkingBlock(event.payload)}
+          </div>
+        ) : event.type === 'strategic_action' ? (
           renderStrategicAction(event.payload)
         ) : getMessage() ? (
           <>
@@ -418,13 +457,13 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
         {event.type !== 'agent_thinking' && (
           <button
             className={styles.expandBtn}
-            onClick={() => setExpanded(!expanded)}
+            onClick={() => setDetailsExpanded(!detailsExpanded)}
           >
-            {expanded ? 'Hide details' : 'Show details'}
+            {detailsExpanded ? 'Hide details' : 'Show details'}
           </button>
         )}
 
-        {expanded && (
+        {detailsExpanded && (
           <div className={styles.details}>
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Event ID:</span>

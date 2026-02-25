@@ -691,7 +691,8 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                         "urgency": urgency,
                         "current_round": current_round,
                         "max_rounds": max_rounds,
-                        "length_instruction": length_instruction
+                        "length_instruction": length_instruction,
+                        "turn_number": total_turns + 1
                     },
                     participants=participants,
                     history_events=history_events
@@ -1661,7 +1662,7 @@ Requirements:
                         constraints.append("- Maintain your previous position unless you explicitly justify changes")
                     
                     if 'no_hallucination' in violation_rules:
-                        constraints.append(f"- Only reference participants from this list: {', '.join(active_participants)}")
+                        constraints.append(f"- Only reference participants from this list: {', '.join(all_participant_names)}")
                     
                     constraints.extend([
                         f"- Follow your role as {agent_config.get('description', 'agent')}",

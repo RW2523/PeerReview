@@ -381,112 +381,141 @@
   font-weight: 500;
 }
 
-/* Thinking blocks - Anthropic/Vercel dark style */
+/* Live thinking step (appears one by one) */
+.liveThinkingStep {
+  margin: 6px 0;
+  animation: slideInThinking 0.3s ease-out;
+}
+
+@keyframes slideInThinking {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Special styling for thinking event cards */
+.thinkingEventCard {
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+.thinkingEventCard:hover {
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
 .thinkingBlock {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), rgba(124, 58, 237, 0.04));
-  border: 1px solid rgba(139, 92, 246, 0.15);
-  border-left: 2px solid rgba(139, 92, 246, 0.5);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #2a2a2a;
+  border-left: 2px solid #666666;
+  border-radius: 6px;
   padding: 10px 14px;
   margin: 0;
   font-size: 12px;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(8px);
+  line-height: 1.6;
+  font-family: inherit;
+  transition: all 0.15s ease;
 }
 
 .thinkingBlock:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.09), rgba(124, 58, 237, 0.06));
-  border-color: rgba(139, 92, 246, 0.25);
-  border-left-color: rgba(139, 92, 246, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #3a3a3a;
+  border-left-color: #888888;
 }
 
 .thinkingHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
   margin-bottom: 6px;
 }
 
 .thinkingIcon {
-  font-size: 15px;
-  opacity: 0.8;
+  font-size: 14px;
+  opacity: 0.6;
 }
 
 .thinkingStage {
-  color: #c4b5fd;
+  color: #cccccc;
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 500;
+  font-family: inherit;
 }
 
 .thinkingStatus {
-  color: #9ca3af;
+  color: #888888;
   font-size: 11px;
   margin-bottom: 6px;
   font-style: italic;
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .thinkingDetails {
-  margin-top: 8px;
-  padding-left: 22px;
+  margin-top: 6px;
+  padding-left: 20px;
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .thinkingDetail {
   font-size: 11px;
-  color: #9ca3af;
-  margin: 3px 0;
+  color: #999999;
+  margin: 2px 0;
   line-height: 1.5;
   font-weight: 400;
-  opacity: 0.9;
 }
 
 .thinkingDetail::before {
   content: "•";
-  color: #8b5cf6;
+  color: #666666;
   margin-right: 8px;
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 /* Thinking section attached to agent message */
 .thinkingSection {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(139, 92, 246, 0.1);
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #2a2a2a;
 }
 
 .showThinkingBtn {
-  background: rgba(139, 92, 246, 0.05);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  color: #c4b5fd;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #2a2a2a;
+  color: #999999;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s ease;
   width: 100%;
   text-align: left;
   display: flex;
   align-items: center;
   gap: 8px;
+  font-family: inherit;
 }
 
 .showThinkingBtn:hover {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgba(139, 92, 246, 0.35);
-  color: #ddd6fe;
-  transform: translateX(2px);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #3a3a3a;
+  color: #cccccc;
 }
 
 .showThinkingBtn::before {
   content: "▸";
-  font-size: 10px;
-  transition: transform 0.2s;
-  opacity: 0.6;
+  font-size: 9px;
+  transition: transform 0.15s;
+  opacity: 0.5;
 }
 
 .showThinkingBtn[data-expanded="true"]::before {
@@ -494,17 +523,17 @@
 }
 
 .thinkingSteps {
-  margin-top: 12px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  animation: fadeIn 0.3s ease-out;
+  gap: 8px;
+  animation: fadeIn 0.2s ease-out;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-2px);
   }
   to {
     opacity: 1;
@@ -513,46 +542,25 @@
 }
 
 .thinkingStep {
-  opacity: 0;
-  animation: slideInThinking 0.3s ease-out forwards;
-}
-
-.thinkingStep:nth-child(1) { animation-delay: 0.05s; }
-.thinkingStep:nth-child(2) { animation-delay: 0.1s; }
-.thinkingStep:nth-child(3) { animation-delay: 0.15s; }
-.thinkingStep:nth-child(4) { animation-delay: 0.2s; }
-.thinkingStep:nth-child(5) { animation-delay: 0.25s; }
-.thinkingStep:nth-child(6) { animation-delay: 0.3s; }
-
-@keyframes slideInThinking {
-  from {
-    opacity: 0;
-    transform: translateX(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  /* No per-step animation for simpler look */
 }
 
 .thinkingExpandBtn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(124, 58, 237, 0.1));
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  color: #c4b5fd;
-  padding: 7px 16px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #2a2a2a;
+  color: #999999;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
-  margin-top: 10px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+  margin-top: 8px;
+  transition: all 0.15s ease;
+  font-family: inherit;
 }
 
 .thinkingExpandBtn:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(124, 58, 237, 0.15));
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
-  transform: translateY(-1px);
-  color: #ddd6fe;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #3a3a3a;
+  color: #cccccc;
 }

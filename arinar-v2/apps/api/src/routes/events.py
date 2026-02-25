@@ -15,7 +15,9 @@ router = APIRouter()
 async def get_debate_events(
     debate_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
+    event_type: Optional[str] = None,
+    since: Optional[int] = None
 ):
     """
     Get all events for a debate (for history/transcript viewing)
@@ -25,9 +27,11 @@ async def get_debate_events(
     Args:
         debate_id: Debate ID
         limit: Optional limit on number of events (default: all)
+        event_type: Optional filter by event type (e.g., 'agent_thinking')
+        since: Optional - only return events with sequence_number > since
     
     Returns:
-        List of events in sequence order
+        List of events in sequence order (WSEventEnvelope format)
     """
     # Verify debate exists and user has access
     service = DebateService()
@@ -50,16 +54,26 @@ async def get_debate_events(
                    sequence_number, content, created_at
             FROM events
             WHERE debate_id = %s
-            ORDER BY sequence_number ASC
         """
+        params = [debate_id]
+        
+        if event_type:
+            query += " AND event_type = %s"
+            params.append(event_type)
+        
+        if since is not None:
+            query += " AND sequence_number > %s"
+            params.append(since)
+        
+        query += " ORDER BY sequence_number DESC"  # Get newest first for polling
         
         if limit:
             query += f" LIMIT {limit}"
         
-        cursor.execute(query, (debate_id,))
+        cursor.execute(query, tuple(params))
         events = cursor.fetchall()
         
-        # Transform events to match frontend expectations
+        # Transform events to match WSEventEnvelope format
         return [{
             'event_id': event['event_id'],
             'debate_id': event['debate_id'],
@@ -68,7 +82,7 @@ async def get_debate_events(
             'sender_id': event['sender_id'],
             'sequence_number': event['sequence_number'],
             'payload': event['content'],  # Map content to payload
-            'created_at': event['created_at'].isoformat() if event.get('created_at') else None
+            'occurred_at': event['created_at'].isoformat() if event.get('created_at') else None
         } for event in events]
 
 
