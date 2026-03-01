@@ -28,6 +28,10 @@ class ConstitutionalValidator:
             "rule": "Don't reference agents who haven't spoken",
             "severity": "critical"
         },
+        "persona_authenticity": {
+            "rule": "Must maintain unique character voice - no generic phrases that any agent could say",
+            "severity": "high"
+        },
         "no_repetition": {
             "rule": "Don't repeat what others just said - add NEW information or disagree",
             "severity": "high"
@@ -45,6 +49,19 @@ class ConstitutionalValidator:
             "severity": "medium"
         }
     }
+    
+    # Generic phrases that destroy persona authenticity
+    GENERIC_PHRASES = [
+        "i appreciate your perspective",
+        "your insights are spot-on",
+        "you raise an important point",
+        "you raise a good point",
+        "building on what",
+        "i completely acknowledge",
+        "i hear your concerns",
+        "that's a fair point",
+        "you make a valid point"
+    ]
     
     def __init__(self):
         pass
@@ -97,6 +114,15 @@ class ConstitutionalValidator:
         )
         if hallucination_violation:
             violations.append(hallucination_violation)
+        
+        # Rule 2.5: Check for persona authenticity (generic phrases)
+        persona_violation = self._check_persona_authenticity(
+            message,
+            agent_name,
+            agent_role
+        )
+        if persona_violation:
+            violations.append(persona_violation)
         
         # Rule 3: Check for self-contradiction
         contradiction_violation = self._check_self_contradiction(
@@ -360,6 +386,43 @@ class ConstitutionalValidator:
                         "severity": "high",
                         "details": f"Message has {overlap_ratio*100:.0f}% word overlap with recent message. Must add unique perspective."
                     }
+        
+        return None
+    
+    def _check_persona_authenticity(
+        self,
+        message: str,
+        agent_name: str,
+        agent_role: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Check if message uses generic phrases that destroy unique character voice
+        
+        This enforces agents to maintain distinct personas and avoid sounding identical
+        """
+        message_lower = message.lower()
+        
+        # Check for forbidden generic phrases
+        found_generic_phrases = []
+        for phrase in self.GENERIC_PHRASES:
+            if phrase in message_lower:
+                found_generic_phrases.append(phrase)
+        
+        if found_generic_phrases:
+            return {
+                "rule": "persona_authenticity",
+                "severity": "high",
+                "details": f"Message uses generic phrases that any agent could say: {', '.join(found_generic_phrases)}. Must use unique character voice for {agent_name} ({agent_role})."
+            }
+        
+        # Check for "agreement then but" pattern
+        agreement_but_pattern = r"(absolutely|definitely|certainly|i agree|you\'re right)[^.!?]*(\.|,)\s*(but|however|though|although)"
+        if re.search(agreement_but_pattern, message_lower, re.IGNORECASE):
+            return {
+                "rule": "persona_authenticity",
+                "severity": "high",
+                "details": f"Message starts with agreement then adds 'but/however' - this is formulaic. {agent_name} should take a clear stance, not hedge."
+            }
         
         return None
     
