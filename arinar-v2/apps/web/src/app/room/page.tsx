@@ -127,14 +127,19 @@ function RoomPageContent() {
 
     // Join presence via WebSocket
     sendCommand('join_presence').catch(err => {
-      console.error('Failed to join presence:', err);
+      // Non-fatal — presence is best-effort
+      console.warn('Failed to join presence:', err);
     });
 
-    // Leave presence on unmount
+    // Leave presence on unmount/disconnect — best-effort, never surfaces an error
     return () => {
-      sendCommand('leave_presence').catch(err => {
-        console.error('Failed to leave presence:', err);
-      });
+      try {
+        sendCommand('leave_presence').catch(() => {
+          // Silently ignore — WS may already be gone when component unmounts
+        });
+      } catch {
+        // sendCommand itself may throw synchronously if client is null
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debateId, connectionStatus]); // sendCommand is stable (useCallback with empty deps), exclude from deps to prevent infinite loop

@@ -131,9 +131,12 @@ export function ParticipantsStep({
                 className={styles.hostModelSelectCompact}
                 title="Host AI Model"
               >
-                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+                <option value="openai/gpt-4o-mini">GPT-4o Mini (recommended)</option>
                 <option value="openai/gpt-4o">GPT-4o</option>
                 <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                <option value="anthropic/claude-3-haiku">Claude 3 Haiku (fast)</option>
+                <option value="google/gemini-flash-1.5">Gemini Flash 1.5</option>
+                <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B</option>
                 <option value="google/gemini-pro-1.5">Gemini Pro 1.5</option>
               </select>
             )}

@@ -159,12 +159,17 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
     setError(null);
     try {
       if (sendCommand) {
-        await sendCommand('control.end');
-        onStateChange('ended');
+        try {
+          await sendCommand('control.end');
+        } catch (wsErr) {
+          // WebSocket unavailable — fall back to REST API
+          console.warn('WS unavailable for control.end, using REST fallback:', wsErr);
+          await api.endDebate(debateId);
+        }
       } else {
-        const result = await api.endDebate(debateId);
-        onStateChange(result.state);
+        await api.endDebate(debateId);
       }
+      onStateChange('ended');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to end debate');
     } finally {
@@ -201,17 +206,26 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
           // No host - just end the meeting
           console.log('🏁 No host enabled - ending meeting directly');
           if (sendCommand) {
-            await sendCommand('control.end');
-            onStateChange('ended');
+            try {
+              await sendCommand('control.end');
+            } catch (wsErr) {
+              console.warn('WS unavailable for control.end, using REST fallback:', wsErr);
+              await api.endDebate(debateId);
+            }
           } else {
             await api.endDebate(debateId);
-            onStateChange('ended');
           }
+          onStateChange('ended');
         }
       } else {
         // Regular turn
         if (sendCommand) {
-          await sendCommand('control.next_turn', { openrouter_key: apiKey });
+          try {
+            await sendCommand('control.next_turn', { openrouter_key: apiKey });
+          } catch (wsErr) {
+            console.warn('WS unavailable for next_turn, using REST fallback:', wsErr);
+            await api.triggerNextTurn(debateId, apiKey);
+          }
         } else {
           await api.triggerNextTurn(debateId, apiKey);
         }

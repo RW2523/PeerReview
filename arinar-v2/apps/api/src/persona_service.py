@@ -12,7 +12,7 @@ async def generate_persona_draft(
     tone: str,
     risk_appetite: str,
     openrouter_api_key: str,
-    model_id: str = "anthropic/claude-3.5-sonnet"
+    model_id: str = "openai/gpt-4o-mini"
 ) -> Dict[str, Any]:
     """
     Generate persona draft using OpenRouter LLM.

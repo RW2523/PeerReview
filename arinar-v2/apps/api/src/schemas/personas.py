@@ -9,7 +9,7 @@ class GeneratePersonaDraftRequest(BaseModel):
     style_brief: str = Field(..., min_length=1, max_length=500)
     tone: str = Field(..., min_length=1, max_length=100)
     risk_appetite: str = Field(..., min_length=1, max_length=100)
-    model_id: str = Field(default="anthropic/claude-3.5-sonnet")
+    model_id: str = Field(default="openai/gpt-4o-mini")
 
 
 class PersonaTraits(BaseModel):

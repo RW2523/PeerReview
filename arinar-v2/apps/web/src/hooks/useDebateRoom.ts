@@ -141,6 +141,10 @@ export function useDebateRoom(options: UseDebateRoomOptions): UseDebateRoomResul
   // Command dispatcher with auto-reconnect
   const sendCommand = useCallback(async (command: WSCommandType, payload?: Record<string, any>): Promise<WSAckMessage> => {
     if (!clientRef.current) {
+      // Presence commands are best-effort — silently no-op when WS is gone
+      if (command === 'join_presence' || command === 'leave_presence') {
+        return { type: 'ack', request_id: '', command, timestamp: '' } as WSAckMessage;
+      }
       throw new Error('WebSocket client not initialized');
     }
     
