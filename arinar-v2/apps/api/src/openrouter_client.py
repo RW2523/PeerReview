@@ -1,5 +1,6 @@
 """OpenRouter client abstraction (OpenRouter-only policy)"""
 import httpx
+import time
 from typing import Dict, Any, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential
 from .config import settings
@@ -48,7 +49,11 @@ class OpenRouterClient:
         model: str,
         messages: list[Dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        # Eval-logger context (never forwarded to OpenRouter)
+        _debate_id: Optional[str] = None,
+        _stage: str = "unknown",
+        _participant: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Request chat completion from OpenRouter
@@ -86,6 +91,7 @@ class OpenRouterClient:
         if max_tokens:
             payload["max_tokens"] = max_tokens
         
+        t_start = time.monotonic()
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(
@@ -93,7 +99,7 @@ class OpenRouterClient:
                     headers=headers,
                     json=payload
                 )
-                
+
                 if response.status_code == 401:
                     raise OpenRouterAuthError("Invalid OpenRouter API key")
                 elif response.status_code == 403:
@@ -101,22 +107,60 @@ class OpenRouterClient:
                 elif response.status_code != 200:
                     error_detail = response.text
                     raise OpenRouterError(f"OpenRouter API error (status {response.status_code}): {error_detail}")
-                
+
                 data = response.json()
-                
-                # Extract content from response
+
                 if "choices" not in data or len(data["choices"]) == 0:
                     raise OpenRouterError("No choices in OpenRouter response")
-                
+
                 choice = data["choices"][0]
                 content = choice.get("message", {}).get("content", "")
-                
-                return {
+                result = {
                     "content": content,
                     "usage": data.get("usage", {}),
-                    "model": data.get("model", model)
+                    "model": data.get("model", model),
                 }
-        
+
+                # ── Eval log ──────────────────────────────────────────────
+                if _debate_id:
+                    try:
+                        from .services.eval_logger import get_logger
+                        get_logger(_debate_id).log_llm_call(
+                            stage=_stage,
+                            model=result["model"],
+                            messages=messages,
+                            response_content=content,
+                            usage=result["usage"],
+                            latency_ms=int((time.monotonic() - t_start) * 1000),
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            participant=_participant,
+                        )
+                    except Exception as _log_exc:
+                        print(f"[eval_logger] log_llm_call failed: {_log_exc}")
+                # ─────────────────────────────────────────────────────────
+
+                return result
+
+        except (OpenRouterAuthError, OpenRouterError):
+            if _debate_id:
+                try:
+                    from .services.eval_logger import get_logger
+                    get_logger(_debate_id).log_llm_call(
+                        stage=_stage,
+                        model=model,
+                        messages=messages,
+                        response_content=None,
+                        usage=None,
+                        latency_ms=int((time.monotonic() - t_start) * 1000),
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        participant=_participant,
+                        error="OpenRouter error — see API logs",
+                    )
+                except Exception:
+                    pass
+            raise
         except httpx.TimeoutException:
             raise OpenRouterError(f"OpenRouter request timed out after {self.timeout}s")
         except httpx.RequestError as e:

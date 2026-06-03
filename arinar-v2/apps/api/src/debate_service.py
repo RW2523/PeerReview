@@ -88,8 +88,25 @@ class DebateService:
             ))
             
             row = cursor.fetchone()
-            return dict(row)
-    
+            result = dict(row)
+
+        # ── Eval log: debate created ───────────────────────────────────
+        try:
+            from .services.eval_logger import get_logger
+            logger = get_logger(debate_id)
+            logger.log_setup(
+                title=title,
+                problem_statement=(policy_config or {}).get('problem_statement', ''),
+                participants=[],
+                policy_config=policy_config,
+            )
+            logger.log_lifecycle("created")
+        except Exception as _log_exc:
+            print(f"[eval_logger] create_debate log failed: {_log_exc}")
+        # ─────────────────────────────────────────────────────────────
+
+        return result
+
     def update_policy_config(self, debate_id: str, policy_updates: Dict[str, Any]) -> Dict[str, Any]:
         """Update policy_config for a debate (e.g., extend rounds or time)"""
         debate = self.get_debate(debate_id)
@@ -165,8 +182,48 @@ class DebateService:
                 datetime.now(timezone.utc)
             ))
         
-        return self.get_debate(debate_id)
-    
+        started_debate = self.get_debate(debate_id)
+
+        # ── Eval log: debate started + capture full setup snapshot ────
+        try:
+            from .services.eval_logger import get_logger
+            logger = get_logger(debate_id)
+            # Enrich setup with participants & materials from DB
+            with get_db_connection() as _conn:
+                _cur = get_cursor(_conn)
+                _cur.execute("""
+                    SELECT role_name, agent_config
+                    FROM participants WHERE debate_id = %s
+                """, (debate_id,))
+                participants_snap = [
+                    {
+                        "name": (r['agent_config'] or {}).get('name', r['role_name']),
+                        "role": r['role_name'],
+                        "model_id": (r['agent_config'] or {}).get('model_id', ''),
+                    }
+                    for r in _cur.fetchall()
+                ]
+                _cur.execute("""
+                    SELECT title, kind FROM meeting_materials WHERE debate_id = %s
+                """, (debate_id,))
+                materials_snap = [dict(r) for r in _cur.fetchall()]
+            policy = started_debate.get('policy_config') or {}
+            logger.log_setup(
+                title=started_debate.get('title', ''),
+                problem_statement=policy.get('problem_statement', ''),
+                participants=participants_snap,
+                materials=materials_snap,
+                agenda=policy.get('agenda', []),
+                desired_outcomes=policy.get('desired_outcomes', []),
+                policy_config=policy,
+            )
+            logger.log_lifecycle("started")
+        except Exception as _log_exc:
+            print(f"[eval_logger] start_debate log failed: {_log_exc}")
+        # ─────────────────────────────────────────────────────────────
+
+        return started_debate
+
     def pause_debate(self, debate_id: str) -> Dict[str, Any]:
         """Pause debate (running -> paused)"""
         debate = self.get_debate(debate_id)
@@ -338,9 +395,16 @@ class DebateService:
                 datetime.now(timezone.utc)
             ))
         
-        # TODO #TICKET-06: Generate summary/minutes/action_items (Phase 5)
+        # ── Eval log: debate ended ─────────────────────────────────────
+        try:
+            from .services.eval_logger import get_logger
+            get_logger(debate_id).log_lifecycle("ended")
+        except Exception as _log_exc:
+            print(f"[eval_logger] end_debate log failed: {_log_exc}")
+        # ─────────────────────────────────────────────────────────────
+
         return self.get_debate(debate_id)
-    
+
     def _get_next_sequence(self, cursor, debate_id: str) -> int:
         """Get next sequence number for debate events"""
         cursor.execute("""

@@ -27,7 +27,8 @@ class AgentReasoningEngine:
         agent_role: str,
         past_positions: str,
         recent_conversation: str,
-        user_intervention: Optional[str] = None
+        user_intervention: Optional[str] = None,
+        debate_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Agent thinks through their position before responding
@@ -71,8 +72,11 @@ class AgentReasoningEngine:
                         "content": prompt
                     }
                 ],
-                temperature=0.5,  # Lower temp for reasoning
-                max_tokens=400
+                temperature=0.5,
+                max_tokens=400,
+                _debate_id=debate_id,
+                _stage="reasoning",
+                _participant=agent_name,
             )
             
             reasoning = json.loads(response["content"])

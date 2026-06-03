@@ -536,6 +536,9 @@ When writing your reviewer preparation memo:
                         {"role": "system", "content": persona_specific_prompt},
                         {"role": "user", "content": prep_prompt}
                     ],
+                    _debate_id=debate_id,
+                    _stage="preflight",
+                    _participant=role_description[:80] if role_description else None,
                     **enhanced_config
                 )
                 prep_pack_content = response.get('content', '')
@@ -613,6 +616,19 @@ When writing your reviewer preparation memo:
         
         prep_pack_knowledge_id = cursor.fetchone()['knowledge_id']
         print(f"    ✓ Prep pack persisted: knowledge_id={prep_pack_knowledge_id}")
+
+        # ── Eval log: record preflight prep pack ──────────────────────
+        try:
+            from src.services.eval_logger import get_logger
+            get_logger(debate_id).log_preflight_participant(
+                participant_id=participant_id,
+                agent_name=agent_name or role_description[:60],
+                model=model_id,
+                prep_pack=prep_pack_content,
+            )
+        except Exception as _log_exc:
+            print(f"[eval_logger] log_preflight_participant failed: {_log_exc}")
+        # ─────────────────────────────────────────────────────────────
         
         # 6. Update participant run to success (TICKET-13C: include retrieval metadata)
         cursor.execute("""

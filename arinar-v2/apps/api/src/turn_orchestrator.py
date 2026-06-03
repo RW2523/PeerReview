@@ -707,7 +707,10 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                     model=model_id,
                     messages=messages,
                     temperature=0.9,
-                    max_tokens=900
+                    max_tokens=900,
+                    _debate_id=debate_id,
+                    _stage="turn",
+                    _participant=agent_name,
                 )
                 agent_message = response['content']
             
@@ -775,6 +778,20 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                 datetime.now(timezone.utc)
             ))
             
+            # ── Eval log: record completed turn ───────────────────────
+            try:
+                from .services.eval_logger import get_logger
+                get_logger(debate_id).log_turn(
+                    turn_number=round_number,
+                    participant=agent_name,
+                    agent_id=next_participant.get('agent_id'),
+                    model=response.get('model', model_id),
+                    content=agent_message,
+                )
+            except Exception as _log_exc:
+                print(f"[eval_logger] log_turn failed: {_log_exc}")
+            # ─────────────────────────────────────────────────────────
+
             # Update turn index in policy_config
             new_turn_index = current_turn_index + 1
             new_total_turns = total_turns + 1
@@ -1526,7 +1543,8 @@ Requirements:
                 agent_role=agent_config.get('description', agent_config.get('system_prompt', '')[:100]),
                 past_positions=memory_context,
                 recent_conversation=recent_conversation,
-                user_intervention=latest_intervention
+                user_intervention=latest_intervention,
+                debate_id=debate_id,
             )
             print(f"    Stance: {reasoning['current_stance'][:60]}...")
             print(f"    Confidence: {reasoning['confidence']}")
@@ -1562,7 +1580,8 @@ Requirements:
                 reasoning=reasoning,
                 conversation_history=conversation_history,
                 debate_context=debate_context,
-                turn_info=turn_info
+                turn_info=turn_info,
+                debate_id=debate_id,
             )
             print(f"    Generated {len(agent_message)} chars")
             

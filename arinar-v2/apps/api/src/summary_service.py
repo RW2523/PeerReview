@@ -64,12 +64,14 @@ class SummaryService:
             model=model_id,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=4000  # Increased to avoid truncation
+            max_tokens=4000,
+            _debate_id=debate_id,
+            _stage="summary",
         )
-        
+
         # Parse structured output
         outputs = self._parse_summary_response(response['content'])
-        
+
         # Store in database
         self._save_outputs(
             debate_id=debate_id,
@@ -81,10 +83,25 @@ class SummaryService:
             model_used=model_id,
             token_count=response.get('usage', {}).get('total_tokens'),
         )
-        
+
         # Create event in ledger
         self._create_summary_event(debate_id, outputs)
-        
+
+        # ── Eval log: record summary ───────────────────────────────────
+        try:
+            from .services.eval_logger import get_logger
+            get_logger(debate_id).log_summary(
+                model=model_id,
+                request_prompt=prompt,
+                summary=outputs.get('summary', ''),
+                minutes=outputs.get('minutes', ''),
+                action_items=outputs.get('action_items', []),
+                usage=response.get('usage', {}),
+            )
+        except Exception as _log_exc:
+            print(f"[eval_logger] log_summary failed: {_log_exc}")
+        # ─────────────────────────────────────────────────────────────
+
         return outputs
     
     def get_summary(self, debate_id: str) -> Optional[Dict[str, Any]]:

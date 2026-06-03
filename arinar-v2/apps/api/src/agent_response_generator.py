@@ -28,7 +28,8 @@ class AgentResponseGenerator:
         reasoning: Dict[str, Any],
         conversation_history: List[Dict[str, str]],
         debate_context: Dict[str, Any],
-        turn_info: Dict[str, Any]
+        turn_info: Dict[str, Any],
+        debate_id: Optional[str] = None,
     ) -> str:
         """
         Generate debate message based on reasoning
@@ -78,8 +79,11 @@ Now generate your debate message following this reasoning."""
             response = self.client.chat_completion(
                 model="openai/gpt-4o-mini",
                 messages=messages,
-                temperature=0.85,  # Higher temp for natural language
-                max_tokens=900
+                temperature=0.85,
+                max_tokens=900,
+                _debate_id=debate_id,
+                _stage="response_generation",
+                _participant=agent_name,
             )
             
             return response["content"].strip()
