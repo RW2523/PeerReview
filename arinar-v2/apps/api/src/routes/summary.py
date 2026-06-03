@@ -129,22 +129,31 @@ async def get_summary(
     check_workspace_access(current_user, debate['workspace_id'])
     
     try:
-        outputs = service.get_outputs(debate_id)
-        
+        summary_service = SummaryService()
+        outputs = summary_service.get_summary(debate_id)
+
         if not outputs:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No summary found for debate {debate_id}. Generate one first using POST /debates/{debate_id}/summarize"
             )
-        
+
+        generated_at = outputs.get('generated_at')
+        if hasattr(generated_at, 'isoformat'):
+            generated_at = generated_at.isoformat()
+        else:
+            generated_at = str(generated_at) if generated_at else ''
+
         return SummaryResponse(
-            output_id=outputs['output_id'],
-            debate_id=outputs['debate_id'],
-            summary=outputs['summary'],
-            minutes_of_meeting=outputs['minutes_of_meeting'],
-            action_items=outputs['action_items']
+            output_id=str(outputs['output_id']),
+            debate_id=str(outputs['debate_id']),
+            summary=outputs.get('summary', ''),
+            minutes=outputs.get('minutes', ''),
+            action_items=outputs.get('action_items') or [],
+            generated_at=generated_at,
+            model_used=outputs.get('model_used')
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:

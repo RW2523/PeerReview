@@ -518,14 +518,16 @@ export async function getDebateSummary(debateId: string): Promise<any> {
     method: 'GET',
     headers,
   });
-  
+
   if (!response.ok) {
     if (response.status === 404) {
       return null; // No summary generated yet
     }
-    throw new Error(`Failed to get summary: ${response.statusText}`);
+    const body = await response.json().catch(() => null);
+    const detail = body?.detail ?? response.statusText;
+    throw new Error(`Failed to get summary: ${detail}`);
   }
-  
+
   return response.json();
 }
 
