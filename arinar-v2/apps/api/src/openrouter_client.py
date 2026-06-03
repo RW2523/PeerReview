@@ -54,7 +54,7 @@ class OpenRouterClient:
         Request chat completion from OpenRouter
         
         Args:
-            model: Model identifier (e.g. "anthropic/claude-3.5-sonnet")
+            model: Model identifier (e.g. "anthropic/claude-sonnet-4-5")
             messages: List of message dicts with "role" and "content"
             temperature: Sampling temperature
             max_tokens: Optional max tokens limit

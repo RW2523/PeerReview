@@ -11,9 +11,9 @@ interface SummaryGenerateFormProps {
 }
 
 const SUMMARY_MODELS = [
+  { id: 'anthropic/claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (recommended)' },
   { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini (fast, cheap)' },
-  { id: 'openai/gpt-4o', label: 'GPT-4o (higher quality)' },
-  { id: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+  { id: 'openai/gpt-4o', label: 'GPT-4o' },
   { id: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku (fast)' },
   { id: 'google/gemini-flash-1.5', label: 'Gemini Flash 1.5' },
   { id: 'meta-llama/llama-3.1-8b-instruct', label: 'Llama 3.1 8B (free tier)' },
@@ -27,7 +27,7 @@ export function SummaryGenerateForm({
 }: SummaryGenerateFormProps) {
   // Pre-fill key from keyStore so user doesn't have to re-enter it
   const [openrouterKey, setOpenrouterKey] = useState(() => keyStore.getKey() || '');
-  const [modelId, setModelId] = useState('openai/gpt-4o-mini');
+  const [modelId, setModelId] = useState('anthropic/claude-sonnet-4-5');
 
   const handleGenerate = async () => {
     if (!openrouterKey.trim()) {

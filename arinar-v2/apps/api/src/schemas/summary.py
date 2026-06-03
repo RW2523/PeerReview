@@ -15,7 +15,7 @@ class SummarizeRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     
     openrouter_api_key: str = Field(..., description="OpenRouter BYOK key (never stored)", min_length=10)
-    model_id: str = Field(default="openai/gpt-4o-mini", description="Model for summary generation")
+    model_id: str = Field(default="anthropic/claude-sonnet-4-5", description="Model for summary generation")
 
 
 class SummaryResponse(BaseModel):

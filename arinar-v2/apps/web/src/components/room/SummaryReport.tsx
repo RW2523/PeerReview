@@ -46,7 +46,7 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
         debateId,
         {
           openrouter_api_key: apiKey,
-          model_id: 'openai/gpt-4o-mini',
+          model_id: 'anthropic/claude-sonnet-4-5',
         },
         apiKey
       );
