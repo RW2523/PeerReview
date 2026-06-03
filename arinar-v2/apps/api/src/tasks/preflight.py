@@ -14,13 +14,13 @@ from src.config import settings
 from src.database import get_cursor
 from src.services.memory_retrieval import retrieve_allowed_chunks
 
-# Try to import web search
+# Web search via Tavily (uses the key from settings.tavily_api_key)
 try:
-    from duckduckgo_search import DDGS
+    from tavily import TavilyClient as _TavilyClient
     WEB_SEARCH_AVAILABLE = True
 except ImportError:
     WEB_SEARCH_AVAILABLE = False
-    DDGS = None
+    _TavilyClient = None
 
 # Try to import Celery, but make it optional
 try:
@@ -292,146 +292,55 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         web_search_urls = []  # Store URLs separately for metadata
         web_search_data = []  # Store full structured results
         
-        if WEB_SEARCH_AVAILABLE and problem_statement:
+        tavily_key = settings.tavily_api_key or ""
+        if WEB_SEARCH_AVAILABLE and problem_statement and tavily_key:
             try:
-                # Broadcast progress: Researching online
                 _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Researching topic online')
-                
-                # Generate HIGHLY PERSONA-SPECIFIC search query based on agent's unique role and perspective
-                role_name = role_description or "analyst"
-                
-                # Extract key persona traits from system prompt for MORE unique searches
-                persona_keywords = ""
-                if system_prompt:
-                    # Extract distinctive keywords from persona (focus words like "skeptical", "data-driven", "emotional", etc.)
-                    prompt_lower = system_prompt.lower()
-                    distinctive_traits = []
-                    trait_words = ['skeptical', 'analytical', 'emotional', 'data', 'strategic', 'critical', 
-                                   'creative', 'pragmatic', 'idealistic', 'technical', 'philosophical', 
-                                   'economic', 'social', 'political', 'scientific', 'historical']
-                    for trait in trait_words:
-                        if trait in prompt_lower:
-                            distinctive_traits.append(trait)
-                    if distinctive_traits:
-                        persona_keywords = " ".join(distinctive_traits[:3])  # Use up to 3 distinctive traits
-                
-                # Clean and enhance query for better search results
-                query_base = problem_statement
-                
-                # Remove question words and generic adjectives that confuse search
-                words_to_remove = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are', 
-                                  'does', 'do', 'can', 'should', 'would', 'could',
-                                  'the', 'a', 'an', 'most', 'best', 'likely', 'potential',
-                                  'effective', 'good', 'better', 'ideal', 'optimal']
-                
-                # Split into words and filter
-                words = query_base.split()
-                cleaned_words = [w for w in words if w.lower() not in words_to_remove]
-                query_base = ' '.join(cleaned_words)
-                
-                # Add context hints for better results
-                # Detect common patterns and add specificity
-                query_lower = query_base.lower()
-                context_hints = []
-                
-                # Political/election context
-                if any(term in query_lower for term in ['president', 'election', 'candidate', 'nomination', 'campaign']):
-                    current_year = datetime.now().year
-                    context_hints.append(f"USA {current_year} {current_year+1}")
-                
-                # Medical/health context  
-                if any(term in query_lower for term in ['patient', 'disease', 'treatment', 'medical', 'health']):
-                    context_hints.append("medical research clinical guidelines")
-                
-                # Tech context
-                if any(term in query_lower for term in ['software', 'ai', 'technology', 'algorithm', 'code']):
-                    context_hints.append("technology industry latest")
-                
-                # Build final search query with context
-                context_str = ' '.join(context_hints)
-                if persona_keywords:
-                    search_query = f"{query_base[:100]} {context_str} {role_name} {persona_keywords}"
-                else:
-                    search_query = f"{query_base[:100]} {context_str} {role_name} analysis"
-                
-                print(f"    🔍 Persona-specific web search ({role_name})")
+
+                # Build a concise, search-friendly query from the problem statement
+                search_query = problem_statement[:300].strip()
+                print(f"    🔍 Tavily web search for preflight")
                 print(f"    📝 Query: {search_query[:150]}")
-                
-                with DDGS() as ddgs:
-                    # Search for top results
-                    results = list(ddgs.text(search_query, max_results=5))  # Get 5 best results
-                    
-                    if results:
-                        web_research_results = "\n**Web Research Results** (Full content from top sources):\n"
-                        
-                        # Use Jina Reader to fetch FULL content from top 3 sources (PARALLEL for speed)
-                        import asyncio
-                        import aiohttp
-                        jina_api_key = settings.jina_api_key
-                        
-                        async def fetch_with_jina(url: str, title: str, snippet: str):
-                            """Async fetch for speed"""
-                            try:
-                                headers = {
-                                    'Authorization': f'Bearer {jina_api_key}',
-                                    'X-Return-Format': 'markdown',
-                                    'X-Timeout': '4'
-                                }
-                                async with aiohttp.ClientSession() as session:
-                                    async with session.get(f'https://r.jina.ai/{url}', headers=headers, timeout=5) as resp:
-                                        if resp.status == 200:
-                                            content = await resp.text()
-                                            return ('success', title, url, content[:3000])
-                                        else:
-                                            return ('fallback', title, url, snippet)
-                            except:
-                                return ('fallback', title, url, snippet)
-                        
-                        # Fetch top 3 in parallel (faster!)
-                        top_results = results[:3]
-                        fetch_tasks = [
-                            fetch_with_jina(r.get('href', ''), r.get('title', 'N/A'), r.get('body', '')[:200])
-                            for r in top_results
-                        ]
-                        
-                        fetched = asyncio.run(asyncio.gather(*fetch_tasks))
-                        sources_fetched = 0
-                        
-                        for i, (status, title, url, content) in enumerate(fetched, 1):
-                            if status == 'success':
-                                web_research_results += f"{i}. **{title}**\n   URL: {url}\n\n{content}\n\n---\n\n"
-                                sources_fetched += 1
-                            else:
-                                web_research_results += f"{i}. **{title}**\n   {content}...\n   Source: {url}\n\n"
-                            
-                            # Store structured data
-                            web_search_urls.append(url)
-                            web_search_data.append({
-                                'title': title,
-                                'snippet': snippet,
-                                'url': url
-                            })
-                        
-                        # Add remaining results as snippets only
-                        for i, result in enumerate(results[3:], 4):
-                            title = result.get('title', 'N/A')
-                            snippet = result.get('body', '')[:200]
-                            url = result.get('href', '')
-                            web_research_results += f"{i}. **{title}**\n   {snippet}...\n   Source: {url}\n\n"
-                            web_search_urls.append(url)
-                            web_search_data.append({
-                                'title': title,
-                                'snippet': snippet,
-                                'url': url
-                            })
-                        
-                        print(f"    ✅ Fetched full content from {sources_fetched}/3 sources, {len(results)} total results")
-                        print(f"    🔗 First 3 URLs: {', '.join(web_search_urls[:3])}")
-                    else:
-                        print(f"    ℹ️ No web search results found")
+
+                tavily = _TavilyClient(api_key=tavily_key)
+                response = tavily.search(
+                    query=search_query,
+                    search_depth="basic",
+                    max_results=5,
+                    include_answer=False,
+                    include_raw_content=False,
+                )
+
+                results = response.get("results", [])
+                if results:
+                    web_research_results = "\n**Web Research Results**:\n"
+                    for i, item in enumerate(results, 1):
+                        title   = item.get("title", "")
+                        url     = item.get("url", "")
+                        content = item.get("content", "")[:800]
+                        web_research_results += (
+                            f"{i}. **{title}**\n"
+                            f"   URL: {url}\n\n"
+                            f"{content}\n\n---\n\n"
+                        )
+                        web_search_urls.append(url)
+                        web_search_data.append({
+                            "title":   title,
+                            "snippet": content,
+                            "url":     url,
+                        })
+                    print(f"    ✅ Tavily returned {len(results)} results")
+                    print(f"    🔗 First 3 URLs: {', '.join(web_search_urls[:3])}")
+                else:
+                    print(f"    ℹ️ Tavily returned no results")
+
             except Exception as e:
+                import traceback
                 print(f"    ⚠️ Web search failed: {e}")
+                traceback.print_exc()
                 web_research_results = ""
+        elif not tavily_key:
+            print(f"    ⚠️ TAVILY_API_KEY not set — skipping web research")
         
         # 3b. Build prep prompt
         # Get current date/time for temporal context
