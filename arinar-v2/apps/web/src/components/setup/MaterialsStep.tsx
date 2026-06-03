@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import * as api from '@/lib/api';
+import { keyStore } from '@/lib/openrouterKeyStore';
 import styles from './SetupSteps.module.css';
 
 interface MaterialsStepProps {
@@ -24,6 +25,38 @@ export function MaterialsStep({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [embeddingStatus, setEmbeddingStatus] = useState<string | null>(null);
+
+  // Poll for status updates while any file is still processing
+  const refreshStatus = useCallback(async () => {
+    if (!debateId) return;
+    try {
+      const status = await api.getMaterialsStatus(debateId);
+      if (onFilesUploaded) onFilesUploaded(status.materials);
+      // Stop polling once all files reach a terminal state
+      const allDone = status.materials.every(
+        (m) => m.processed_status === 'complete' || m.processed_status === 'failed'
+      );
+      if (allDone && pollInterval) {
+        clearInterval(pollInterval);
+        setPollInterval(null);
+      }
+    } catch {
+      // Silently ignore polling errors
+    }
+  }, [debateId, onFilesUploaded, pollInterval]);
+
+  // Load existing files when debateId first becomes available
+  useEffect(() => {
+    if (debateId) refreshStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debateId]);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => { if (pollInterval) clearInterval(pollInterval); };
+  }, [pollInterval]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -34,13 +67,13 @@ export function MaterialsStep({
 
     try {
       const fileArray = Array.from(files);
-      await api.uploadMaterials(debateId, fileArray);
+      const openrouterKey = keyStore.getKey();
+      await api.uploadMaterials(debateId, fileArray, openrouterKey);
       
-      // Fetch updated status
-      const status = await api.getMaterialsStatus(debateId);
-      if (onFilesUploaded) {
-        onFilesUploaded(status.materials);
-      }
+      // Fetch immediately then poll until processing completes
+      await refreshStatus();
+      const interval = setInterval(refreshStatus, 3000);
+      setPollInterval(interval);
     } catch (error) {
       console.error('Upload failed:', error);
       setUploadError(error instanceof Error ? error.message : 'Upload failed');
@@ -51,6 +84,25 @@ export function MaterialsStep({
       }
     }
   };
+
+  const handleGenerateEmbeddings = async () => {
+    if (!debateId) return;
+    const key = keyStore.getKey();
+    if (!key) {
+      setEmbeddingStatus('No OpenRouter key found. Please add your key in Settings first.');
+      return;
+    }
+    setEmbeddingStatus('Queuing embedding generation...');
+    try {
+      const result = await api.triggerEmbeddingGeneration(debateId, key);
+      setEmbeddingStatus(result.message);
+    } catch (err) {
+      setEmbeddingStatus(err instanceof Error ? err.message : 'Failed to queue embeddings');
+    }
+  };
+
+  // Check if any complete files still lack embeddings info
+  const hasCompleteFiles = uploadedFiles.some(f => f.processed_status === 'complete');
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, string> = {
@@ -65,8 +117,8 @@ export function MaterialsStep({
 
   return (
     <div className={styles.section}>
-      <h2>Materials</h2>
-      <p className={styles.hint}>Add context, documents, or links for participants</p>
+      <h2>Document Ingestion</h2>
+      <p className={styles.hint}>Upload your paper draft, proposal, dataset description, or any supporting documents. Add URLs or paste text passages for reviewers to reference.</p>
 
       <div className={styles.buttonGroup}>
         <button onClick={() => onAdd('text')} className={styles.btnAdd}>
@@ -88,7 +140,7 @@ export function MaterialsStep({
           onClick={() => fileInputRef.current?.click()} 
           className={styles.btnAdd}
           disabled={!debateId || uploading}
-          title={!debateId ? 'Debate being created...' : 'Upload PDF, DOCX, TXT, or MD files'}
+          title={!debateId ? 'Session being created...' : 'Upload PDF, DOCX, TXT, or MD files'}
         >
           <span>📎</span> {uploading ? 'Uploading...' : 'Upload Files'}
         </button>
@@ -96,6 +148,21 @@ export function MaterialsStep({
 
       {uploadError && (
         <div className={styles.error}>{uploadError}</div>
+      )}
+
+      {hasCompleteFiles && (
+        <div className={styles.embeddingBar}>
+          <button
+            onClick={handleGenerateEmbeddings}
+            className={styles.btnSecondary}
+            title="Generate semantic embeddings so AI reviewers can search your documents intelligently"
+          >
+            🔍 Generate Embeddings for RAG
+          </button>
+          {embeddingStatus && (
+            <span className={styles.embeddingStatusText}>{embeddingStatus}</span>
+          )}
+        </div>
       )}
 
       <div className={styles.list}>

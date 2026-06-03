@@ -1,4 +1,4 @@
-"""Turn-based debate orchestration for M2+"""
+"""Turn-based review orchestration for PeerForge (M2+)"""
 import uuid
 import random
 import asyncio
@@ -178,17 +178,25 @@ class TurnOrchestrator:
             current_date_str = current_datetime.strftime("%A, %B %d, %Y")
             current_time_str = current_datetime.strftime("%I:%M %p UTC")
             
-            # Context message with topic, agenda, outcomes
+            # Context message with review session topic, agenda, objectives
             context_parts = [
-                f"📅 Current Date & Time: {current_date_str} at {current_time_str}",
-                f"Debate Topic: {debate['title'] or 'Untitled Debate'}"
+                f"Current Date & Time: {current_date_str} at {current_time_str}",
+                f"Research Title: {debate['title'] or 'Untitled Review Session'}"
             ]
             if debate['description']:
-                context_parts.append(f"Problem: {debate['description']}")
+                context_parts.append(f"Research Question / Abstract: {debate['description']}")
             if agenda:
-                context_parts.append(f"Agenda:\n" + "\n".join(f"  - {item}" for item in agenda))
+                context_parts.append(f"Review Agenda:\n" + "\n".join(f"  - {item}" for item in agenda))
             if desired_outcomes:
-                context_parts.append(f"Desired Outcomes:\n" + "\n".join(f"  - {item}" for item in desired_outcomes))
+                context_parts.append(f"Review Objectives:\n" + "\n".join(f"  - {item}" for item in desired_outcomes))
+            context_parts.append(
+                "ACADEMIC PEER REVIEW CITATION REQUIREMENT:\n"
+                "  - Every claim about the research MUST be supported by evidence\n"
+                "  - Cite ingested materials as: (Section N of submitted draft) or (see uploaded material: [title])\n"
+                "  - Cite literature as: Author et al. (Year) — doi/url if available\n"
+                "  - Do NOT make unsupported claims about the quality or novelty of the work\n"
+                "  - Follow the review arc: Contribution → Strengths → Weaknesses → Lit Gaps → Recommendation"
+            )
             
             messages.append({
                 "role": "system",
@@ -299,42 +307,42 @@ class TurnOrchestrator:
             if highlight_parts:
                 messages.append({
                     "role": "system",
-                    "content": f"""🔴 WHAT JUST HAPPENED (React to this):
+                    "content": f"""RECENT REVIEW ACTIVITY (engage with this):
 
 {chr(10).join(highlight_parts)}
 
-**Your job now:**
-- Pick specific points/proposals/coalitions and react
-- Support proposals: Use their ACTUAL name like "I'm with @Visionary on voting for X"
-- Counter proposals: Use their ACTUAL name like "@Professional_Arguer, that vote won't work because..."
-- Challenge coalitions: "Wait, those two teaming up? That's concerning."
-- Add new info: Reference what they ACTUALLY said, don't invent quotes
-- Be direct, opinionated, and conversational
+YOUR TASK AS A REVIEWER:
+- Directly address the most important point raised — agree, disagree, or extend with evidence
+- Use @mentions with the reviewer's EXACT name when responding to them
+- Every claim must be backed by cited evidence from the submitted materials or literature
+- Move the review arc forward: if strengths were covered, pivot to weaknesses or lit gaps
+- Be specific: name figures, tables, methods, or equations from the submitted work
 
-⚠️ USE THE EXACT NAMES from the "Active:" list above - don't make up @Name or @Agent1"""
+USE EXACT NAMES from the "Active:" list — do not invent @names"""
                 })
             else:
-                # NO ONE HAS SPOKEN YET - Agent is going FIRST
+                # NO ONE HAS SPOKEN YET - Reviewer is going FIRST
                 messages.append({
                     "role": "system",
-                    "content": f"""🔴🔴🔴 YOU ARE THE FIRST SPEAKER - NOBODY HAS SPOKEN YET!
+                    "content": f"""YOU ARE THE FIRST REVIEWER TO SPEAK — SET THE TONE
 
-**DO NOT:**
-❌ Reference what "others said" - NOBODY spoke yet!
-❌ Use phrases like "you mentioned", "as discussed", "building on that"
-❌ Use @tags or @mentions - nobody to tag yet!
-❌ Say "fragmentation was mentioned" or "someone raised" - YOU'RE FIRST!
+DO NOT:
+- Reference what others said — nobody has spoken yet
+- Use vague opener phrases like "This paper explores..." or "The authors present..."
 
-**DO:**
-✅ Make a bold opening claim: "X is clearly the answer because..."
-✅ Ask a provocative question: "Here's what nobody's asking: Why Z?"
-✅ State your position: "I believe Y will happen for 3 reasons..."
-✅ Challenge conventional wisdom: "Everyone assumes X, but they're wrong."
+DO:
+- Open with a substantive claim about the work's core contribution or a methodological concern
+- State your most important observation from your reviewer lens immediately
+- Be specific: reference a method, figure, claim, or dataset from the submitted work
+- Ask a pointed question that will drive the review discussion
 
-You're setting the stage. Others will REACT to YOU.
+Example openers (adapt to your reviewer role):
+  "The central claim of this work — [X] — rests on [Y], which the evidence does not yet support."
+  "The strongest contribution here is [X], but it depends entirely on the validity of [Y]."
+  "Before evaluating novelty, the panel must establish whether [X] is correctly measured."
 
-Current participant list: {participant_list}
-(This shows YOU'RE FIRST - don't reference anyone yet!)"""
+Current panel: {participant_list}
+(You are first — set the review agenda.)"""
                 })
             
             # Extract any recent human interventions and make them VERY prominent
@@ -361,23 +369,17 @@ Current participant list: {participant_list}
                 # Add moderator guidance as context (not as primary focus)
                 messages.append({
                     "role": "system",
-                    "content": f"""📢 Moderator Guidance:
+                    "content": f"""RESEARCHER / MODERATOR INPUT:
 
-The moderator has provided the following input to help steer the debate:
+The researcher or session moderator has provided the following:
 
 {chr(10).join(f"• {msg}" for msg in recent_human_messages)}
 
-**How to handle this:**
-- Briefly acknowledge the moderator's point (1 sentence max)
-- Integrate their guidance into your ongoing argument about the main debate topic
-- Continue focusing on the original problem statement and desired outcomes
-- Don't pivot completely - treat this as helpful context, not a new debate topic
-
-**Example (Good):**
-"Good point, Moderator. With that in mind, I'd also add that [continue your argument on the main topic]..."
-
-**Example (Bad - Don't do this):**
-"Let me completely shift focus to address what the moderator said..." ❌"""
+How to respond:
+- Acknowledge briefly (1 sentence), then integrate into your ongoing review
+- If the researcher is clarifying a methodology point, incorporate it into your assessment
+- If the moderator is redirecting the panel, follow the new focus area
+- Continue grounding your review in cited evidence from submitted materials or literature"""
                 })
             
             # Calculate progress and urgency
@@ -427,47 +429,43 @@ The moderator has provided the following input to help steer the debate:
                     urgency = f"⏰ Only {rounds_remaining} rounds left ({current_round}/{max_rounds})"
                     length_instruction = f"Time is running out! Express urgency. Be concise (3-4 sentences). Focus on what matters most. Show that you've listened to others in rounds 1-{current_round - 1}."
                 elif current_round == 1:
-                    urgency = f"Round {current_round}/{max_rounds} - OPENING"
-                    length_instruction = f"First round of {max_rounds}. Make a bold opening claim or ask a provocative question. Be specific. If others spoke, RESPOND to them - don't ignore them. Keep it punchy: 150-250 words max."
+                    urgency = f"Round {current_round}/{max_rounds} - OPENING REVIEW"
+                    length_instruction = f"First review round of {max_rounds}. Focus on: the paper's main contribution and immediate methodological concerns. Be specific and cite evidence. 150-250 words."
                 else:
-                    urgency = f"Round {current_round}/{max_rounds}"
-                    length_instruction = f"Round {current_round} of {max_rounds}. Read what others said and REACT. Agree? Disagree? Add new info? Challenge their logic? Be direct and conversational. Keep it tight: 150-250 words."
+                    urgency = f"Round {current_round}/{max_rounds} - DEEP REVIEW"
+                    length_instruction = f"Round {current_round} of {max_rounds}. Engage with other reviewers' points. Challenge weak arguments, acknowledge strong ones, and advance to the next arc stage (weaknesses, lit gaps). Cite evidence. 150-250 words."
             else:
-                urgency = f"Turn {total_turns + 1}"
-                length_instruction = "Keep it short and punchy. Read what others said and respond directly. 150-250 words max."
+                urgency = f"Review Turn {total_turns + 1}"
+                length_instruction = "Advance the review arc. Respond to other reviewers with cited evidence. 150-250 words."
             
             # Add turn instruction with conversational guidance
             role_context = agent_config.get('description', f"You are {agent_name}")
             
-            # Build strategic context about debate structure
+            # Build strategic context about review structure
             if max_rounds:
-                # Adapt strategy guidance based on total rounds
-                if max_rounds == 2:
+                if max_rounds <= 2:
                     strategy_guide = f"""
-**DEBATE STRUCTURE:**
-Total Rounds: {max_rounds} | Current: Round {current_round}/{max_rounds}
+REVIEW STRUCTURE: {max_rounds} round(s) | Current: Round {current_round}/{max_rounds}
 
-**YOUR STRATEGY FOR THIS 2-ROUND DEBATE:**
-Round 1: Explore the topic, share initial thoughts, ask questions. Be open to others' perspectives.
-Round 2 (FINAL): Synthesize what you heard, make your decision with clear reasoning based on the discussion."""
+REVIEW ARC STRATEGY:
+Round 1: Assess the core contribution, identify the most important strength AND the most critical weakness. Cite evidence.
+Round 2 (FINAL): Address literature gaps, confirm or revise your provisional recommendation, synthesise with other reviewers."""
                 elif max_rounds == 3:
                     strategy_guide = f"""
-**DEBATE STRUCTURE:**
-Total Rounds: {max_rounds} | Current: Round {current_round}/{max_rounds}
+REVIEW STRUCTURE: {max_rounds} rounds | Current: Round {current_round}/{max_rounds}
 
-**YOUR STRATEGY FOR THIS 3-ROUND DEBATE:**
-Round 1: Explore, listen, ask clarifying questions, share initial observations
-Round 2: Engage with others' points, challenge/build on ideas, develop your position
-Round 3 (FINAL): Converge, synthesize discussion, make your final call with clear reasoning"""
+REVIEW ARC STRATEGY:
+Round 1: Contribution assessment and initial methodological observations (cite submitted materials)
+Round 2: Deep engagement — challenge other reviewers' points, raise literature gaps, unresolved questions
+Round 3 (FINAL): Finalise your recommendation (Accept/Minor/Major/Reject) with synthesised rationale"""
                 else:
                     strategy_guide = f"""
-**DEBATE STRUCTURE:**
-Total Rounds: {max_rounds} | Current: Round {current_round}/{max_rounds}
+REVIEW STRUCTURE: {max_rounds} rounds | Current: Round {current_round}/{max_rounds}
 
-**YOUR STRATEGY FOR THIS {max_rounds}-ROUND DEBATE:**
-Early Rounds (1-2): Explore and listen, ask questions, share initial thoughts
-Middle Rounds: Engage deeply, challenge/build on ideas, develop position
-Final Round ({max_rounds}): Converge, synthesize, make your final decision"""
+REVIEW ARC STRATEGY:
+Rounds 1-2: Contribution assessment, initial strengths and concerns (cite submitted materials)
+Middle Rounds: Deep methodological and literature engagement — challenge, evidence, counter-evidence
+Final Round ({max_rounds}): Clear recommendation with full rationale"""
             else:
                 strategy_guide = ""
             

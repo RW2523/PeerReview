@@ -48,10 +48,10 @@ export default function LoginPage() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.loginHeader}>
-          <span className={styles.loginIcon}>🏛️</span>
-          <h1>Boardroom AI</h1>
+          <span className={styles.loginIcon}>🔬</span>
+          <h1>PeerForge</h1>
         </div>
-        <p className={styles.subtitle}>Sign in to access the debate platform</p>
+        <p className={styles.subtitle}>Sign in to access your research review platform</p>
 
         <div className={styles.toggle}>
           <button

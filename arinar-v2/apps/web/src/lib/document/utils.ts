@@ -51,8 +51,8 @@ export function calculateSectionProgress(section: DocumentSection): number {
   if (section.status === SectionStatus.PENDING) return 0;
   
   // If in progress, calculate based on word count
-  if (section.wordLimit && section.wordCount > 0) {
-    const progress = (section.wordCount / section.wordLimit) * 100;
+  if (section.wordLimit && (section.wordCount ?? 0) > 0) {
+    const progress = ((section.wordCount ?? 0) / section.wordLimit) * 100;
     return Math.min(progress, 95); // Cap at 95% until marked complete
   }
   

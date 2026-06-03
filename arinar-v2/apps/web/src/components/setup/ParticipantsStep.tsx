@@ -108,19 +108,19 @@ export function ParticipantsStep({
 
   return (
     <div className={styles.section}>
-      <h2>Assemble Your Panel ({participants.length}/8)</h2>
+      <h2>Select AI Reviewers ({participants.length}/8)</h2>
       <p className={styles.hint}>
-        Select AI experts with diverse perspectives. Mix roles, seniority, and thinking styles for richer debates.
-        <strong> Min 2, Max 8 participants.</strong>
+        Assemble your peer-review panel. Mix domain experts, methodologists, statisticians, critical reviewers, and writing editors for thorough coverage.
+        <strong> Min 2, Max 8 reviewers.</strong>
       </p>
 
       {/* Compact Ultimate Host Toggle */}
       <div className={styles.hostConfigCompact}>
         <div className={styles.hostToggleRow}>
           <label htmlFor="enable-host" className={styles.hostToggleLabel}>
-            <span className={styles.hostIcon}>🏛️</span>
-            <span className={styles.hostName}>Enable Ultimate Host</span>
-            <span className={styles.hostHint}>Neutral moderator synthesizes viewpoints & provides final decision</span>
+            <span className={styles.hostIcon}>🎓</span>
+            <span className={styles.hostName}>Enable Review Chair</span>
+            <span className={styles.hostHint}>Neutral chair synthesizes all reviewer positions and delivers final recommendation</span>
           </label>
           
           <div className={styles.hostControls}>
@@ -170,11 +170,10 @@ export function ParticipantsStep({
                   title="Document Template"
                   style={{marginRight: '8px'}}
                 >
-                  <option value="meeting-summary">📋 Meeting Summary</option>
-                  <option value="medical-consultation">🏥 Medical Consultation</option>
-                  <option value="legal-analysis">⚖️ Legal Analysis</option>
-                  <option value="technical-decision">💻 Technical Decision</option>
-                  <option value="business-strategy">💼 Business Strategy</option>
+                  <option value="meeting-summary">Peer-Review Report</option>
+                  <option value="medical-consultation">Research Summary</option>
+                  <option value="technical-decision">Technical Review</option>
+                  <option value="business-strategy">Methodology Assessment</option>
                 </select>
                 <input
                   type="text"

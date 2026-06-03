@@ -1,4 +1,4 @@
-"""FastAPI application entry point"""
+"""PeerForge API entry point"""
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
@@ -8,11 +8,13 @@ from .routes import (
     workspace_settings, presence, websocket, knowledge, analytics, ai_assist,
     participants, autonomous, documents
 )
+from .routes.literature import router as literature_router
+from .routes.web_search import router as web_search_router
 
 
 app = FastAPI(
-    title="Arinar Debate API",
-    description="M1/M2: Debate API with realtime controls",
+    title="PeerForge API",
+    description="AI-Powered Academic Peer Review Platform",
     version="2.0.0"
 )
 
@@ -50,6 +52,8 @@ app.include_router(ai_assist.router, tags=["ai-assist"])
 app.include_router(participants.router, tags=["participants"])
 app.include_router(autonomous.router, tags=["autonomous"])
 app.include_router(documents.router, tags=["documents"])
+app.include_router(literature_router, tags=["literature"])
+app.include_router(web_search_router, tags=["web-search"])
 
 # Document WebSocket endpoint
 from .websocket.document_hub import handle_document_websocket

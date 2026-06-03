@@ -39,7 +39,7 @@ export function useParticipants() {
         role_description: agent.role_description,
         system_prompt: agent.system_prompt,
         model_id: agent.model_id,
-        model_config: agent.llm_config,
+        model_config: agent.model_config,
       }];
     });
   }, []);

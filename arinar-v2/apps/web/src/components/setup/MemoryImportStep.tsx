@@ -43,11 +43,11 @@ export function MemoryImportStep({
       const response = await api.listImportableMemorySources(workspaceId, 20);
       setImportableSources(response.debates);
       if (response.debates.length === 0) {
-        setError('No past meetings available to import. Create and complete a meeting first.');
+        setError('No past review sessions available to import. Complete a review session first.');
       }
     } catch (err: any) {
       console.error('Failed to load importable sources:', err);
-      setError(`Failed to load past meetings: ${err.message}`);
+      setError(`Failed to load past review sessions: ${err.message}`);
     } finally {
       setIsLoadingSources(false);
     }
@@ -125,10 +125,10 @@ export function MemoryImportStep({
 
   return (
     <div className={styles.section}>
-      <h2>Bring Context from Past Meetings?</h2>
+      <h2>Prior Review Memory</h2>
       <p className={styles.hint}>
-        Optionally share insights, materials, and decisions from previous debates with this meeting's participants.
-        Grants are immutable once the meeting starts, ensuring audit integrity.
+        Optionally import materials and reviewer notes from previous sessions — useful when this is a revision round or continuation of prior work.
+        Grants are immutable once the review starts, ensuring audit integrity.
       </p>
 
       <div className={styles.toggleRow}>
@@ -154,12 +154,12 @@ export function MemoryImportStep({
           )}
 
           {isLoadingSources ? (
-            <div className={styles.loadingState}>Loading past meetings...</div>
+            <div className={styles.loadingState}>Loading past review sessions...</div>
           ) : importableSources.length > 0 ? (
             <>
               <div className={styles.subsection}>
-                <h3>1. Pick Past Meetings</h3>
-                <p className={styles.subsectionHint}>Select one or more completed meetings to import context from.</p>
+                <h3>1. Pick Past Review Sessions</h3>
+                <p className={styles.subsectionHint}>Select one or more completed review sessions to import context from.</p>
                 <div className={styles.sourceList}>
                   {importableSources.map((debate) => (
                     <label key={debate.debate_id} className={styles.sourceCard}>
@@ -194,8 +194,8 @@ export function MemoryImportStep({
                       onChange={(e) => handleSourceTypeChange(e.target.value as 'debate_full' | 'materials_only')}
                       className={styles.select}
                     >
-                      <option value="debate_full">Full Meeting (all context)</option>
-                      <option value="materials_only">Materials Only (documents, links)</option>
+                      <option value="debate_full">Full Session (all reviewer notes + documents)</option>
+                      <option value="materials_only">Documents Only (uploaded files and links)</option>
                     </select>
                   </div>
 

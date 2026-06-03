@@ -9,10 +9,11 @@ from .openrouter_client import OpenRouterClient
 
 class HostOrchestrator:
     """
-    Manages the Ultimate Host conclusion flow
-    
-    The host is NOT a regular participant - it only speaks at the end
-    to provide a neutral, fact-based synthesis of all viewpoints.
+    Manages the Review Chair conclusion flow
+
+    The chair is NOT a regular participant - it only speaks at the end
+    to provide a neutral, evidence-based synthesis of all reviewer positions
+    and a final peer-review recommendation.
     """
     
     def __init__(self, openrouter_api_key: str):
@@ -20,11 +21,11 @@ class HostOrchestrator:
     
     def trigger_conclusion(self, debate_id: str) -> Dict[str, Any]:
         """
-        Trigger the Ultimate Host to provide final conclusion
-        
-        Only called after all regular rounds are complete.
-        Host synthesizes all viewpoints and provides neutral recommendation.
-        
+        Trigger the Review Chair to provide the final peer-review conclusion.
+
+        Only called after all regular reviewer rounds are complete.
+        The chair synthesises all reviewer positions into a structured recommendation.
+
         Returns:
             Dict with event_id, message, etc.
         """
@@ -84,9 +85,9 @@ class HostOrchestrator:
             
             # Build host system prompt from template
             from .agent_templates import get_template_by_id
-            host_template = get_template_by_id('ultimate-host')
+            host_template = get_template_by_id('review-chair')
             if not host_template:
-                raise ValueError("Ultimate Host template not found")
+                raise ValueError("Review Chair template not found")
             
             host_system_prompt = host_template['system_prompt']
             
@@ -138,7 +139,7 @@ class HostOrchestrator:
                 None,  # No specific participant_id for host
                 next_seq,
                 psycopg2.extras.Json({
-                    'agent_name': 'Ultimate Host',
+                    'agent_name': 'Review Chair',
                     'text': host_response['content'],
                     'model': host_response.get('model', host_model_id),
                     'is_host_conclusion': True
@@ -158,7 +159,7 @@ class HostOrchestrator:
             return {
                 'event_id': event_id,
                 'message': host_response['content'],
-                'participant_name': 'Ultimate Host',
+                'participant_name': 'Review Chair',
                 'sequence_number': next_seq,
                 'is_conclusion': True
             }
@@ -191,34 +192,33 @@ class HostOrchestrator:
         current_date_str = current_datetime.strftime("%A, %B %d, %Y")
         current_time_str = current_datetime.strftime("%I:%M %p UTC")
         
-        prompt = f"""You are the Ultimate Host providing the final conclusion for this debate.
+        prompt = f"""You are the Review Chair delivering the final structured peer-review conclusion.
 
-📅 **Current Date & Time**: {current_date_str} at {current_time_str}
+**Current Date**: {current_date_str} at {current_time_str}
 
-**Meeting Title**: {title}
+**Research Title**: {title}
 
-**Participants**: {participant_list}
+**Reviewers**: {participant_list}
 
-**Desired Outcomes**:
+**Review Objectives**:
 {outcomes_text}
 
-**Full Debate Transcript**:
+**Full Review Session Transcript**:
 {conversation_text}
 
 ---
 
-**Your Task**:
-Provide your final conclusion as the Ultimate Host. Remember:
-1. Consider the current date ({current_date_str}) when evaluating the recency and relevance of discussed information
-2. Summarize the main positions discussed
-3. Identify areas of consensus
-4. Explain the majority viewpoint
-5. Acknowledge dissenting opinions respectfully
-6. Make a clear recommendation based on the discussion
-7. Reference specific arguments from participants
-8. Note if any information discussed appears outdated given today's date
-9. Be objective and transparent about your reasoning
+**Your Task — Structured Peer-Review Report**:
+Synthesise the panel's positions into a definitive peer-review report with the following sections:
 
-Provide your conclusion now:"""
+1. **Summary of Contribution** — What does this work claim to contribute and what is its scope?
+2. **Key Strengths** — The strongest positives identified across all reviewers (with citations to reviewer arguments).
+3. **Key Weaknesses & Methodology Concerns** — The most critical issues raised.
+4. **Literature & Related-Work Gaps** — Missing citations or inadequate engagement with prior work.
+5. **Reproducibility & Ethics** — Data/code availability, ethical concerns, limitations transparency.
+6. **Required Changes** — Specific, actionable revisions the authors must address.
+7. **Recommendation** — Choose exactly one: Accept / Minor Revision / Major Revision / Reject — with explicit rationale.
+
+Be objective, cite specific reviewer arguments, and acknowledge where the panel disagreed."""
         
         return prompt

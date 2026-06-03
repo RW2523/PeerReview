@@ -8,7 +8,7 @@ import { useDocumentSync } from '@/lib/hooks/useDocumentSync';
 import { useDocument } from '@/lib/hooks/useDocument';
 import DocumentEditor from '@/components/document/DocumentEditor';
 import DiagramSection from '@/components/document/DiagramSection';
-import { SectionType } from '@/lib/document/types';
+import { SectionType, DocumentSection } from '@/lib/document/types';
 import styles from './DocumentPanel.module.css';
 
 interface DocumentPanelProps {
@@ -99,7 +99,7 @@ export default function DocumentPanel({
       </div>
 
       <div className={styles.sections}>
-        {document?.sections.map((section) => (
+        {document?.sections.map((section: DocumentSection) => (
           <div key={section.section_id || section.id} className={styles.section}>
             <div className={styles.sectionHeader}>
               <h3>{section.section_title || section.title || 'Untitled Section'}</h3>
@@ -135,7 +135,7 @@ export default function DocumentPanel({
             ) : (
               <DocumentEditor
                 provider={provider}
-                sectionKey={section.section_key || section.key}
+                sectionKey={section.section_key || section.key || 'default'}
                 userName={userName}
                 placeholder={`Write ${(section.section_title || section.title || 'section').toLowerCase()}...`}
               />

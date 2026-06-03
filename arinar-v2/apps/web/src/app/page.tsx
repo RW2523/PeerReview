@@ -17,11 +17,11 @@ export default function HomePage() {
       <main className={styles.main}>
         <div className={styles.container}>
           <header className={styles.header}>
-            <div className={styles.badge}>New Session</div>
-            <h1>Bring your challenge.</h1>
-            <h1 className={styles.gradient}>Get expert perspective.</h1>
+            <div className={styles.badge}>AI Peer Review</div>
+            <h1>Submit your research.</h1>
+            <h1 className={styles.gradient}>Get rigorous feedback.</h1>
             <p className={styles.subtitle}>
-              Whether you're facing a strategic decision, exploring research directions, or need diverse viewpoints—assemble your panel of AI experts and let them deliberate.
+              Upload your paper, proposal, or idea and let an AI panel of domain experts, methodologists, statisticians, and critical reviewers evaluate it with literature-grounded depth.
             </p>
           </header>
 
@@ -34,22 +34,22 @@ export default function HomePage() {
             <div className={styles.step}>
               <div className={styles.stepNumber}>1</div>
               <div className={styles.stepContent}>
-                <h3>Frame your challenge</h3>
-                <p>Describe the decision, problem, or topic you're working through</p>
+                <h3>Define your research question</h3>
+                <p>State your research topic, scope, and what kind of review you need</p>
               </div>
             </div>
             <div className={styles.step}>
               <div className={styles.stepNumber}>2</div>
               <div className={styles.stepContent}>
-                <h3>Assemble your expert panel</h3>
-                <p>Select 2-8 AI agents with diverse roles and perspectives</p>
+                <h3>Search the literature</h3>
+                <p>Find relevant papers from arXiv, Semantic Scholar, PubMed, and Crossref</p>
               </div>
             </div>
             <div className={styles.step}>
               <div className={styles.stepNumber}>3</div>
               <div className={styles.stepContent}>
-                <h3>Run the deliberation</h3>
-                <p>Watch live as they debate, then get summary + action items</p>
+                <h3>Get your peer-review report</h3>
+                <p>AI reviewers debate your work and produce a structured report with recommendations</p>
               </div>
             </div>
           </div>

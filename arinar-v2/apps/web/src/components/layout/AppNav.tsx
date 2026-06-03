@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import UserMenu from './UserMenu';
+import { APP_NAME, APP_TAGLINE, APP_ICON } from '@/lib/brand';
 import styles from './AppNav.module.css';
 
 export default function AppNav() {
@@ -17,10 +18,10 @@ export default function AppNav() {
     <nav className={styles.nav}>
       <div className={styles.container}>
         <Link href="/" className={styles.logo}>
-          <span className={styles.logoIcon}>🏛️</span>
+          <span className={styles.logoIcon}>{APP_ICON}</span>
           <div className={styles.logoText}>
-            <span className={styles.wordmark}>Boardroom AI</span>
-            <span className={styles.tagline}>Intelligent Debate Platform</span>
+            <span className={styles.wordmark}>{APP_NAME}</span>
+            <span className={styles.tagline}>{APP_TAGLINE}</span>
           </div>
         </Link>
 
@@ -28,27 +29,21 @@ export default function AppNav() {
           <div className={styles.links}>
             <Link
               href="/"
-              className={`${styles.link} ${isActive('/') && !pathname.includes('/room') && !pathname.includes('/settings') && !pathname.includes('/history') && !pathname.includes('/architecture') ? styles.active : ''}`}
+              className={`${styles.link} ${isActive('/') && !pathname.includes('/room') && !pathname.includes('/settings') && !pathname.includes('/history') ? styles.active : ''}`}
             >
-              Create Debate
+              New Review
             </Link>
             <Link
               href="/room"
               className={`${styles.link} ${isActive('/room') ? styles.active : ''}`}
             >
-              Room
+              Review Room
             </Link>
             <Link
               href="/history"
               className={`${styles.link} ${isActive('/history') ? styles.active : ''}`}
             >
-              📜 History
-            </Link>
-            <Link
-              href="/architecture"
-              className={`${styles.link} ${isActive('/architecture') ? styles.active : ''}`}
-            >
-              📐 Architecture
+              History
             </Link>
           </div>
 

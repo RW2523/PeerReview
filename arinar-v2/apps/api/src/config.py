@@ -11,8 +11,8 @@ class Settings(BaseSettings):
         extra="ignore"
     )
     
-    # Database
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/arinar_local"
+    # Database (5433 to avoid conflict with system Postgres; set DATABASE_URL env var to override)
+    database_url: str = "postgresql://postgres:postgres@localhost:5433/peerforge_local"
     
     # API
     api_host: str = "0.0.0.0"
@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_timeout: int = 120
     openrouter_max_retries: int = 2
+    # Optional server-side key used by Celery workers for embedding generation.
+    # Set OPENROUTER_API_KEY in .env — users can still override with their BYOK key.
+    openrouter_api_key: str = ""
     
     # Supabase Auth
     supabase_jwt_secret: str = "your-jwt-secret-here"
@@ -39,8 +42,13 @@ class Settings(BaseSettings):
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
-    minio_bucket: str = "arinar-materials"
+    minio_bucket: str = "peerforge-materials"
     minio_secure: bool = False
+
+    # Research / web-search integrations
+    jina_api_key: str = ""
+    semantic_scholar_api_key: str = ""
+    tavily_api_key: str = ""
 
 
 settings = Settings()

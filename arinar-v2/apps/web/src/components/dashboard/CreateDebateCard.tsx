@@ -36,8 +36,8 @@ export default function CreateDebateCard({ workspaceId, onDebateCreated }: Creat
 
   return (
     <div className={styles.card}>
-      <h2>Your Challenge</h2>
-      <p className={styles.description}>Describe what you need help with—be specific for better insights</p>
+      <h2>Start a New Review Session</h2>
+      <p className={styles.description}>Name your research project and describe the core question — the more specific, the better the review</p>
 
       {error && (
         <div className={styles.error}>
@@ -48,22 +48,22 @@ export default function CreateDebateCard({ workspaceId, onDebateCreated }: Creat
 
       <div className={styles.form}>
         <label>
-          Title
+          Project Title
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g., Should we expand to international markets?"
+            placeholder="e.g., Transformer-based models for protein structure prediction"
             disabled={loading}
           />
         </label>
 
         <label>
-          Problem Statement <span className={styles.optional}>(optional)</span>
+          Research Question / Abstract <span className={styles.optional}>(optional)</span>
           <textarea
             value={problemStatement}
             onChange={(e) => setProblemStatement(e.target.value)}
-            placeholder="Provide context, constraints, and what you're trying to decide. The more detail, the better the insights."
+            placeholder="Describe your research question, hypothesis, or the work you want reviewed. Include methodology or key contributions if known."
             rows={4}
             disabled={loading}
           />
@@ -74,7 +74,7 @@ export default function CreateDebateCard({ workspaceId, onDebateCreated }: Creat
           disabled={!title.trim()}
           className={styles.btnPrimary}
         >
-          Next: Assemble Panel →
+          Next: Configure Review Session →
         </button>
       </div>
     </div>

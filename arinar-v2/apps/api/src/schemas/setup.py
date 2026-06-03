@@ -1,5 +1,5 @@
 """Pydantic models for meeting setup endpoints"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from .agents import SetupParticipant
 
@@ -14,6 +14,8 @@ class SetupMaterial(BaseModel):
 
 class DebateSetupRequest(BaseModel):
     """Request to create debate with full setup"""
+    model_config = ConfigDict(protected_namespaces=())
+
     workspace_id: str
     title: str
     problem_statement: str

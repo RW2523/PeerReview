@@ -109,7 +109,7 @@ export function useDebateSetupActions(
           const selectedTemplate = templates.find(t => t.id === options.documentTemplateId);
           
           if (selectedTemplate) {
-            const docTitle = options.documentTitle || `${title} - ${selectedTemplate.title}`;
+            const docTitle = options.documentTitle || `${title} - ${selectedTemplate.name}`;
             await api.createDocument({
               debate_id: debate_id,
               template_id: options.documentTemplateId || 'meeting-summary',
@@ -184,20 +184,40 @@ export function useDebateSetupActions(
     setIsLoading(true);
 
     try {
-      // Start the debate (pending -> running)
-      await api.startDebate(debateId);
+      // Fetch current debate state first to avoid re-starting an already-running debate
+      let currentState: string | null = null;
+      try {
+        const current = await api.getDebate(debateId);
+        currentState = current.state;
+      } catch { /* ignore — getDebate failing shouldn't block launch */ }
+
+      if (currentState === 'ended') {
+        alert('This review session has already ended. Please create a new one.');
+        return;
+      }
+
+      // Only call startDebate if not already running/paused
+      if (currentState === 'pending' || currentState === null) {
+        // Pass key so the backend can queue embedding backfill immediately
+        await api.startDebate(debateId, apiKey);
+      } else {
+        console.log(`Debate already in state "${currentState}", skipping startDebate`);
+      }
 
       // Check if YOLO mode is enabled
       if (options.yoloMode) {
-        // Start autonomous mode
         if (!apiKey) {
           throw new Error('OpenRouter API key required for YOLO mode. Please add it in Settings.');
         }
         await api.startAutonomousDebate(debateId, options.autoTurnDelay || 10, apiKey);
         console.log('🚀 YOLO Mode activated!');
       } else {
-        // Trigger first agent turn immediately (manual mode)
-        await api.triggerNextTurn(debateId, apiKey);
+        // Trigger first agent turn in manual mode (non-fatal if it fails — user can trigger from room)
+        try {
+          await api.triggerNextTurn(debateId, apiKey);
+        } catch (turnErr: any) {
+          console.warn('First turn trigger failed (non-fatal):', turnErr.message);
+        }
       }
 
       // Navigate to room

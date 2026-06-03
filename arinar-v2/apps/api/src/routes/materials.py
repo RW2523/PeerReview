@@ -5,7 +5,7 @@ Materials upload and status endpoints
 import io
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 import psycopg2
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header
 from psycopg2.extras import Json
@@ -22,6 +22,7 @@ from src.utils.storage import get_storage_client
 from src.utils.text_extraction import TextExtractor
 from src.tasks.material_processing import process_material
 from src.auth import require_auth
+from src.tasks.material_processing import generate_debate_embeddings
 
 router = APIRouter()
 
@@ -30,6 +31,7 @@ router = APIRouter()
 async def upload_materials(
     debate_id: str,
     files: List[UploadFile] = File(...),
+    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
     _workspace_id: str = Depends(require_auth)
 ):
     """
@@ -129,8 +131,8 @@ async def upload_materials(
             created_material_id = cursor.fetchone()[0]
             material_ids.append(str(created_material_id))
             
-            # Queue Celery task
-            task = process_material.delay(str(created_material_id), debate_id)
+            # Queue Celery task — pass BYOK key so worker can generate embeddings
+            task = process_material.delay(str(created_material_id), debate_id, x_openrouter_key)
             job_ids.append(task.id)
         
         conn.commit()
@@ -277,9 +279,57 @@ async def retry_material_processing(
     
     # Queue new Celery task
     task = process_material.delay(request.material_id, debate_id)
-    
+
     return MaterialRetryResponse(
         material_id=request.material_id,
         job_id=task.id,
         message="Processing retry queued"
     )
+
+
+@router.post("/debates/{debate_id}/materials/embed")
+async def trigger_embedding_generation(
+    debate_id: str,
+    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
+    _workspace_id: str = Depends(require_auth),
+):
+    """
+    Trigger (or re-trigger) embedding generation for all unembedded chunks in a debate.
+
+    Useful after:
+    - Initial upload when no server-side OPENROUTER_API_KEY was configured
+    - Any embedding failures that need to be retried
+
+    Requires X-OpenRouter-Key header (BYOK).
+    """
+    resolved_key = x_openrouter_key or settings.openrouter_api_key
+    if not resolved_key:
+        raise HTTPException(
+            status_code=400,
+            detail="No OpenRouter API key available. Pass X-OpenRouter-Key header or set OPENROUTER_API_KEY in .env",
+        )
+
+    conn = psycopg2.connect(settings.database_url)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT debate_id FROM debates WHERE debate_id = %s", (debate_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Debate not found")
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM memory_chunks WHERE source_debate_id = %s AND agent_id IS NULL AND embedding_status IN ('not_started','failed')",
+            (debate_id,),
+        )
+        pending_count = cursor.fetchone()[0]
+    finally:
+        conn.close()
+
+    if pending_count == 0:
+        return {"debate_id": debate_id, "job_id": None, "message": "All chunks already have embeddings"}
+
+    task = generate_debate_embeddings.delay(debate_id, resolved_key)
+    return {
+        "debate_id": debate_id,
+        "job_id": task.id,
+        "message": f"Embedding generation queued for {pending_count} chunks",
+    }

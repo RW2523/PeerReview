@@ -97,10 +97,10 @@ async def conclude_debate_with_host(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Trigger Ultimate Host to provide final conclusion
-    
-    Called after all regular rounds are complete when host is enabled.
-    Host synthesizes all viewpoints and provides neutral recommendation.
+    Trigger the Review Chair to provide the final peer-review conclusion.
+
+    Called after all regular reviewer rounds are complete when chair is enabled.
+    The chair synthesises all reviewer positions into a structured recommendation.
     
     Protected: Requires valid JWT and workspace access
     
@@ -143,7 +143,7 @@ async def conclude_debate_with_host(
             'sender_type': 'system',
             'sender_id': None,
             'payload': {
-                'agent_name': 'Ultimate Host',
+                'agent_name': 'Review Chair',
                 'text': result['message'],
                 'is_host_conclusion': True
             }

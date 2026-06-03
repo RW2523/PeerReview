@@ -13,22 +13,23 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Get current session access token
- * Returns null if no active session
- * 
- * In development mode (NEXT_PUBLIC_AUTH_MODE=development), uses test token from env
+ * Get current session access token.
+ *
+ * In development mode (NEXT_PUBLIC_AUTH_MODE=development) the backend runs
+ * with REQUIRE_AUTH=false and accepts any non-empty bearer value.  We return a
+ * static dev-bypass token so every API call and WebSocket connection succeeds
+ * without a real Supabase session.
  */
 export async function getAccessToken(): Promise<string | null> {
-  // Development mode: use test token for local testing without Supabase
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE;
+
   if (authMode === 'development') {
-    const testToken = process.env.NEXT_PUBLIC_TEST_TOKEN;
-    if (testToken) {
-      return testToken;
-    }
+    // Prefer an explicit token from env (useful for integration tests), but
+    // fall back to a static dev sentinel — the backend ignores it anyway.
+    return process.env.NEXT_PUBLIC_TEST_TOKEN || 'dev-bypass-token';
   }
-  
-  // Production mode: use Supabase session
+
+  // Production: use Supabase session
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token || null;
 }

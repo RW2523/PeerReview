@@ -161,8 +161,8 @@ export default function HistoryPage() {
         <div className={styles.container}>
           <header className={styles.header}>
             <div>
-              <h1>📜 Debate History</h1>
-              <p className={styles.subtitle}>View past debates, transcripts, and summaries</p>
+              <h1>Review History</h1>
+              <p className={styles.subtitle}>View past review sessions, transcripts, and peer-review reports</p>
             </div>
             {viewMode !== 'list' && (
               <button onClick={() => { setViewMode('list'); setSelectedDebate(null); }} className={styles.btnBack}>
@@ -271,7 +271,7 @@ export default function HistoryPage() {
               {loading ? (
                 <div className={styles.loading}>
                   <div className={styles.spinner}></div>
-                  <p>Loading debates...</p>
+                  <p>Loading review sessions...</p>
                 </div>
               ) : filteredAndSortedDebates.length === 0 && (searchQuery || statusFilter !== 'all') ? (
                 <div className={styles.emptyState}>
@@ -295,10 +295,10 @@ export default function HistoryPage() {
               ) : debates.length === 0 ? (
                 <div className={styles.emptyState}>
                   <span className={styles.emptyIcon}>📭</span>
-                  <h3>No debates yet</h3>
-                  <p>Create your first debate to get started</p>
+                  <h3>No review sessions yet</h3>
+                  <p>Start your first review session to get going</p>
                   <button onClick={() => router.push('/setup')} className={styles.btnPrimary}>
-                    Create Debate
+                    New Review Session
                   </button>
                 </div>
               ) : (
@@ -313,7 +313,7 @@ export default function HistoryPage() {
                   {filteredAndSortedDebates.map((debate) => (
                     <div key={debate.debate_id} className={styles.debateCard}>
                       <div className={styles.cardHeader}>
-                        <h3 className={styles.debateTitle}>{debate.title || 'Untitled Debate'}</h3>
+                        <h3 className={styles.debateTitle}>{debate.title || 'Untitled Review Session'}</h3>
                         {getStateBadge(debate.state)}
                       </div>
                       
@@ -382,7 +382,7 @@ export default function HistoryPage() {
           {viewMode === 'transcript' && selectedDebate && (
             <div className={styles.transcriptView}>
               <div className={styles.viewHeader}>
-                <h2>📄 Full Transcript</h2>
+                <h2>Full Transcript</h2>
                 <div className={styles.viewActions}>
                   <button onClick={() => openInRoom(selectedDebate)} className={styles.btnPrimary}>
                     Open in Room
@@ -425,7 +425,7 @@ export default function HistoryPage() {
           {viewMode === 'summary' && selectedDebate && (
             <div className={styles.summaryView}>
               <div className={styles.viewHeader}>
-                <h2>📊 Debate Summary</h2>
+                <h2>Peer-Review Report</h2>
                 <div className={styles.viewActions}>
                   <button onClick={() => viewDebateTranscript(selectedDebate)} className={styles.btnSecondary}>
                     View Transcript
@@ -438,34 +438,57 @@ export default function HistoryPage() {
 
               {summary ? (
                 <div className={styles.summaryContent}>
-                  <section className={styles.summarySection}>
-                    <h3>📝 Summary</h3>
+                      <section className={styles.summarySection}>
+                    <h3>Summary of Contribution</h3>
                     <p className={styles.summaryText}>{summary.summary}</p>
                   </section>
 
                   <section className={styles.summarySection}>
-                    <h3>📋 Minutes of Meeting</h3>
+                    <h3>Detailed Review Notes</h3>
                     <div className={styles.minutesText}>{summary.minutes}</div>
                   </section>
 
-                  {summary.action_items && summary.action_items.length > 0 && (
-                    <section className={styles.summarySection}>
-                      <h3>✅ Action Items</h3>
-                      <div className={styles.actionItems}>
-                        {summary.action_items.map((item: any, idx: number) => (
-                          <div key={idx} className={styles.actionItem}>
-                            <div className={styles.actionHeader}>
-                              <span className={styles.actionPriority} data-priority={item.priority}>
-                                {item.priority === 'high' ? '🔴' : item.priority === 'medium' ? '🟡' : '🟢'}
-                              </span>
-                              <span className={styles.actionOwner}>{item.owner}</span>
+                  {summary.action_items && summary.action_items.length > 0 && (() => {
+                    const recommendation = summary.action_items.find((i: any) => i._type === 'recommendation');
+                    const actionItems = summary.action_items.filter((i: any) => i._type !== 'recommendation');
+                    return (
+                      <>
+                        {recommendation && (
+                          <section className={styles.summarySection}>
+                            <h3>Final Recommendation</h3>
+                            <div style={{
+                              background: '#f0fdf4',
+                              border: '2px solid #22c55e',
+                              borderRadius: '8px',
+                              padding: '16px',
+                              fontSize: '15px',
+                              fontWeight: 600,
+                            }}>
+                              {recommendation.description}
                             </div>
-                            <p className={styles.actionDescription}>{item.description}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
+                          </section>
+                        )}
+                        {actionItems.length > 0 && (
+                          <section className={styles.summarySection}>
+                            <h3>Required Changes &amp; Next Steps</h3>
+                            <div className={styles.actionItems}>
+                              {actionItems.map((item: any, idx: number) => (
+                                <div key={idx} className={styles.actionItem}>
+                                  <div className={styles.actionHeader}>
+                                    <span className={styles.actionPriority} data-priority={item.priority}>
+                                      {item.priority === 'high' ? '🔴' : item.priority === 'medium' ? '🟡' : '🟢'}
+                                    </span>
+                                    <span className={styles.actionOwner}>{item.owner}</span>
+                                  </div>
+                                  <p className={styles.actionDescription}>{item.description}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {summary.generated_at && (
                     <div className={styles.summaryMeta}>
@@ -477,8 +500,8 @@ export default function HistoryPage() {
               ) : (
                 <div className={styles.emptyState}>
                   <span className={styles.emptyIcon}>📊</span>
-                  <h3>No Summary Generated</h3>
-                  <p>This debate hasn't been summarized yet</p>
+                  <h3>No Report Generated</h3>
+                  <p>This review session hasn't produced a report yet</p>
                   <button onClick={() => openInRoom(selectedDebate)} className={styles.btnPrimary}>
                     Open in Room to Generate
                   </button>

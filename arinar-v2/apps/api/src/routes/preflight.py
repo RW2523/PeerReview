@@ -231,7 +231,17 @@ def start_preflight(
             })
         
         conn.commit()
-        
+
+        # If we have a BYOK key, also queue embedding generation for any un-embedded chunks.
+        # This covers the common case where files were uploaded before the key was available.
+        if x_openrouter_key:
+            try:
+                from src.tasks.material_processing import generate_debate_embeddings
+                generate_debate_embeddings.delay(debate_id, x_openrouter_key)
+                print(f"✅ Embedding backfill queued for debate {debate_id}")
+            except Exception as embed_err:
+                print(f"⚠️  Could not queue embedding backfill: {embed_err}")
+
         # Import threading to run preflight in background
         import threading
         from src.tasks.preflight import orchestrate_preflight_impl

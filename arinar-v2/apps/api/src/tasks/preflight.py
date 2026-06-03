@@ -365,10 +365,9 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
                         web_research_results = "\n**Web Research Results** (Full content from top sources):\n"
                         
                         # Use Jina Reader to fetch FULL content from top 3 sources (PARALLEL for speed)
-                        import requests
                         import asyncio
                         import aiohttp
-                        jina_api_key = "jina_cc6446808d1742868f3d236b28ce09408nTRb3eRDPWIDA6ePEXFgKpHty2a"
+                        jina_api_key = settings.jina_api_key
                         
                         async def fetch_with_jina(url: str, title: str, snippet: str):
                             """Async fetch for speed"""
@@ -440,43 +439,39 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         current_date_str = current_datetime.strftime("%A, %B %d, %Y")
         current_time_str = current_datetime.strftime("%I:%M %p UTC")
         
-        prep_prompt = f"""You are preparing for an important strategic discussion.
+        prep_prompt = f"""You are preparing YOUR private reviewer preparation memo for an academic peer-review session.
 
-**Current Date & Time**: {current_date_str} at {current_time_str}
+**Date**: {current_date_str} at {current_time_str}
 
-**Discussion Title**: {debate_title}
+**Research Title**: {debate_title}
 
-**Your Role**: {system_prompt[:200] if system_prompt else 'Strategic advisor'}
+**Your Reviewer Role**: {system_prompt[:200] if system_prompt else 'Academic reviewer'}
 
-**Problem Statement**:
+**Research Question / Abstract**:
 {problem_statement}
 
-**Available Materials**:
-{materials_context if materials_context else 'No materials provided.'}
+**Submitted Materials (paper draft, proposals, datasets)**:
+{materials_context if materials_context else 'No materials provided by the author.'}
 
-**Imported Context from Prior Meetings**:
-{imported_context if imported_context else 'No prior context imported.'}
+**Imported Context from Prior Review Sessions**:
+{imported_context if imported_context else 'No prior review context imported.'}
 
 {web_research_results if web_research_results else '**No web research performed for this preparation.**'}
 
-**Task**: Generate YOUR preparation memo (400-600 words) in YOUR voice and perspective covering:
-1. Key facts and insights - analyze and synthesize findings from ALL web research sources through YOUR lens
-2. Potential risks or concerns based on YOUR expertise
-3. Open questions YOU want to explore
-4. YOUR initial position/recommendations (but remain open-minded)
+**Task**: Write YOUR private reviewer preparation memo (400-600 words) in YOUR voice covering:
+1. Initial assessment of the contribution's novelty and significance through YOUR reviewer lens
+2. Key methodological concerns or strengths you plan to raise
+3. Relevant literature the authors may have missed — cite specific papers where you can
+4. The specific questions or experiments you want the panel to address
+5. YOUR provisional recommendation reasoning (Accept / Minor Revision / Major Revision / Reject)
 
-**CRITICAL INSTRUCTIONS**: 
-- STAY IN CHARACTER - this memo should reflect YOUR unique perspective, analytical style, and personality
-- ALWAYS consider the current date ({current_date_str}) when analyzing information
-- If web research results are provided above (multiple sources), you MUST:
-  * Apply YOUR expertise to analyze patterns and themes across ALL sources
-  * Cite multiple sources with their URLs throughout your memo
-  * Use YOUR analytical framework to note conflicting information
-  * Reference at least 5-7 key sources analyzed through YOUR perspective
-- Use inline citations like: "According to [source title] (URL), ..."
-- Your memo should demonstrate YOUR unique analytical approach and voice
-- This prep work is PRIVATE to you - other participants will NOT see this
-- During the debate, you can only reference what others have actually said"""
+**CRITICAL INSTRUCTIONS**:
+- STAY IN CHARACTER as YOUR specific reviewer persona
+- Ground every claim in evidence from the submitted materials or cited literature
+- Use inline citations: "Author et al. (Year) [URL]" or "(see [material section])"
+- If literature search results are available, cite at least 5 relevant papers
+- This memo is PRIVATE — other reviewers will NOT see it before the session
+- During the review session, reference only what has been submitted or discussed openly"""
         
         # 4. Call OpenRouter to generate prep pack
         # For V1, use a simple synchronous call (no streaming)
@@ -486,8 +481,8 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         # Get OpenRouter key from policy_config (if exists) or use test mode
         openrouter_key = policy_config.get('openrouter_key') if policy_config else None
         
-        # Broadcast progress: Generating insights
-        _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Generating strategic insights')
+        # Broadcast progress: Generating review prep
+        _broadcast_preflight_progress(debate_id, participant_id, 'running', 'Generating reviewer preparation memo')
         
         if not openrouter_key:
             # For V1, create a placeholder prep pack (no real OpenRouter call)
@@ -517,16 +512,16 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                 
                 # Build persona-specific system prompt by COMBINING agent's persona with research instructions
                 # This preserves each agent's unique character while ensuring they cite sources
-                persona_specific_prompt = f"""{system_prompt if system_prompt else 'You are a strategic advisor.'}
+                persona_specific_prompt = f"""{system_prompt if system_prompt else 'You are an academic peer reviewer.'}
 
-**ADDITIONAL INSTRUCTIONS FOR PREPARATION**:
-When preparing for this debate:
-1. STAY IN CHARACTER - analyze everything through your unique perspective and personality
-2. MUST incorporate web research sources when provided - cite at least 5-7 different sources with URLs
-3. Synthesize information across sources using YOUR analytical style
-4. Note temporal context - is information current or outdated?
-5. Apply YOUR expertise to identify patterns, risks, opportunities based on your role
-6. Your memo should be 400-600 words, reference-heavy, and reflect YOUR voice and perspective"""
+**ADDITIONAL PREPARATION INSTRUCTIONS**:
+When writing your reviewer preparation memo:
+1. STAY IN CHARACTER as your specific academic reviewer persona
+2. Ground every assessment in evidence from the submitted materials or literature
+3. If literature/web sources are provided, cite at least 5 relevant papers or sources with their URLs
+4. Apply YOUR specific reviewer expertise lens: methodologist looks at design, statistician at numbers, etc.
+5. Your memo should be 400-600 words, citation-heavy, and written in a formal academic review voice
+6. End with a provisional recommendation: Accept / Minor Revision / Major Revision / Reject"""
                 
                 # Adjust model config for longer, more detailed output
                 enhanced_config = model_config.copy()

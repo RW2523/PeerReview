@@ -68,15 +68,20 @@ export async function getDebate(debateId: string): Promise<any> {
   return response.json();
 }
 
-export async function startDebate(debateId: string): Promise<DebateResponse> {
+export async function startDebate(debateId: string, openrouterKey?: string | null): Promise<DebateResponse> {
   const headers = await getAuthHeaders();
+  if (openrouterKey) {
+    (headers as Record<string, string>)['X-OpenRouter-Key'] = openrouterKey;
+  }
   const response = await fetch(`${API_URL}/debates/${debateId}/start`, {
     method: 'POST',
     headers,
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to start debate: ${response.statusText}`);
+    const body = await response.json().catch(() => null);
+    const detail = body?.detail ?? response.statusText;
+    throw new Error(`Failed to start debate: ${detail}`);
   }
   
   return response.json();
@@ -558,27 +563,50 @@ export interface MaterialsStatusResponse {
 
 export async function uploadMaterials(
   debateId: string,
-  files: File[]
+  files: File[],
+  openrouterKey?: string | null
 ): Promise<MaterialUploadResponse> {
   const token = await getAccessToken();
   const formData = new FormData();
-  
+
   files.forEach(file => {
     formData.append('files', file);
   });
-  
+
+  const headers: Record<string, string> = {
+    'Authorization': token ? `Bearer ${token}` : '',
+  };
+  if (openrouterKey) {
+    headers['X-OpenRouter-Key'] = openrouterKey;
+  }
+
   const response = await fetch(`${API_URL}/debates/${debateId}/materials/upload`, {
     method: 'POST',
-    headers: {
-      'Authorization': token ? `Bearer ${token}` : '',
-    },
+    headers,
     body: formData,
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to upload materials: ${response.statusText}`);
   }
-  
+
+  return response.json();
+}
+
+export async function triggerEmbeddingGeneration(
+  debateId: string,
+  openrouterKey: string
+): Promise<{ debate_id: string; job_id: string | null; message: string }> {
+  const headers = await getAuthHeaders();
+  (headers as Record<string, string>)['X-OpenRouter-Key'] = openrouterKey;
+  const response = await fetch(`${API_URL}/debates/${debateId}/materials/embed`, {
+    method: 'POST',
+    headers,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to trigger embeddings: ${text}`);
+  }
   return response.json();
 }
 
@@ -1197,5 +1225,203 @@ export async function getDocument(documentId: string): Promise<any> {
     throw new Error(`Failed to get document: ${response.statusText}`);
   }
   
+  return response.json();
+}
+
+// ============================================================================
+// LITERATURE SEARCH (PeerForge)
+// ============================================================================
+
+export interface PaperResult {
+  title: string;
+  authors: string[];
+  year: number | null;
+  abstract: string;
+  url: string;
+  doi: string | null;
+  venue: string;
+  citation_count: number;
+  source: string;
+}
+
+export interface LiteratureSearchResponse {
+  query: string;
+  papers: PaperResult[];
+  total: number;
+  sources_queried: string[];
+}
+
+export interface SavedPaper {
+  material_id: string;
+  title: string;
+  source: string;
+  url: string;
+  doi: string | null;
+  year: number | null;
+  saved_at: string;
+}
+
+export interface SavePapersResponse {
+  saved: number;
+  material_ids: string[];
+}
+
+export async function searchLiterature(
+  debateId: string,
+  query: string,
+  sources?: string[],
+  maxPerSource: number = 8,
+  maxTotal: number = 25,
+): Promise<LiteratureSearchResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/literature/search`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      query,
+      sources: sources ?? null,
+      max_per_source: maxPerSource,
+      max_total: maxTotal,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => response.statusText);
+    throw new Error(`Literature search failed: ${errText}`);
+  }
+
+  return response.json();
+}
+
+export async function savePapersToContext(
+  debateId: string,
+  papers: PaperResult[],
+  label?: string,
+): Promise<SavePapersResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/literature/save`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ papers, label }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => response.statusText);
+    throw new Error(`Failed to save papers: ${errText}`);
+  }
+
+  return response.json();
+}
+
+export async function listSavedPapers(debateId: string): Promise<{
+  papers: SavedPaper[];
+  total: number;
+}> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/literature`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list saved papers: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// ---------------------------------------------------------------------------
+// Web Search (Tavily)
+// ---------------------------------------------------------------------------
+
+export interface WebResult {
+  title: string;
+  url: string;
+  content: string;
+  score: number;
+  published_date: string | null;
+  source_domain: string;
+}
+
+export interface WebSearchResponse {
+  query: string;
+  results: WebResult[];
+  total: number;
+  search_depth: string;
+}
+
+export interface SavedWebResult {
+  material_id: string;
+  title: string;
+  url: string;
+  source_domain: string;
+  saved_at: string;
+}
+
+export async function searchWeb(
+  debateId: string,
+  query: string,
+  options?: {
+    maxResults?: number;
+    searchDepth?: 'basic' | 'advanced';
+    includeDomains?: string[];
+    excludeDomains?: string[];
+  },
+): Promise<WebSearchResponse> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/web/search`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      query,
+      max_results: options?.maxResults ?? 10,
+      search_depth: options?.searchDepth ?? 'advanced',
+      include_domains: options?.includeDomains ?? null,
+      exclude_domains: options?.excludeDomains ?? null,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => response.statusText);
+    throw new Error(`Web search failed: ${errText}`);
+  }
+
+  return response.json();
+}
+
+export async function saveWebResults(
+  debateId: string,
+  results: WebResult[],
+  label?: string,
+): Promise<{ saved: number; material_ids: string[] }> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/web/save`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ results, label }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => response.statusText);
+    throw new Error(`Failed to save web results: ${errText}`);
+  }
+
+  return response.json();
+}
+
+export async function listSavedWebResults(debateId: string): Promise<{
+  results: SavedWebResult[];
+  total: number;
+}> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/web`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list saved web results: ${response.statusText}`);
+  }
+
   return response.json();
 }

@@ -199,7 +199,7 @@ class DocumentOrchestrator:
                 if host:
                     self.doc_service.assign_section(
                         section_id=section['section_id'],
-                        agent_name='Ultimate Host'
+                        agent_name='Review Chair'
                     )
                     
             elif strategy == 'role':
@@ -241,8 +241,9 @@ class DocumentOrchestrator:
         self,
         participants: List[Dict[str, Any]]
     ) -> Optional[Dict[str, Any]]:
-        """Find ultimate host in participants"""
+        """Find Review Chair (or legacy Ultimate Host) in participants."""
         for participant in participants:
-            if 'ultimate host' in participant.get('name', '').lower():
+            name_lower = participant.get('name', '').lower()
+            if 'review chair' in name_lower or 'ultimate host' in name_lower:
                 return participant
         return None

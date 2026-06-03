@@ -15,8 +15,8 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'Boardroom AI',
-  description: 'Intelligent Debate Platform - AI-Powered Group Decision Making',
+  title: 'PeerForge',
+  description: 'AI-Powered Academic Peer Review — deep-research review sessions for PhD students and researchers',
 }
 
 export default function RootLayout({

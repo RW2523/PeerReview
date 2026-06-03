@@ -143,25 +143,25 @@ export function BasicInfoStep({
 
   return (
     <div className={styles.section}>
-      <h2>Meeting Details</h2>
+      <h2>Research Idea &amp; Scope</h2>
       
-      <label>Meeting Title *</label>
+      <label>Project / Paper Title *</label>
       <input
         type="text"
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
-        placeholder="e.g., Q1 Feature Planning"
+        placeholder="e.g., Transformer-based models for low-resource NLP"
         disabled={isLoading}
       />
 
       <label>
-        Problem Statement *
+        Research Question / Abstract *
         <button
           type="button"
           onClick={handleImproveProblemStatement}
           disabled={isLoading || isGenerating || !problemStatement.trim()}
           className={styles.generateButton}
-          title="Use AI to improve this problem statement"
+          title="Use AI to improve this research statement"
         >
     {isGenerating ? (
             <>
@@ -169,7 +169,7 @@ export function BasicInfoStep({
             </>
           ) : (
             <>
-              ✨ Improve with AI
+              ✨ Refine with AI
             </>
           )}
         </button>
@@ -177,14 +177,14 @@ export function BasicInfoStep({
       <textarea
         value={problemStatement}
         onChange={(e) => onProblemChange(e.target.value)}
-        placeholder="What question or problem should the group discuss?"
+        placeholder="Describe your research question, hypothesis, methodology, or what you want reviewed. Include key contributions and open questions."
         rows={4}
         disabled={isLoading || isGenerating}
       />
       {showKeyPoints && keyPoints.length > 0 && (
         <div className={styles.keyPoints}>
           <div className={styles.keyPointsHeader}>
-            <strong>📌 Key Discussion Points:</strong>
+            <strong>Key Research Points:</strong>
             <button
               type="button"
               onClick={() => setShowKeyPoints(false)}
@@ -201,7 +201,7 @@ export function BasicInfoStep({
         </div>
       )}
 
-      <label>Meeting Agenda (optional)</label>
+      <label>Review Agenda (optional)</label>
       <div className={styles.listInput}>
         <input
           type="text"
@@ -243,7 +243,7 @@ export function BasicInfoStep({
         </ul>
       )}
 
-      <label>Desired Outcomes (optional)</label>
+      <label>Review Objectives (optional)</label>
       <div className={styles.listInput}>
         <input
           type="text"
@@ -290,11 +290,11 @@ export function BasicInfoStep({
         <div className={styles.yoloHeader}>
           <label className={styles.yoloLabel}>
             <div className={styles.yoloTitle}>
-              🚀 YOLO Mode
+              Auto Mode
               <span className={styles.betaBadge}>AUTO</span>
             </div>
             <div className={styles.yoloDescription}>
-              Fully autonomous debate - set it and forget it
+              Fully autonomous review — reviewers run without manual intervention
             </div>
           </label>
           <label className={styles.toggleSwitch}>
@@ -311,7 +311,7 @@ export function BasicInfoStep({
         {yoloMode && (
           <div className={styles.yoloSettings}>
             <div className={styles.yoloInfo}>
-              ✨ Debate will run automatically without manual intervention
+              Review will run automatically without manual intervention
             </div>
             <label>Auto-turn delay (seconds)</label>
             <input
@@ -328,8 +328,8 @@ export function BasicInfoStep({
         )}
       </div>
 
-      {/* Meeting Limit Cards */}
-      <label>Debate Duration</label>
+      {/* Review Limit Cards */}
+      <label>Review Session Length</label>
       <div className={styles.limitCards}>
         <div 
           className={`${styles.limitCard} ${meetingType === 'rounds' ? styles.limitCardActive : ''}`}

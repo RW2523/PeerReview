@@ -244,8 +244,8 @@ export class DocumentCollaborationProvider {
     });
 
     // Connection errors
-    this.provider.on('connection-error', (error: Error) => {
-      console.error('[Yjs] Connection error:', error);
+    this.provider.on('connection-error', (event: Event) => {
+      console.error('[Yjs] Connection error:', event);
     });
 
     // Document updates

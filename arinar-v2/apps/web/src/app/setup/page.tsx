@@ -9,6 +9,7 @@ import { MaterialsStep } from '@/components/setup/MaterialsStep';
 import { ParticipantsStep } from '@/components/setup/ParticipantsStep';
 import { MemoryImportStep } from '@/components/setup/MemoryImportStep';
 import { PreflightStep } from '@/components/setup/PreflightStep';
+import { LiteratureStep } from '@/components/setup/LiteratureStep';
 import { ReviewStep } from '@/components/setup/ReviewStep';
 import { SetupStepper } from '@/components/setup/SetupStepper';
 import { useMemoryImport } from '@/hooks/useMemoryImport';
@@ -69,6 +70,7 @@ export default function SetupPage() {
     handleUpdate: handleUpdateMaterial,
     handleRemove: handleRemoveMaterial,
   } = useMaterials();
+  const [uploadedFiles, setUploadedFiles] = useState<api.MaterialStatus[]>([]);
   
   // Step 3: Participants
   const {
@@ -119,12 +121,12 @@ export default function SetupPage() {
     selectedMemorySources: memoryImport.source_debate_ids,
   });
   const steps = [
-    { id: 1, label: 'Basic Info' },
-    { id: 2, label: 'Materials' },
-    { id: 3, label: 'Participants' },
-    { id: 4, label: 'Memory' },
-    { id: 5, label: 'Prepare' },
-    { id: 6, label: 'Review' },
+    { id: 1, label: 'Idea & Scope' },
+    { id: 2, label: 'Documents' },
+    { id: 3, label: 'Reviewers' },
+    { id: 4, label: 'Prior Memory' },
+    { id: 5, label: 'Literature' },
+    { id: 6, label: 'Review & Launch' },
   ];
 
   useEffect(() => {
@@ -151,6 +153,11 @@ export default function SetupPage() {
   // Create debate early (after step 1) to enable file uploads
   const handleCreateDebateEarly = async () => {
     if (createdDebateId) {
+      // Debate already exists — reload its materials then proceed
+      try {
+        const status = await api.getMaterialsStatus(createdDebateId);
+        setUploadedFiles(status.materials);
+      } catch { /* ignore */ }
       setStep(2);
       return;
     }
@@ -196,10 +203,10 @@ export default function SetupPage() {
       }
     }
     if (result) {
-      // Create memory grants if enabled
+      // Create memory grants if enabled, then advance to Literature step
       const shouldContinue = await createMemoryGrants(result.debateId, result.participantIds);
       if (shouldContinue) {
-        setStep(5);
+        setStep(5); // Literature step
       }
     }
   };
@@ -217,8 +224,8 @@ export default function SetupPage() {
       <AppNav />
       <div className={styles.container}>
       <header className={styles.header}>
-        <h1>Meeting Setup</h1>
-        <p className={styles.subtitle}>Configure your AI-moderated discussion</p>
+        <h1>New Review Session</h1>
+        <p className={styles.subtitle}>Configure your AI-powered peer review</p>
       </header>
 
       {!apiKey && (
@@ -236,7 +243,7 @@ export default function SetupPage() {
           <div>
             <strong style={{ color: '#856404' }}>OpenRouter API Key Required</strong>
             <p style={{ margin: '4px 0 0 0', color: '#856404', fontSize: '14px' }}>
-              You need to add your OpenRouter API key in <a href="/settings" style={{ color: '#0066cc', textDecoration: 'underline' }}>Settings</a> before launching the meeting. AI agents need this key to participate.
+              Add your OpenRouter API key in <a href="/settings" style={{ color: '#0066cc', textDecoration: 'underline' }}>Settings</a> before launching the review. AI reviewers need this key to participate.
             </p>
           </div>
         </div>
@@ -275,6 +282,8 @@ export default function SetupPage() {
               onAdd={handleAddMaterial}
               onUpdate={handleUpdateMaterial}
               onRemove={handleRemoveMaterial}
+              uploadedFiles={uploadedFiles}
+              onFilesUploaded={(files) => setUploadedFiles(files)}
             />
           )}
 
@@ -311,29 +320,36 @@ export default function SetupPage() {
           )}
 
           {step === 5 && (
-            <PreflightStep
+            <LiteratureStep
               debateId={createdDebateId}
-              participants={participants}
-              participantIds={createdParticipantIds}
+              researchQuestion={problemStatement}
               onCanContinueChange={setCanEnterRoom}
-              meetingTitle={title}
-              meetingPurpose={problemStatement}
-              meetingAgenda={agenda}
-              desiredOutcomes={desiredOutcomes}
             />
           )}
 
           {step === 6 && (
-            <ReviewStep
-              title={title}
-              problemStatement={problemStatement}
-              timeboxMinutes={timeboxMinutes}
-              yoloMode={yoloMode}
-              autoTurnDelay={autoTurnDelay}
-              materials={materials}
-              participants={participants}
-              workspaceId={workspaceId}
-            />
+            <>
+              <PreflightStep
+                debateId={createdDebateId}
+                participants={participants}
+                participantIds={createdParticipantIds}
+                onCanContinueChange={setCanEnterRoom}
+                meetingTitle={title}
+                meetingPurpose={problemStatement}
+                meetingAgenda={agenda}
+                desiredOutcomes={desiredOutcomes}
+              />
+              <ReviewStep
+                title={title}
+                problemStatement={problemStatement}
+                timeboxMinutes={timeboxMinutes}
+                yoloMode={yoloMode}
+                autoTurnDelay={autoTurnDelay}
+                materials={materials}
+                participants={participants}
+                workspaceId={workspaceId}
+              />
+            </>
           )}
         </div>
 
@@ -341,10 +357,8 @@ export default function SetupPage() {
           {step > 1 && (
             <button 
               onClick={() => {
-                // Allow going back to edit earlier steps
-                if (step === 5 || step === 6) {
-                  // From Preflight/Review, go back to Memory Import
-                  setStep(4);
+                if (step === 6) {
+                  setStep(5); // Back to Literature from Prepare & Launch
                 } else {
                   setStep(step - 1);
                 }
@@ -387,21 +401,32 @@ export default function SetupPage() {
               disabled={!canGoNext() || isLoading}
               className={styles.btnNext}
             >
-              <span>{isLoading ? 'Creating...' : 'Create & Prepare'}</span>
+              <span>{isLoading ? 'Creating...' : 'Continue to Literature Search'}</span>
+              <span className={styles.btnIcon}>→</span>
+            </button>
+          )}
+
+          {step === 5 && (
+            <button
+              onClick={() => setStep(6)}
+              disabled={isLoading}
+              className={styles.btnNext}
+            >
+              <span>Continue to Prepare &amp; Launch</span>
               <span className={styles.btnIcon}>→</span>
             </button>
           )}
           
-          {(step === 5 || step === 6) && (
+          {step === 6 && (
             <button
               onClick={handleLaunchAfterPreflight}
               disabled={isLoading || !canEnterRoom || !apiKey}
               className={styles.btnLaunch}
-              title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete agent preparation first' : ''}
+              title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete reviewer preparation first' : ''}
             >
               <span className={styles.launchIcon}>🚀</span>
               <span>
-                {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Meeting'}
+                {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Review'}
               </span>
             </button>
           )}

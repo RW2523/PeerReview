@@ -31,9 +31,15 @@ celery_app.conf.update(
     result_expires=3600,  # Results expire after 1 hour
 )
 
-# Task routes (optional: can route different task types to different queues)
+# Route tasks to named queues.
+# IMPORTANT: workers must be started with --queues=celery,materials,preflight
+# (or use the default "celery" queue for everything by removing these routes).
+# All queues are consolidated here so a single worker handles the full pipeline.
 celery_app.conf.task_routes = {
     "src.tasks.material_processing.process_material": {"queue": "materials"},
-    "src.tasks.material_processing.extract_text": {"queue": "extract"},
-    "src.tasks.material_processing.chunk_text": {"queue": "chunk"},
+    "src.tasks.preflight.*": {"queue": "preflight"},
 }
+
+# Workers pick up all queues by default (avoids "task stuck pending" issues).
+celery_app.conf.task_default_queue = "celery"
+celery_app.conf.worker_queues = ("celery", "materials", "preflight")

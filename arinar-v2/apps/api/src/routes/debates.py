@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query, Header
 from typing import Dict, Any, Optional, List
 from ..auth import get_current_user, check_workspace_access
+from ..config import settings
 from ..debate_engine import DebateEngine
 from ..debate_service import DebateService
 from ..openrouter_client import OpenRouterAuthError, OpenRouterError
@@ -240,6 +241,7 @@ async def create_debate(
 @router.post("/debates/{debate_id}/start", response_model=DebateResponse)
 async def start_debate(
     debate_id: str,
+    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -273,6 +275,16 @@ async def start_debate(
         logger.info(f"Starting debate {debate_id} - current state: {debate.get('state')}")
         debate = service.start_debate(debate_id)
         logger.info(f"Debate {debate_id} started successfully - new state: {debate.get('state')}")
+
+        # Queue embedding backfill so AI reviewers have full semantic RAG from the start
+        resolved_key = x_openrouter_key or settings.openrouter_api_key
+        if resolved_key:
+            try:
+                from src.tasks.material_processing import generate_debate_embeddings
+                generate_debate_embeddings.delay(debate_id, resolved_key)
+                logger.info(f"Embedding backfill queued for debate {debate_id}")
+            except Exception as embed_err:
+                logger.warning(f"Could not queue embedding backfill: {embed_err}")
         
         return DebateResponse(
             debate_id=debate['debate_id'],

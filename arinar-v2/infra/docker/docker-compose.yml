@@ -14,8 +14,8 @@ services:
     environment:
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DEFAULT_ORGANIZATION_NAME: Arinar
-      DEFAULT_PROJECT_NAME: Arinar V2 Local
+      DEFAULT_ORGANIZATION_NAME: PeerForge
+      DEFAULT_PROJECT_NAME: PeerForge Local
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
       SUPABASE_ANON_KEY: ${ANON_KEY}
@@ -161,7 +161,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     command: server /data --console-address ":9001"
     volumes:
-      - arinar-minio-data:/data
+      - peerforge-minio-data:/data
 
 volumes:
   arinar-db-data:
@@ -170,9 +170,9 @@ volumes:
     driver: local
   arinar-redis-data:
     driver: local
-  arinar-minio-data:
+  peerforge-minio-data:
     driver: local
 
 networks:
   default:
-    name: arinar-network
+    name: peerforge-network

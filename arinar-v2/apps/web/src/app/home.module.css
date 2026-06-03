@@ -73,7 +73,7 @@
 .step {
   display: flex;
   gap: var(--space-3);
-  align-items: start;
+  align-items: flex-start;
   padding: var(--space-4);
   background: var(--surface-0);
   border: 1px solid var(--border-soft);

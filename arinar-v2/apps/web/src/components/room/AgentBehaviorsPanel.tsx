@@ -54,7 +54,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
   const [privateMessages, setPrivateMessages] = useState<PrivateMessage[]>([]);
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
   const [strategicActions, setStrategicActions] = useState<StrategicAction[]>([]);
-  const [activeTab, setActiveTab] = useState<'coalitions' | 'messages' | 'questions' | 'tasks'>('coalitions');
+  const [activeTab, setActiveTab] = useState<'coalitions' | 'messages' | 'questions' | 'tasks' | 'actions'>('coalitions');
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [replyTexts, setReplyTexts] = useState<Map<string, string>>(new Map());

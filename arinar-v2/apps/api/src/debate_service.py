@@ -419,26 +419,48 @@ class DebateService:
     def delete_debate(self, debate_id: str) -> bool:
         """
         Delete a debate and all associated data.
-        This includes events, participants, and the debate record itself.
+
+        Tables with ON DELETE CASCADE are handled automatically by Postgres.
+        Tables with ON DELETE SET NULL that also have a non-null ownership
+        check must be cleaned up manually first, otherwise the SET NULL action
+        violates the constraint:
+          - memory_chunks.source_debate_id (SET NULL) + ownership_check
+          - agent_knowledge_units.source_debate_id (SET NULL)
         """
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
-            
-            # Delete in order of foreign key dependencies
-            # 1. Delete events
+
+            # 1. Remove memory_chunks that belong to this debate (literature
+            #    paper chunks have agent_id = NULL, so SET NULL would fail the
+            #    ownership check constraint).
             cursor.execute("""
-                DELETE FROM events WHERE debate_id = %s
+                DELETE FROM memory_chunks WHERE source_debate_id = %s
             """, (debate_id,))
-            
-            # 2. Delete participants
+
+            # 2. Nullify source_debate_id on agent knowledge units that reference
+            #    this debate (they are owned by an agent, so SET NULL is safe
+            #    but we do it explicitly to avoid surprises).
             cursor.execute("""
-                DELETE FROM participants WHERE debate_id = %s
+                UPDATE agent_knowledge_units
+                SET source_debate_id = NULL
+                WHERE source_debate_id = %s
             """, (debate_id,))
-            
-            # 3. Delete the debate itself
+
+            # 3. Delete preflight participant runs (FK → participants, no cascade)
+            cursor.execute("""
+                DELETE FROM preflight_participant_runs
+                WHERE run_id IN (
+                    SELECT run_id FROM preflight_runs WHERE debate_id = %s
+                )
+            """, (debate_id,))
+
+            # 4. Delete the debate — remaining children (events, participants,
+            #    preflight_runs, meeting_materials, debate_outputs, artifacts,
+            #    debate_memory_grants, memory_events, memory_access_log,
+            #    material_processing_jobs) are all ON DELETE CASCADE.
             cursor.execute("""
                 DELETE FROM debates WHERE debate_id = %s
             """, (debate_id,))
-            
+
             conn.commit()
             return True

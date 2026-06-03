@@ -1,4 +1,4 @@
-"""Summary generation service for M3 end-of-meeting outputs"""
+"""PeerForge — Peer-Review Report generation service (replaces old meeting summary)"""
 import uuid
 import json
 from typing import Dict, Any, List, Optional
@@ -10,12 +10,13 @@ from .openrouter_client import OpenRouterClient
 
 class SummaryService:
     """
-    Service for generating and storing debate summaries (M3)
-    
-    Generates:
-    - Summary (short, 1-3 sentences)
-    - Minutes (detailed meeting recap)
-    - Action items (structured list)
+    Service for generating and storing peer-review reports.
+
+    The generated report includes:
+    - Summary of Contribution (1-3 sentences)
+    - Detailed Review Notes (strengths, weaknesses, methodology, literature)
+    - Action Items / Required Changes (structured list with owner + priority)
+    - Recommendation: Accept / Minor Revision / Major Revision / Reject
     """
     
     def __init__(self, openrouter_client: Optional[OpenRouterClient] = None):
@@ -75,8 +76,10 @@ class SummaryService:
             summary=outputs['summary'],
             minutes=outputs['minutes'],
             action_items=outputs['action_items'],
+            recommendation=outputs.get('recommendation', ''),
+            recommendation_rationale=outputs.get('recommendation_rationale', ''),
             model_used=model_id,
-            token_count=response.get('usage', {}).get('total_tokens')
+            token_count=response.get('usage', {}).get('total_tokens'),
         )
         
         # Create event in ledger
@@ -133,59 +136,65 @@ class SummaryService:
             return [dict(row) for row in cursor.fetchall()]
     
     def _build_context(self, debate: Dict[str, Any], events: List[Dict[str, Any]]) -> str:
-        """Build context string from debate and events"""
+        """Build context string from review session events."""
         lines = [
-            f"# Debate: {debate['title']}",
-            f"Description: {debate.get('description', 'N/A')}",
-            f"",
-            "## Events:",
-            ""
+            f"# Research Title: {debate['title']}",
+            f"Research Question / Abstract: {debate.get('description', 'N/A')}",
+            "",
+            "## Review Session Transcript:",
+            "",
         ]
-        
+
         for event in events:
             event_type = event['event_type']
             content = event.get('content', {})
-            
+
             if event_type == 'system_message':
                 action = content.get('action', 'unknown')
-                lines.append(f"- System: {action}")
+                lines.append(f"[System: {action}]")
             elif event_type == 'intervention':
                 text = content.get('text', '')
                 tagged = content.get('tagged_agents', [])
-                lines.append(f"- Intervention: {text} (tagged: {', '.join(tagged)})")
+                lines.append(f"[Researcher/Moderator: {text} (directed at: {', '.join(tagged)})]")
             elif event_type in ['agent_message', 'debate_turn']:
+                agent = content.get('agent_name', event.get('sender_type', 'Reviewer'))
                 text = content.get('text', content.get('message', ''))
-                lines.append(f"- {event['sender_type']}: {text[:200]}...")
-        
+                is_chair = content.get('is_host_conclusion', False)
+                prefix = "[Review Chair Final]" if is_chair else f"[{agent}]"
+                lines.append(f"{prefix}: {text[:400]}{'...' if len(text) > 400 else ''}")
+
         return "\n".join(lines)
     
     def _build_summary_prompt(self, context: str) -> str:
-        """Build prompt for summary generation"""
-        return f"""You are analyzing a debate meeting. Generate a structured summary in JSON format.
+        """Build prompt for peer-review report generation."""
+        return f"""You are a senior academic editor synthesising a peer-review session into a structured report.
 
 {context}
 
-**CRITICAL**: You MUST output ONLY valid, complete JSON. No markdown, no code blocks, no explanations.
+CRITICAL: Output ONLY valid, complete JSON. No markdown, no code blocks, no explanations.
 
-Output this EXACT JSON structure (fill in the content):
+Output EXACTLY this JSON structure:
 
 {{
-  "summary": "Write 1-3 sentence high-level summary here",
-  "minutes": "Write detailed meeting minutes here (2-4 paragraphs covering key points, decisions, and disagreements)",
+  "summary": "1-3 sentence summary of the research contribution and overall panel verdict",
+  "minutes": "Comprehensive peer-review notes covering: (1) Contribution & Novelty assessment, (2) Key Strengths identified by reviewers, (3) Weaknesses & Methodological Concerns raised, (4) Literature & Related-Work Gaps, (5) Reproducibility and Ethics observations. 3-6 paragraphs. Cite specific reviewer positions.",
   "action_items": [
-    {{"description": "Specific action item", "owner": "Role or person responsible", "priority": "high"}},
-    {{"description": "Another action item", "owner": "Owner name", "priority": "medium"}}
-  ]
+    {{"description": "Required change or suggested experiment", "owner": "Responsible reviewer role or 'Authors'", "priority": "high"}},
+    {{"description": "Another required change", "owner": "Authors", "priority": "medium"}}
+  ],
+  "recommendation": "Accept | Minor Revision | Major Revision | Reject",
+  "recommendation_rationale": "2-3 sentences explaining the recommendation with reference to the key reviewer arguments"
 }}
 
 Requirements:
-- Summary: Concise, captures main outcome and decisions
-- Minutes: Comprehensive, covers what was discussed and decided
-- Action items: Specific, actionable tasks with clear ownership and priority (high/medium/low)
-- MUST be valid, complete JSON - ensure all quotes are closed, all braces are matched
-- If no action items identified, use empty array: "action_items": []
+- summary: Capture the paper's main contribution and the panel's dominant verdict
+- minutes: Be specific — name methodological issues, missing citations, and strong points as raised by reviewers
+- action_items: Specific, actionable changes for the authors (not vague suggestions)
+- recommendation: Choose EXACTLY ONE of: Accept / Minor Revision / Major Revision / Reject
+- recommendation_rationale: Must cite specific reviewer concerns that drove the recommendation
+- MUST be valid complete JSON — close all quotes, brackets, braces
 
-START YOUR RESPONSE WITH {{ and END WITH }}"""
+START WITH {{ AND END WITH }}"""
     
     def _parse_summary_response(self, content: str) -> Dict[str, Any]:
         """Parse LLM response into structured outputs"""
@@ -193,79 +202,58 @@ START YOUR RESPONSE WITH {{ and END WITH }}"""
         
         # Try multiple parsing strategies
         
+        def _extract(parsed: dict) -> dict:
+            return {
+                'summary': parsed.get('summary', ''),
+                'minutes': parsed.get('minutes', ''),
+                'action_items': parsed.get('action_items', []),
+                'recommendation': parsed.get('recommendation', ''),
+                'recommendation_rationale': parsed.get('recommendation_rationale', ''),
+            }
+
         # Strategy 1: Direct JSON parse
         try:
             parsed = json.loads(content)
-            
-            # Validate structure
             if not all(k in parsed for k in ['summary', 'minutes', 'action_items']):
-                raise ValueError("Missing required keys in summary response")
-            
-            return {
-                'summary': parsed['summary'],
-                'minutes': parsed['minutes'],
-                'action_items': parsed['action_items']
-            }
+                raise ValueError("Missing required keys")
+            return _extract(parsed)
         except json.JSONDecodeError as e:
             print(f"⚠️ JSON parse failed: {str(e)}")
-            pass
-        
+
         # Strategy 2: Extract from markdown code block
         try:
             if '```json' in content:
                 json_str = content.split('```json')[1].split('```')[0].strip()
-                parsed = json.loads(json_str)
-                return {
-                    'summary': parsed['summary'],
-                    'minutes': parsed['minutes'],
-                    'action_items': parsed['action_items']
-                }
+                return _extract(json.loads(json_str))
             elif '```' in content:
-                # Try generic code block
                 json_str = content.split('```')[1].split('```')[0].strip()
-                parsed = json.loads(json_str)
-                return {
-                    'summary': parsed['summary'],
-                    'minutes': parsed['minutes'],
-                    'action_items': parsed['action_items']
-                }
+                return _extract(json.loads(json_str))
         except (json.JSONDecodeError, IndexError) as e:
             print(f"⚠️ Markdown extraction failed: {str(e)}")
-            pass
-        
-        # Strategy 3: Try to fix incomplete JSON
+
+        # Strategy 3: Fix incomplete JSON
         try:
-            # If JSON is incomplete, try to close it
             content_cleaned = content.strip()
             if content_cleaned.startswith('{') and not content_cleaned.endswith('}'):
-                # Add missing closing braces
                 open_count = content_cleaned.count('{')
                 close_count = content_cleaned.count('}')
                 content_cleaned += '}' * (open_count - close_count)
-                
-                # Also close any open arrays
                 open_arrays = content_cleaned.count('[')
                 close_arrays = content_cleaned.count(']')
                 if open_arrays > close_arrays:
                     content_cleaned = content_cleaned.rstrip(',') + ']' * (open_arrays - close_arrays)
-                
-                parsed = json.loads(content_cleaned)
-                
-                return {
-                    'summary': parsed.get('summary', 'Summary generation incomplete'),
-                    'minutes': parsed.get('minutes', 'Minutes generation incomplete'),
-                    'action_items': parsed.get('action_items', [])
-                }
+                return _extract(json.loads(content_cleaned))
         except Exception as e:
             print(f"⚠️ JSON repair failed: {str(e)}")
-            pass
-        
-        # Strategy 4: Fallback to extracting text manually
-        print(f"⚠️ All parsing strategies failed. Creating fallback summary...")
+
+        # Strategy 4: Fallback
+        print("⚠️ All parsing strategies failed. Creating fallback report...")
         return {
-            'summary': 'Summary generation failed - unable to parse AI response',
-            'minutes': f'The AI generated an invalid response format. Raw content (first 500 chars):\n\n{content[:500]}',
-            'action_items': []
+            'summary': 'Report generation failed — unable to parse AI response',
+            'minutes': f'Raw content (first 500 chars):\n\n{content[:500]}',
+            'action_items': [],
+            'recommendation': 'Major Revision',
+            'recommendation_rationale': 'Report generation failed; manual review required.',
         }
     
     def _save_outputs(
@@ -275,17 +263,28 @@ START YOUR RESPONSE WITH {{ and END WITH }}"""
         minutes: str,
         action_items: List[Dict[str, Any]],
         model_used: str,
-        token_count: Optional[int]
+        token_count: Optional[int],
+        recommendation: str = '',
+        recommendation_rationale: str = '',
     ) -> None:
-        """Save outputs to debate_outputs table"""
+        """Save peer-review report outputs to debate_outputs table."""
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
+            # Encode recommendation into action_items metadata for backward compat
+            meta_items = action_items or []
+            if recommendation:
+                meta_items = list(meta_items) + [{
+                    "description": f"RECOMMENDATION: {recommendation}. {recommendation_rationale}",
+                    "owner": "Review Chair",
+                    "priority": "high",
+                    "_type": "recommendation",
+                }]
             cursor.execute("""
                 INSERT INTO debate_outputs (
                     debate_id, summary, minutes, action_items,
                     generated_at, model_used, token_count
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (debate_id) 
+                ON CONFLICT (debate_id)
                 DO UPDATE SET
                     summary = EXCLUDED.summary,
                     minutes = EXCLUDED.minutes,
@@ -298,10 +297,10 @@ START YOUR RESPONSE WITH {{ and END WITH }}"""
                 debate_id,
                 summary,
                 minutes,
-                psycopg2.extras.Json(action_items),
+                psycopg2.extras.Json(meta_items),
                 datetime.now(timezone.utc),
                 model_used,
-                token_count
+                token_count,
             ))
     
     def _create_summary_event(self, debate_id: str, outputs: Dict[str, Any]) -> None:
