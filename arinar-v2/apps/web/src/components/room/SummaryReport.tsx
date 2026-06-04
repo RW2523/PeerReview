@@ -61,7 +61,7 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
   if (!summary) {
     return (
       <div className={styles.generatePanel}>
-        <div className={styles.icon}>📝</div>
+        <div className={styles.icon} />
         <h3>Generate Meeting Summary</h3>
         <p>
           Create a comprehensive summary with minutes and action items using AI.

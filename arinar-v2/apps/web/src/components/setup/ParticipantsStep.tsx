@@ -118,7 +118,7 @@ export function ParticipantsStep({
       <div className={styles.hostConfigCompact}>
         <div className={styles.hostToggleRow}>
           <label htmlFor="enable-host" className={styles.hostToggleLabel}>
-            <span className={styles.hostIcon}>🎓</span>
+            <span className={styles.hostIcon} />
             <span className={styles.hostName}>Enable Review Chair</span>
             <span className={styles.hostHint}>Neutral chair synthesizes all reviewer positions and delivers final recommendation</span>
           </label>
@@ -158,7 +158,7 @@ export function ParticipantsStep({
       <div className={styles.hostConfigCompact} style={{marginTop: '16px'}}>
         <div className={styles.hostToggleRow}>
           <label htmlFor="enable-documents" className={styles.hostToggleLabel}>
-            <span className={styles.hostIcon}>📄</span>
+            <span className={styles.hostIcon} />
             <span className={styles.hostName}>Enable Document Collaboration</span>
             <span className={styles.hostHint}>Agents write structured documents together with diagrams</span>
           </label>

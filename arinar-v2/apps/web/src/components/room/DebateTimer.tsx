@@ -68,10 +68,10 @@ export default function DebateTimer({
     urgencyIcon = '⏰';
   } else if (secondsRemaining < 60) {
     urgencyClass = styles.critical;
-    urgencyIcon = '🔴';
+    urgencyIcon = '';
   } else if (secondsRemaining < 120) {
     urgencyClass = styles.warning;
-    urgencyIcon = '⚠️';
+    urgencyIcon = '';
   }
 
   return (

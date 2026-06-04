@@ -235,7 +235,7 @@ function RoomPageContent() {
                   </div>
                   {isYoloMode && (
                     <div className={styles.yoloBadge} title="Running autonomously">
-                      🚀 YOLO
+                      YOLO
                     </div>
                   )}
                 </div>
@@ -326,14 +326,14 @@ function RoomPageContent() {
                 className={`${styles.tab} ${activeTab === 'transcript' ? styles.tabActive : ''}`}
                 onClick={() => setActiveTab('transcript')}
               >
-                💬 Live Transcript
+                Live Transcript
               </button>
               {documentId && (
                 <button
                   className={`${styles.tab} ${activeTab === 'document' ? styles.tabActive : ''}`}
                   onClick={() => setActiveTab('document')}
                 >
-                  📄 Document
+                  Document
                 </button>
               )}
               {debateId && (
@@ -341,7 +341,7 @@ function RoomPageContent() {
                   className={`${styles.tab} ${activeTab === 'defense' ? styles.tabActive : ''}`}
                   onClick={() => setActiveTab('defense')}
                 >
-                  🎓 Mock Defense
+                  Mock Defense
                 </button>
               )}
             </div>

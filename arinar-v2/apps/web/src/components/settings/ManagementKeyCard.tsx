@@ -46,7 +46,7 @@ export function ManagementKeyCard({
       {managementKey ? (
         <div className={styles.keyStatus}>
           <div className={styles.keyStatusHeader}>
-            <span className={styles.keyIcon}>🔑</span>
+            <span className={styles.keyIcon} />
             <div>
               <strong>Management Key Saved</strong>
               <p>

@@ -273,21 +273,21 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           onClick={() => setActiveTab('messages')}
           title="Private messages between agents"
         >
-          💬 <span className={styles.tabLabel}>Agent DMs</span> <span className={styles.count}>{agentToAgentMessages.length}</span>
+          <span className={styles.tabLabel}>Agent DMs</span> <span className={styles.count}>{agentToAgentMessages.length}</span>
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'actions' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('actions')}
           title="Strategic proposals"
         >
-          🎯 <span className={styles.tabLabel}>Strategic</span> <span className={styles.count}>{strategicActions.length}</span>
+          <span className={styles.tabLabel}>Strategic</span> <span className={styles.count}>{strategicActions.length}</span>
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('tasks')}
           title="Agent autonomous actions"
         >
-          📋 <span className={styles.count}>{subTasks.length}</span>
+          <span className={styles.count}>{subTasks.length}</span>
         </button>
       </div>
 
@@ -296,7 +296,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           <div className={styles.section}>
             {coalitions.length === 0 ? (
               <div className={styles.empty}>
-                <span className={styles.emptyIcon}>🤝</span>
+                <span className={styles.emptyIcon} />
                 <p>No coalitions formed yet</p>
                 <p className={styles.emptyHint}>Agents will form alliances during the debate</p>
               </div>
@@ -334,7 +334,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           <div className={styles.section}>
             {questionsToHost.length === 0 ? (
               <div className={styles.emptyCompact}>
-                <span className={styles.emptyIcon}>❓</span>
+                <span className={styles.emptyIcon} />
                 <p>No questions yet</p>
               </div>
             ) : (
@@ -384,7 +384,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           <div className={styles.section}>
             {agentToAgentMessages.length === 0 ? (
               <div className={styles.emptyCompact}>
-                <span className={styles.emptyIcon}>💬</span>
+                <span className={styles.emptyIcon} />
                 <p>No DMs yet</p>
               </div>
             ) : (
@@ -409,7 +409,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
                     <div key={key} className={styles.conversationThread}>
                       <div className={styles.threadHeader}>
                         <span className={styles.threadParticipants}>
-                          💬 {participants[0]} ↔️ {participants[1]}
+                          {participants[0]} — {participants[1]}
                         </span>
                         <span className={styles.threadCount}>{msgs.length}</span>
                       </div>
@@ -440,7 +440,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           <div className={styles.section}>
             {privateMessages.length === 0 ? (
               <div className={styles.empty}>
-                <span className={styles.emptyIcon}>💬</span>
+                <span className={styles.emptyIcon} />
                 <p>No private messages yet</p>
                 <p className={styles.emptyHint}>Agents negotiate behind the scenes</p>
               </div>
@@ -466,22 +466,14 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           <div className={styles.section}>
             {strategicActions.length === 0 ? (
               <div className={styles.empty}>
-                <span className={styles.emptyIcon}>🎯</span>
+                <span className={styles.emptyIcon} />
                 <p>No strategic proposals yet</p>
                 <p className={styles.emptyHint}>Agents can propose votes, format changes, etc.</p>
               </div>
             ) : (
               strategicActions.map(action => {
                 const move = action.move;
-                const actionIcons: Record<string, string> = {
-                  'vote': '🗳️',
-                  'narrow': '🎯',
-                  'breakdown': '📋',
-                  'evidence': '📊',
-                  'restructure': '🔄',
-                  'interrupt': '⚠️'
-                };
-                const icon = actionIcons[move.action] || '🎯';
+                const icon = '';
                 
                 return (
                   <div key={action.id} className={styles.actionCard}>
@@ -546,7 +538,7 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
           <div className={styles.section}>
             {subTasks.length === 0 ? (
               <div className={styles.emptyCompact}>
-                <span className={styles.emptyIcon}>📋</span>
+                <span className={styles.emptyIcon} />
                 <p>No tasks yet</p>
               </div>
             ) : (
@@ -555,9 +547,9 @@ export default function AgentBehaviorsPanel({ debateId, events, sendCommand }: A
                   <div className={styles.taskHeader}>
                     <span className={styles.taskAgent}>{task.agent}</span>
                     <span className={`${styles.taskStatus} ${styles[`status-${task.status}`]}`}>
-                      {task.status === 'planning' && '🤔 Planning'}
-                      {task.status === 'executing' && '⚡ Executing'}
-                      {task.status === 'completed' && '✅ Complete'}
+                      {task.status === 'planning' && 'Planning'}
+                      {task.status === 'executing' && 'Executing'}
+                      {task.status === 'completed' && 'Complete'}
                     </span>
                   </div>
                   <div className={styles.taskContent}>{task.task}</div>

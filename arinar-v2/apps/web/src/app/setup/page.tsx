@@ -243,7 +243,7 @@ export default function SetupPage() {
           alignItems: 'center',
           gap: '12px'
         }}>
-          <span style={{ fontSize: '24px' }}>⚠️</span>
+          <span style={{ fontSize: '14px', fontWeight: 700, color: '#856404' }}>Notice</span>
           <div>
             <strong style={{ color: '#856404' }}>OpenRouter API Key Required</strong>
             <p style={{ margin: '4px 0 0 0', color: '#856404', fontSize: '14px' }}>
@@ -431,7 +431,7 @@ export default function SetupPage() {
               className={styles.btnLaunch}
               title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete reviewer preparation first' : ''}
             >
-              <span className={styles.launchIcon}>🚀</span>
+              <span className={styles.launchIcon} />
               <span>
                 {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Review'}
               </span>
@@ -447,9 +447,9 @@ export default function SetupPage() {
 // ── Reasoning Mode Selector (inline) ──────────────────────────────────────
 
 const MODE_OPTS = [
-  { id: 'light'  as api.ReasoningMode, emoji: '⚡', label: 'Light',  hint: 'Fast, low-cost single model', color: '#16a34a' },
-  { id: 'medium' as api.ReasoningMode, emoji: '⚖️', label: 'Medium', hint: 'Role-aware balanced models',  color: '#d97706' },
-  { id: 'heavy'  as api.ReasoningMode, emoji: '🔥', label: 'Heavy',  hint: 'Frontier models for all',    color: '#dc2626' },
+  { id: 'light'  as api.ReasoningMode, label: 'Light',  hint: 'Single fast model for all tasks' },
+  { id: 'medium' as api.ReasoningMode, label: 'Medium', hint: 'Role-aware balanced models' },
+  { id: 'heavy'  as api.ReasoningMode, label: 'Heavy',  hint: 'Frontier models for every activity' },
 ];
 
 function ReasoningModeSelector({
@@ -460,12 +460,17 @@ function ReasoningModeSelector({
   onChange: (m: api.ReasoningMode) => void;
 }) {
   return (
-    <div style={{ marginBottom: 24, padding: 16, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff' }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
-        ⚡ Reasoning Mode
+    <div style={{
+      marginBottom: 24, padding: 16,
+      border: '1px solid var(--border-medium)',
+      borderRadius: 'var(--radius-lg)',
+      background: 'var(--surface-1)',
+    }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-0)', letterSpacing: '-0.01em' }}>
+        Reasoning Mode
       </h3>
-      <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: '#64748b' }}>
-        Controls which AI models power every activity — analysis, agent turns, evaluations, and reports.
+      <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-2)', lineHeight: 1.5 }}>
+        Controls which AI models are used for agent turns, analysis, evaluation, and reports.
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {MODE_OPTS.map(opt => (
@@ -473,17 +478,18 @@ function ReasoningModeSelector({
             key={opt.id}
             onClick={() => onChange(opt.id)}
             style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-              padding: '12px 8px',
-              border: `2px solid ${mode === opt.id ? opt.color : '#e2e8f0'}`,
-              borderRadius: 10,
-              background: mode === opt.id ? `${opt.color}15` : '#f8fafc',
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
+              padding: '12px 14px',
+              border: `1px solid ${mode === opt.id ? 'var(--accent)' : 'var(--border-medium)'}`,
+              borderRadius: 'var(--radius-md)',
+              background: mode === opt.id ? 'var(--accent-subtle)' : 'var(--surface-2)',
               cursor: 'pointer',
+              transition: 'border-color 150ms, background 150ms',
+              textAlign: 'left',
             }}
           >
-            <span style={{ fontSize: '1.3rem' }}>{opt.emoji}</span>
-            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{opt.label}</span>
-            <span style={{ fontSize: '0.7rem', color: opt.color }}>{opt.hint}</span>
+            <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-0)' }}>{opt.label}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', lineHeight: 1.4 }}>{opt.hint}</span>
           </button>
         ))}
       </div>

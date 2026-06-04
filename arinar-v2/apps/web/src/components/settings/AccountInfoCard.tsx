@@ -106,7 +106,7 @@ export function AccountInfoCard({
           {/* Show if management key is working */}
           {accountInfo.has_management_key && accountInfo.credits?.balance !== null && (
             <div className={styles.note} style={{ backgroundColor: '#e8f5e9', borderColor: '#4caf50' }}>
-              <span>✅</span>
+              <span>&#10003;</span>
               <span>Management key verified - showing live credit balance</span>
             </div>
           )}

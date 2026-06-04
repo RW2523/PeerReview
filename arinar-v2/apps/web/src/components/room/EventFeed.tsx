@@ -298,14 +298,14 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
   };
 
   const getEventTypeLabel = (type: string) => {
-    if (type === 'agent_message') return '💬 Message';
+    if (type === 'agent_message') return 'Message';
     if (type === 'human_message') return '👤 You';
-    if (type === 'intervention') return '⚡ Intervention';
+    if (type === 'intervention') return 'Intervention';
     if (type === 'system_message') return '⚙️ System';
     if (type === 'turn_start') return '▶️ Turn Start';
     if (type === 'turn_end') return '⏸️ Turn End';
-    if (type === 'state_update') return '📊 State';
-    if (type === 'strategic_action') return '🎯 Strategic Move';
+    if (type === 'state_update') return 'State';
+    if (type === 'strategic_action') return 'Strategic Move';
     if (type === 'agent_thinking') return ''; // No label, just show content
     if (type === 'error') return '❌ Error';
     return type.replace(/_/g, ' ');
@@ -321,10 +321,10 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
     const getThinkingIcon = () => {
       if (thinkingType.includes('reasoning')) return '🤔';
       if (thinkingType.includes('generating')) return '✍️';
-      if (thinkingType.includes('validating')) return '✅';
-      if (thinkingType.includes('issues')) return '⚠️';
+      if (thinkingType.includes('validating')) return '–';
+      if (thinkingType.includes('issues')) return '!';
       if (thinkingType.includes('corrected')) return '🔧';
-      if (thinkingType.includes('regenerating')) return '🔄';
+      if (thinkingType.includes('regenerating')) return '↺';
       return '💭';
     };
     
@@ -354,22 +354,12 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
     
     if (!move) return null;
     
-    const actionIcons = {
-      'vote': '🗳️',
-      'narrow': '🎯',
-      'evidence': '📊',
-      'restructure': '🔄',
-      'interrupt': '⚠️'
-    };
-    
-    const icon = actionIcons[move.action as keyof typeof actionIcons] || '🎯';
-    
     return (
       <div className={styles.strategicAction}>
         <div className={styles.strategicHeader}>
-          {icon} <strong>{agent}</strong> proposes: <strong>{move.action.toUpperCase()}</strong>
+          <strong>{agent}</strong> proposes: <strong>{move.action.toUpperCase()}</strong>
         </div>
-        {move.question && <div className={styles.strategicDetail}>❓ "{move.question}"</div>}
+        {move.question && <div className={styles.strategicDetail}>"{move.question}"</div>}
         {move.options && (
           <div className={styles.strategicOptions}>
             {move.options.map((opt: string, i: number) => (
@@ -384,9 +374,9 @@ function EventCard({ event, showTurnSeparator, turnNumber }: { event: WSEventEnv
             ))}
           </div>
         )}
-        {move.what_needed && <div className={styles.strategicDetail}>📊 {move.what_needed}</div>}
-        {move.proposal && <div className={styles.strategicDetail}>💡 {move.proposal}</div>}
-        {move.reason && <div className={styles.strategicDetail}>⚠️ {move.reason}</div>}
+        {move.what_needed && <div className={styles.strategicDetail}>{move.what_needed}</div>}
+        {move.proposal && <div className={styles.strategicDetail}>{move.proposal}</div>}
+        {move.reason && <div className={styles.strategicDetail}>{move.reason}</div>}
       </div>
     );
   };

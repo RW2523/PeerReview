@@ -9,7 +9,7 @@
 }
 
 .composer::before {
-  content: "💬 Intervene in Debate";
+  content: "Intervene in Debate";
   display: block;
   font-size: 13px;
   font-weight: 600;

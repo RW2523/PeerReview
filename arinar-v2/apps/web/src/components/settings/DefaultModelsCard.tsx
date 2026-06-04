@@ -171,7 +171,7 @@ export function DefaultModelsCard({ apiKey, workspaceId }: DefaultModelsCardProp
 
       {modelsSuccess && (
         <div className={styles.success}>
-          <span>✅</span>
+          <span>&#10003;</span>
           <div>
             <strong>Defaults Saved!</strong>
             <p>These settings are now active for this workspace across all devices.</p>

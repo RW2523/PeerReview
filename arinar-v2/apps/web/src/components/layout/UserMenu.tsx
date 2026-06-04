@@ -111,7 +111,7 @@ export default function UserMenu() {
             className={styles.menuItem}
             onClick={() => handleNavigate('/history')}
           >
-            <span className={styles.menuIcon}>📚</span>
+            <span className={styles.menuIcon} />
             <span>History</span>
           </button>
 

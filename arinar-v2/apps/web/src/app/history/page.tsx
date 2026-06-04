@@ -173,7 +173,7 @@ export default function HistoryPage() {
 
           {error && (
             <div className={styles.error}>
-              <span>⚠️</span>
+              <span style={{ fontWeight: 600, color: 'var(--warning)' }}>!</span>
               <div>
                 <div>{error}</div>
                 {error.includes('backend server') && (
@@ -232,7 +232,7 @@ export default function HistoryPage() {
               {!loading && debates.length > 0 && (
                 <div className={styles.controls}>
                   <div className={styles.searchBox}>
-                    <span className={styles.searchIcon}>🔍</span>
+                    <span className={styles.searchIcon}>&#x2315;</span>
                     <input
                       type="text"
                       placeholder="Search debates by title or ID..."
@@ -259,10 +259,10 @@ export default function HistoryPage() {
                       onChange={(e) => setSortBy(e.target.value as any)}
                       className={styles.sortSelect}
                     >
-                      <option value="date-desc">📅 Newest First</option>
-                      <option value="date-asc">📅 Oldest First</option>
-                      <option value="title-asc">🔤 Title A-Z</option>
-                      <option value="title-desc">🔤 Title Z-A</option>
+                      <option value="date-desc">Newest First</option>
+                      <option value="date-asc">Oldest First</option>
+                      <option value="title-asc">Title A–Z</option>
+                      <option value="title-desc">Title Z–A</option>
                     </select>
                   </div>
                 </div>
@@ -275,7 +275,7 @@ export default function HistoryPage() {
                 </div>
               ) : filteredAndSortedDebates.length === 0 && (searchQuery || statusFilter !== 'all') ? (
                 <div className={styles.emptyState}>
-                  <span className={styles.emptyIcon}>🔍</span>
+                  <span className={styles.emptyIcon} aria-hidden="true" />
                   <h3>No results found</h3>
                   <p>
                     {searchQuery 
@@ -294,7 +294,7 @@ export default function HistoryPage() {
                 </div>
               ) : debates.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <span className={styles.emptyIcon}>📭</span>
+                  <span className={styles.emptyIcon} aria-hidden="true" />
                   <h3>No review sessions yet</h3>
                   <p>Start your first review session to get going</p>
                   <button onClick={() => router.push('/setup')} className={styles.btnPrimary}>
@@ -319,16 +319,16 @@ export default function HistoryPage() {
                       
                       <div className={styles.cardMeta}>
                         <span className={styles.metaItem}>
-                          📅 {new Date(debate.created_at).toLocaleDateString()}
+                          {new Date(debate.created_at).toLocaleDateString()}
                         </span>
                         {debate.participant_count && (
                           <span className={styles.metaItem}>
-                            👥 {debate.participant_count} participants
+                            {debate.participant_count} participants
                           </span>
                         )}
                         {debate.message_count && (
                           <span className={styles.metaItem}>
-                            💬 {debate.message_count} messages
+                            {debate.message_count} messages
                           </span>
                         )}
                       </div>
@@ -339,7 +339,7 @@ export default function HistoryPage() {
                           className={styles.btnSecondary}
                           title="View transcript"
                         >
-                          📄 Transcript
+                          Transcript
                         </button>
                         {debate.state === 'ended' && (
                           <button 
@@ -347,7 +347,7 @@ export default function HistoryPage() {
                             className={styles.btnSecondary}
                             title="View summary"
                           >
-                            📊 Summary
+                            Summary
                           </button>
                         )}
                         <button 
@@ -355,7 +355,7 @@ export default function HistoryPage() {
                           className={styles.btnPrimary}
                           title="Open in room"
                         >
-                          🏠 Open
+                          Open
                         </button>
                         <button 
                           onClick={(e) => handleDelete(debate.debate_id, e)}
@@ -499,7 +499,7 @@ export default function HistoryPage() {
                 </div>
               ) : (
                 <div className={styles.emptyState}>
-                  <span className={styles.emptyIcon}>📊</span>
+                  <span className={styles.emptyIcon} aria-hidden="true" />
                   <h3>No Report Generated</h3>
                   <p>This review session hasn't produced a report yet</p>
                   <button onClick={() => openInRoom(selectedDebate)} className={styles.btnPrimary}>
