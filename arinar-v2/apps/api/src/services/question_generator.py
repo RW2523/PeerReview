@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
+from .reasoning_modes import get_model, ReasoningMode
 
 QUESTION_CATEGORIES = [
     "problem_statement",
@@ -84,8 +85,9 @@ Each element must have EXACTLY these keys:
 def generate_questions(
     debate_id: str,
     openrouter_key: str,
-    model_id: str = "anthropic/claude-sonnet-4-5",
+    model_id: str = "",
     n_questions: int = 15,
+    mode: ReasoningMode = "medium",
 ) -> List[Dict[str, Any]]:
     """
     Generate defense questions for *debate_id* and persist to ``defense_questions``.
@@ -110,6 +112,9 @@ def generate_questions(
 
     # ── Fetch chunks for source grounding ─────────────────────────────────
     excerpts = _fetch_excerpts(debate_id, limit=12)
+
+    if not model_id:
+        model_id = get_model("question_generation", mode)
 
     # ── LLM call ──────────────────────────────────────────────────────────
     profile_summary = {

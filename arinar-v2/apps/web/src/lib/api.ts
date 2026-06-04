@@ -326,6 +326,7 @@ export interface DebateSetupRequest {
   host_model_id?: string;
   participants: SetupParticipant[];
   materials?: SetupMaterial[];
+  reasoning_mode?: ReasoningMode;
 }
 
 export interface DebateSetupResponse {
@@ -1434,6 +1435,25 @@ export async function listSavedWebResults(debateId: string): Promise<{
 // DEFENSE PLATFORM API
 // ============================================================================
 
+export type ReasoningMode = 'light' | 'medium' | 'heavy';
+
+export interface ReasoningModeInfo {
+  label: string;
+  description: string;
+  default_model: string;
+  summary_model: string;
+  cost_hint: string;
+}
+
+export interface SuggestedPersona {
+  name: string;
+  role: string;
+  expertise: string;
+  focus_area: string;
+  system_prompt: string;
+  model_id: string;
+}
+
 export interface ResearchProfile {
   profile_id: string;
   debate_id: string;
@@ -1512,15 +1532,42 @@ async function defenseHeaders(openrouterKey?: string): Promise<HeadersInit> {
   return base;
 }
 
+export async function getReasoningModes(): Promise<Record<ReasoningMode, ReasoningModeInfo>> {
+  const response = await fetch(`${API_URL}/reasoning-modes`, {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  const data = await response.json();
+  return data.modes;
+}
+
 export async function analyzeResearch(
   debateId: string,
   openrouterKey: string,
-  modelId = 'anthropic/claude-sonnet-4-5'
-): Promise<{ status: string; profile: ResearchProfile }> {
+  mode: ReasoningMode = 'medium',
+  modelId = ''
+): Promise<{ status: string; profile: ResearchProfile; mode_used: string }> {
   const response = await fetch(`${API_URL}/debates/${debateId}/analyze-research`, {
     method: 'POST',
     headers: await defenseHeaders(openrouterKey),
-    body: JSON.stringify({ model_id: modelId }),
+    body: JSON.stringify({ model_id: modelId, mode }),
+  });
+  if (!response.ok) {
+    const b = await response.json().catch(() => null);
+    throw new Error(b?.detail ?? response.statusText);
+  }
+  return response.json();
+}
+
+export async function suggestPersonas(
+  debateId: string,
+  openrouterKey: string,
+  mode: ReasoningMode = 'medium'
+): Promise<{ personas: SuggestedPersona[]; mode: string; mode_info: ReasoningModeInfo }> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/suggest-personas`, {
+    method: 'POST',
+    headers: await defenseHeaders(openrouterKey),
+    body: JSON.stringify({ mode }),
   });
   if (!response.ok) {
     const b = await response.json().catch(() => null);
@@ -1545,12 +1592,13 @@ export async function generateDefenseQuestions(
   debateId: string,
   openrouterKey: string,
   nQuestions = 15,
-  modelId = 'anthropic/claude-sonnet-4-5'
-): Promise<{ count: number; questions: DefenseQuestion[] }> {
+  mode: ReasoningMode = 'medium',
+  modelId = ''
+): Promise<{ count: number; questions: DefenseQuestion[]; mode_used: string }> {
   const response = await fetch(`${API_URL}/debates/${debateId}/defense-questions/generate`, {
     method: 'POST',
     headers: await defenseHeaders(openrouterKey),
-    body: JSON.stringify({ n_questions: nQuestions, model_id: modelId }),
+    body: JSON.stringify({ n_questions: nQuestions, model_id: modelId, mode }),
   });
   if (!response.ok) {
     const b = await response.json().catch(() => null);
@@ -1576,12 +1624,13 @@ export async function submitAnswer(
   questionId: string,
   answerText: string,
   openrouterKey: string,
-  modelId = 'anthropic/claude-sonnet-4-5'
+  mode: ReasoningMode = 'medium',
+  modelId = ''
 ): Promise<AnswerEvaluation> {
   const response = await fetch(`${API_URL}/debates/${debateId}/answers`, {
     method: 'POST',
     headers: await defenseHeaders(openrouterKey),
-    body: JSON.stringify({ question_id: questionId, answer_text: answerText, model_id: modelId }),
+    body: JSON.stringify({ question_id: questionId, answer_text: answerText, model_id: modelId, mode }),
   });
   if (!response.ok) {
     const b = await response.json().catch(() => null);
@@ -1601,12 +1650,13 @@ export async function getAnswers(debateId: string): Promise<{ count: number; ans
 export async function generateReadinessReport(
   debateId: string,
   openrouterKey: string,
-  modelId = 'anthropic/claude-sonnet-4-5'
+  mode: ReasoningMode = 'medium',
+  modelId = ''
 ): Promise<ReadinessReport> {
   const response = await fetch(`${API_URL}/debates/${debateId}/readiness-report`, {
     method: 'POST',
     headers: await defenseHeaders(openrouterKey),
-    body: JSON.stringify({ model_id: modelId }),
+    body: JSON.stringify({ model_id: modelId, mode }),
   });
   if (!response.ok) {
     const b = await response.json().catch(() => null);

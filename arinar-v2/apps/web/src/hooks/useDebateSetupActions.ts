@@ -26,6 +26,7 @@ interface UseDebateSetupActionsOptions {
   participants: SetupParticipant[];
   materials: SetupMaterial[];
   selectedMemorySources: string[];
+  reasoningMode?: api.ReasoningMode;
 }
 
 interface UseDebateSetupActionsReturn {
@@ -61,6 +62,7 @@ export function useDebateSetupActions(
       participants,
       materials,
       selectedMemorySources,
+      reasoningMode,
     } = options;
 
     // Allow creating debate without participants initially (for file uploads)
@@ -81,6 +83,7 @@ export function useDebateSetupActions(
         host_model_id: enableHost ? (hostModelId || 'openai/gpt-4o-mini') : undefined,
         participants: participants,
         materials: materials && materials.length > 0 ? materials : undefined,
+        reasoning_mode: reasoningMode || 'medium',
       });
 
       const { debate_id, participant_ids } = setupResponse;

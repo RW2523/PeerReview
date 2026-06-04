@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 
 from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
+from .reasoning_modes import get_model, ReasoningMode
 
 _SYSTEM = """\
 You are a PhD defense committee evaluator.
@@ -72,7 +73,8 @@ def evaluate_answer(
     question_id: str,
     answer_text: str,
     openrouter_key: str,
-    model_id: str = "anthropic/claude-sonnet-4-5",
+    model_id: str = "",
+    mode: ReasoningMode = "medium",
 ) -> Dict[str, Any]:
     """
     Evaluate *answer_text* against *question_id*, persist to ``session_answers``,
@@ -94,6 +96,9 @@ def evaluate_answer(
         )
         profile_row = cur.fetchone()
         profile = dict(profile_row) if profile_row else {}
+
+    if not model_id:
+        model_id = get_model("answer_evaluation", mode)
 
     research_context = _build_context(profile, question)
 

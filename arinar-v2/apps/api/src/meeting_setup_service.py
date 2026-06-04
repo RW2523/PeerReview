@@ -38,6 +38,7 @@ class MeetingSetupService:
         max_rounds: Optional[int] = None,
         enable_host: Optional[bool] = False,
         host_model_id: Optional[str] = None,
+        reasoning_mode: Optional[str] = "medium",
     ) -> Tuple[str, List[str], List[str]]:
         """
         Returns: (debate_id, participant_ids, material_ids)
@@ -65,6 +66,8 @@ class MeetingSetupService:
         if enable_host:
             policy_config["enable_host"] = enable_host
             policy_config["host_model_id"] = host_model_id or "openai/gpt-4o-mini"
+        # Store reasoning mode so all services can pick the right model later
+        policy_config["reasoning_mode"] = reasoning_mode or "medium"
 
         debate = self._debates.create_debate(
             workspace_id=workspace_id, title=title, policy_config=policy_config

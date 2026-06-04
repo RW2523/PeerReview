@@ -1,6 +1,6 @@
 """Pydantic models for meeting setup endpoints"""
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 from .agents import SetupParticipant
 
 
@@ -27,6 +27,10 @@ class DebateSetupRequest(BaseModel):
     host_model_id: Optional[str] = Field(default=None, description="AI model for host (only if enable_host=true)")
     participants: List[SetupParticipant]
     materials: Optional[List[SetupMaterial]] = Field(default_factory=list)
+    reasoning_mode: Optional[Literal["light", "medium", "heavy"]] = Field(
+        default="medium",
+        description="Reasoning mode controls model selection across all AI activities"
+    )
 
 
 class DebateSetupResponse(BaseModel):

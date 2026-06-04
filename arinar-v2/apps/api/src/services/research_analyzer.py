@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
 from ..services.memory_retrieval import retrieve_allowed_chunks
+from .reasoning_modes import get_model, mode_from_policy, ReasoningMode
 
 
 # ── System prompt ──────────────────────────────────────────────────────────
@@ -66,8 +67,9 @@ Return a JSON object with EXACTLY these keys:
 def analyze_research(
     debate_id: str,
     openrouter_key: str,
-    model_id: str = "anthropic/claude-sonnet-4-5",
+    model_id: str = "",
     max_chunks: int = 20,
+    mode: ReasoningMode = "medium",
 ) -> Dict[str, Any]:
     """
     Analyse uploaded research materials for *debate_id* and store the
@@ -92,6 +94,10 @@ def analyze_research(
             raise ValueError(f"Debate {debate_id} not found")
         profile_id = row["profile_id"]
         conn.commit()
+
+    # Resolve model: explicit > mode-based default
+    if not model_id:
+        model_id = get_model("analysis", mode)
 
     try:
         # ── Retrieve document chunks via existing RAG service ─────────────

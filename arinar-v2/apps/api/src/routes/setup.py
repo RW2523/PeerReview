@@ -35,6 +35,7 @@ async def setup_debate(
             timebox_minutes=request.timebox_minutes,
             enable_host=request.enable_host,
             host_model_id=request.host_model_id,
+            reasoning_mode=request.reasoning_mode or "medium",
             participants=[
                 p.model_dump(exclude_none=True, by_alias=True) for p in request.participants
             ],

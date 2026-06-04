@@ -39,6 +39,9 @@ export default function SetupPage() {
   const [yoloMode, setYoloMode] = useState(false);
   const [autoTurnDelay, setAutoTurnDelay] = useState(10);
   
+  // Reasoning Mode
+  const [reasoningMode, setReasoningMode] = useState<api.ReasoningMode>('medium');
+
   // Host Configuration
   const [enableHost, setEnableHost] = useState(false);
   const [hostModelId, setHostModelId] = useState('openai/gpt-4o-mini');
@@ -119,6 +122,7 @@ export default function SetupPage() {
     participants,
     materials,
     selectedMemorySources: memoryImport.source_debate_ids,
+    reasoningMode,
   });
   const steps = [
     { id: 1, label: 'Idea & Scope' },
@@ -288,26 +292,29 @@ export default function SetupPage() {
           )}
 
           {step === 3 && (
-          <ParticipantsStep
-            participants={participants}
-            templates={templates}
-            agents={agents}
-            enableHost={enableHost}
-            hostModelId={hostModelId}
-            enableDocuments={enableDocuments}
-            documentTemplateId={documentTemplateId}
-            documentTitle={documentTitle}
-            onEnableHostChange={setEnableHost}
-            onHostModelChange={setHostModelId}
-            onEnableDocumentsChange={setEnableDocuments}
-            onDocumentTemplateChange={setDocumentTemplateId}
-            onDocumentTitleChange={setDocumentTitle}
-            onAddFromTemplate={handleAddParticipantFromTemplate}
-            onAddExisting={handleAddExistingAgent}
-            onUpdate={handleUpdateParticipant}
-            onRemove={handleRemoveParticipant}
-            onReorder={handleReorderParticipant}
-          />
+          <>
+            <ReasoningModeSelector mode={reasoningMode} onChange={setReasoningMode} />
+            <ParticipantsStep
+              participants={participants}
+              templates={templates}
+              agents={agents}
+              enableHost={enableHost}
+              hostModelId={hostModelId}
+              enableDocuments={enableDocuments}
+              documentTemplateId={documentTemplateId}
+              documentTitle={documentTitle}
+              onEnableHostChange={setEnableHost}
+              onHostModelChange={setHostModelId}
+              onEnableDocumentsChange={setEnableDocuments}
+              onDocumentTemplateChange={setDocumentTemplateId}
+              onDocumentTitleChange={setDocumentTitle}
+              onAddFromTemplate={handleAddParticipantFromTemplate}
+              onAddExisting={handleAddExistingAgent}
+              onUpdate={handleUpdateParticipant}
+              onRemove={handleRemoveParticipant}
+              onReorder={handleReorderParticipant}
+            />
+          </>
           )}
 
           {step === 4 && (
@@ -434,5 +441,52 @@ export default function SetupPage() {
       </div>
       </div>
     </>
+  );
+}
+
+// ── Reasoning Mode Selector (inline) ──────────────────────────────────────
+
+const MODE_OPTS = [
+  { id: 'light'  as api.ReasoningMode, emoji: '⚡', label: 'Light',  hint: 'Fast, low-cost single model', color: '#16a34a' },
+  { id: 'medium' as api.ReasoningMode, emoji: '⚖️', label: 'Medium', hint: 'Role-aware balanced models',  color: '#d97706' },
+  { id: 'heavy'  as api.ReasoningMode, emoji: '🔥', label: 'Heavy',  hint: 'Frontier models for all',    color: '#dc2626' },
+];
+
+function ReasoningModeSelector({
+  mode,
+  onChange,
+}: {
+  mode: api.ReasoningMode;
+  onChange: (m: api.ReasoningMode) => void;
+}) {
+  return (
+    <div style={{ marginBottom: 24, padding: 16, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff' }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
+        ⚡ Reasoning Mode
+      </h3>
+      <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: '#64748b' }}>
+        Controls which AI models power every activity — analysis, agent turns, evaluations, and reports.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        {MODE_OPTS.map(opt => (
+          <button
+            key={opt.id}
+            onClick={() => onChange(opt.id)}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              padding: '12px 8px',
+              border: `2px solid ${mode === opt.id ? opt.color : '#e2e8f0'}`,
+              borderRadius: 10,
+              background: mode === opt.id ? `${opt.color}15` : '#f8fafc',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: '1.3rem' }}>{opt.emoji}</span>
+            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{opt.label}</span>
+            <span style={{ fontSize: '0.7rem', color: opt.color }}>{opt.hint}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

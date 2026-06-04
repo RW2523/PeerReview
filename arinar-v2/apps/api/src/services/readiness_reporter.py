@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
+from .reasoning_modes import get_model, ReasoningMode
 
 
 _SYSTEM = """\
@@ -86,7 +87,8 @@ Return a JSON object with EXACTLY these keys:
 def generate_readiness_report(
     debate_id: str,
     openrouter_key: str,
-    model_id: str = "anthropic/claude-sonnet-4-5",
+    model_id: str = "",
+    mode: ReasoningMode = "medium",
 ) -> Dict[str, Any]:
     """
     Build and persist a readiness report for *debate_id*.
@@ -165,6 +167,9 @@ def generate_readiness_report(
         """, (debate_id, workspace_id, len(answers), len(answers)))
         report_id = cur.fetchone()["report_id"]
         conn.commit()
+
+    if not model_id:
+        model_id = get_model("readiness_report", mode)
 
     try:
         # ── LLM call ──────────────────────────────────────────────────────

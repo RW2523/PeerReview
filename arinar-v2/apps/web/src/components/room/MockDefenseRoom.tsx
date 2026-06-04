@@ -1,531 +1,770 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import * as api from '@/lib/api';
-import type {
-  ResearchProfile, DefenseQuestion, AnswerEvaluation, ReadinessReport
-} from '@/lib/api';
-import { keyStore } from '@/lib/openrouterKeyStore';
+import React, { useState, useEffect, useCallback } from 'react';
 import styles from './MockDefenseRoom.module.css';
+import {
+  analyzeResearch,
+  generateDefenseQuestions,
+  suggestPersonas,
+  submitAnswer,
+  generateReadinessReport,
+  getResearchProfile,
+  getDefenseQuestions,
+  getReadinessReport,
+  type ResearchProfile,
+  type DefenseQuestion,
+  type AnswerEvaluation,
+  type ReadinessReport,
+  type ReasoningMode,
+  type SuggestedPersona,
+} from '@/lib/api';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type Phase =
+  | 'setup'        // choose mode, see persona previews
+  | 'analyzing'    // analyzing research materials
+  | 'suggesting'   // fetching AI persona suggestions
+  | 'questions'    // reviewing/selecting questions
+  | 'defense'      // active Q&A loop
+  | 'evaluated'    // last answer was evaluated
+  | 'report'       // readiness report rendered
+  | 'error';
+
+interface ModeOption {
+  id: ReasoningMode;
+  label: string;
+  emoji: string;
+  description: string;
+  costHint: string;
+  badgeColor: string;
+}
+
+const MODE_OPTIONS: ModeOption[] = [
+  {
+    id: 'light',
+    label: 'Light',
+    emoji: '⚡',
+    description: 'Single fast model for all tasks. Great for practice and iteration.',
+    costHint: '~$0.01–0.05 / session',
+    badgeColor: '#16a34a',
+  },
+  {
+    id: 'medium',
+    label: 'Medium',
+    emoji: '⚖️',
+    description: 'Different smarter models per role. Balanced quality vs. cost.',
+    costHint: '~$0.10–0.40 / session',
+    badgeColor: '#d97706',
+  },
+  {
+    id: 'heavy',
+    label: 'Heavy',
+    emoji: '🔥',
+    description: 'Frontier models for every activity. Production-grade depth.',
+    costHint: '~$1–5 / session',
+    badgeColor: '#dc2626',
+  },
+];
+
+const SCORE_LABELS: Record<string, string> = {
+  score_relevance:          'Relevance',
+  score_evidence:           'Evidence Support',
+  score_clarity:            'Clarity',
+  score_completeness:       'Completeness',
+  score_methodology:        'Methodology',
+  score_critical_thinking:  'Critical Thinking',
+};
+
+// ── Component ──────────────────────────────────────────────────────────────
 
 interface Props {
   debateId: string;
+  openrouterKey: string;
 }
 
-type Phase = 'setup' | 'analyzing' | 'questions' | 'defense' | 'report';
+export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
+  // mode & phase
+  const [mode, setMode]       = useState<ReasoningMode>('medium');
+  const [phase, setPhase]     = useState<Phase>('setup');
+  const [error, setError]     = useState('');
 
-const CATEGORY_LABELS: Record<string, string> = {
-  problem_statement:  'Problem Statement',
-  research_gap:       'Research Gap',
-  methodology:        'Methodology',
-  novelty:            'Novelty',
-  evidence:           'Evidence',
-  limitations:        'Limitations',
-  results:            'Results',
-  future_work:        'Future Work',
-  practical_impact:   'Practical Impact',
-  committee_challenge:'Committee Challenge',
-};
+  // data
+  const [profile, setProfile]         = useState<ResearchProfile | null>(null);
+  const [personas, setPersonas]       = useState<SuggestedPersona[]>([]);
+  const [questions, setQuestions]     = useState<DefenseQuestion[]>([]);
+  const [qIndex, setQIndex]           = useState(0);
+  const [evaluation, setEvaluation]   = useState<AnswerEvaluation | null>(null);
+  const [report, setReport]           = useState<ReadinessReport | null>(null);
+  const [answerText, setAnswerText]   = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
+  const [showProfile, setShowProfile] = useState(false);
 
-const DIFFICULTY_COLOR: Record<string, string> = {
-  easy:   '#22c55e',
-  medium: '#f59e0b',
-  hard:   '#ef4444',
-};
-
-const PERSONA_EMOJI: Record<string, string> = {
-  'Advisor':               '🎓',
-  'Methodology Professor': '🔬',
-  'Domain Expert':         '📚',
-  'Skeptical Reviewer':    '🧐',
-  'Friendly Professor':    '😊',
-  'External Examiner':     '⚖️',
-};
-
-export default function MockDefenseRoom({ debateId }: Props) {
-  const [phase, setPhase] = useState<Phase>('setup');
-  const [profile, setProfile] = useState<ResearchProfile | null>(null);
-  const [questions, setQuestions] = useState<DefenseQuestion[]>([]);
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [answer, setAnswer] = useState('');
-  const [evaluation, setEvaluation] = useState<AnswerEvaluation | null>(null);
-  const [allEvaluations, setAllEvaluations] = useState<AnswerEvaluation[]>([]);
-  const [report, setReport] = useState<ReadinessReport | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [nQuestions, setNQuestions] = useState(10);
-
-  const apiKey = keyStore.getKey() || '';
-
-  // ── Load existing data on mount ──────────────────────────────────────────
+  // Load existing data if any
   useEffect(() => {
     (async () => {
       try {
-        const p = await api.getResearchProfile(debateId);
+        const p = await getResearchProfile(debateId);
         setProfile(p);
         if (p.status === 'complete') {
-          const qs = await api.getDefenseQuestions(debateId);
-          if (qs.questions.length > 0) {
-            setQuestions(qs.questions);
-            const ans = await api.getAnswers(debateId);
-            setAllEvaluations(ans.answers as AnswerEvaluation[]);
-            // Find first unanswered
-            const firstUnanswered = qs.questions.findIndex(q => !q.asked);
-            setCurrentIdx(firstUnanswered >= 0 ? firstUnanswered : 0);
-            setPhase('defense');
+          const qRes = await getDefenseQuestions(debateId);
+          if (qRes.count > 0) {
+            setQuestions(qRes.questions);
+            // check report
+            try {
+              const r = await getReadinessReport(debateId);
+              setReport(r);
+              setPhase('report');
+            } catch {
+              setPhase('questions');
+            }
           } else {
-            setPhase('questions');
+            setPhase('setup');
           }
-        } else {
-          setPhase('setup');
         }
-        // Check for existing report
-        try {
-          const r = await api.getReadinessReport(debateId);
-          setReport(r);
-          if (r.status === 'complete') setPhase('report');
-        } catch {}
       } catch {
-        setPhase('setup');
+        // no profile yet – stay on setup
       }
     })();
   }, [debateId]);
 
-  // ── Step 1: Analyze research ─────────────────────────────────────────────
-  const handleAnalyze = useCallback(async () => {
-    if (!apiKey) { setError('Enter your OpenRouter API key first (Key Vault button)'); return; }
-    setError(null);
-    setLoading(true);
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleAnalyzeAndSuggest = useCallback(async () => {
+    setError('');
     setPhase('analyzing');
     try {
-      const result = await api.analyzeResearch(debateId, apiKey);
-      setProfile(result.profile);
+      const res = await analyzeResearch(debateId, openrouterKey, mode);
+      setProfile(res.profile);
+
+      setPhase('suggesting');
+      const pRes = await suggestPersonas(debateId, openrouterKey, mode);
+      setPersonas(pRes.personas);
+
       setPhase('questions');
     } catch (e: any) {
-      setError(e.message);
-      setPhase('setup');
-    } finally {
-      setLoading(false);
+      setError(e.message || 'Analysis failed');
+      setPhase('error');
     }
-  }, [debateId, apiKey]);
+  }, [debateId, openrouterKey, mode]);
 
-  // ── Step 2: Generate questions ───────────────────────────────────────────
   const handleGenerateQuestions = useCallback(async () => {
-    if (!apiKey) { setError('Enter your OpenRouter API key first'); return; }
-    setError(null);
-    setLoading(true);
+    setError('');
+    setPhase('analyzing');
     try {
-      const result = await api.generateDefenseQuestions(debateId, apiKey, nQuestions);
-      setQuestions(result.questions);
-      setCurrentIdx(0);
+      const res = await generateDefenseQuestions(debateId, openrouterKey, 15, mode);
+      setQuestions(res.questions);
+      setQIndex(0);
       setPhase('defense');
     } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
+      setError(e.message || 'Question generation failed');
+      setPhase('error');
     }
-  }, [debateId, apiKey, nQuestions]);
+  }, [debateId, openrouterKey, mode]);
 
-  // ── Step 3: Submit answer ────────────────────────────────────────────────
   const handleSubmitAnswer = useCallback(async () => {
-    if (!apiKey) { setError('Enter your OpenRouter API key first'); return; }
-    if (!answer.trim()) { setError('Please type your answer before submitting'); return; }
-    const q = questions[currentIdx];
+    if (!answerText.trim() || submitting) return;
+    const q = questions[qIndex];
     if (!q) return;
-    setError(null);
-    setLoading(true);
-    setEvaluation(null);
+    setSubmitting(true);
+    setError('');
     try {
-      const ev = await api.submitAnswer(debateId, q.question_id, answer.trim(), apiKey);
+      const ev = await submitAnswer(debateId, q.question_id, answerText, openrouterKey, mode);
       setEvaluation(ev);
-      setAllEvaluations(prev => [...prev, ev]);
-      // Mark question as answered locally
-      setQuestions(prev => prev.map((pq, i) => i === currentIdx ? { ...pq, asked: true } : pq));
+      setAnsweredIds(prev => new Set(prev).add(q.question_id));
+      setPhase('evaluated');
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || 'Evaluation failed');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
-  }, [debateId, apiKey, answer, questions, currentIdx]);
+  }, [answerText, debateId, openrouterKey, mode, questions, qIndex, submitting]);
 
   const handleNextQuestion = useCallback(() => {
-    setAnswer('');
+    setAnswerText('');
     setEvaluation(null);
-    setError(null);
-    const nextIdx = currentIdx + 1;
-    if (nextIdx < questions.length) {
-      setCurrentIdx(nextIdx);
+    const next = qIndex + 1;
+    if (next >= questions.length) {
+      setPhase('questions'); // all done — let them generate report
     } else {
-      setPhase('report');
+      setQIndex(next);
+      setPhase('defense');
     }
-  }, [currentIdx, questions.length]);
+  }, [qIndex, questions.length]);
 
-  // ── Step 4: Generate report ──────────────────────────────────────────────
   const handleGenerateReport = useCallback(async () => {
-    if (!apiKey) { setError('Enter your OpenRouter API key first'); return; }
-    setError(null);
-    setLoading(true);
+    setError('');
+    setPhase('analyzing');
     try {
-      const r = await api.generateReadinessReport(debateId, apiKey);
+      const r = await generateReadinessReport(debateId, openrouterKey, mode);
       setReport(r);
+      setPhase('report');
     } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
+      setError(e.message || 'Report generation failed');
+      setPhase('error');
     }
-  }, [debateId, apiKey]);
+  }, [debateId, openrouterKey, mode]);
 
-  // ── Render ───────────────────────────────────────────────────────────────
-  const currentQ = questions[currentIdx];
-  const answeredCount = questions.filter(q => q.asked).length;
-  const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
+  // ── Render helpers ─────────────────────────────────────────────────────────
 
-  return (
-    <div className={styles.defenseRoom}>
-      {/* Header */}
-      <div className={styles.header}>
-        <h2>🎓 Mock Defense Room</h2>
-        <div className={styles.headerMeta}>
-          {phase === 'defense' && (
-            <span className={styles.progress}>
-              {answeredCount} / {questions.length} questions answered
-            </span>
-          )}
-          <span className={`${styles.phaseBadge} ${styles[`phase_${phase}`]}`}>
-            {phase === 'setup' && '📋 Setup'}
-            {phase === 'analyzing' && '🔬 Analyzing…'}
-            {phase === 'questions' && '🗂 Generating Questions'}
-            {phase === 'defense' && '⚔️ Defense In Progress'}
-            {phase === 'report' && '📊 Report Ready'}
-          </span>
-        </div>
-      </div>
+  const currentQuestion = questions[qIndex] ?? null;
+  const answeredCount   = answeredIds.size;
+  const modeInfo        = MODE_OPTIONS.find(m => m.id === mode)!;
 
-      {error && (
-        <div className={styles.errorBanner}>⚠️ {error}</div>
-      )}
+  // ── Setup phase ────────────────────────────────────────────────────────────
 
-      {/* ── Phase: Setup ── */}
-      {phase === 'setup' && (
-        <div className={styles.setupCard}>
-          <p className={styles.setupIntro}>
-            Upload your research documents (in the Materials step), then analyze them to
-            build your research profile and generate personalized committee questions.
+  if (phase === 'setup') {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>🎓 Mock Defense Setup</h2>
+          <p className={styles.subtitle}>
+            Choose your reasoning mode, then analyse your research to generate a
+            tailored committee and defense questions.
           </p>
-          <button
-            className={styles.btnPrimary}
-            onClick={handleAnalyze}
-            disabled={loading || !apiKey}
-          >
-            🔬 Analyze Research Materials
-          </button>
-          {!apiKey && (
-            <p className={styles.keyHint}>⚠️ Click "API Key" in the toolbar to enter your OpenRouter key.</p>
-          )}
         </div>
-      )}
 
-      {/* ── Phase: Analyzing ── */}
-      {phase === 'analyzing' && (
-        <div className={styles.loadingCard}>
-          <div className={styles.spinner} />
-          <p>Analyzing your research materials…<br /><small>This may take 30-60 seconds</small></p>
-        </div>
-      )}
-
-      {/* ── Phase: Questions (profile ready, no questions yet) ── */}
-      {phase === 'questions' && profile && (
-        <div className={styles.profileCard}>
-          <h3>✅ Research Profile Ready</h3>
-          <div className={styles.profileGrid}>
-            <ProfileField label="Research Problem"  value={profile.research_problem} />
-            <ProfileField label="Main Claim"        value={profile.main_claim} />
-            <ProfileField label="Methodology"       value={profile.methodology} />
-            <ProfileField label="Limitations"       value={profile.limitations} />
-          </div>
-          {profile.weak_areas && profile.weak_areas.length > 0 && (
-            <div className={styles.weakAreas}>
-              <strong>⚠️ Potential Weak Areas:</strong>
-              <ul>
-                {profile.weak_areas.map((w, i) => (
-                  <li key={i}><b>{w.area}:</b> {w.reason}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className={styles.questionConfig}>
-            <label>Number of questions:
-              <input
-                type="number" min={5} max={30} value={nQuestions}
-                onChange={e => setNQuestions(Number(e.target.value))}
-                className={styles.numInput}
-              />
-            </label>
-          </div>
-          <button
-            className={styles.btnPrimary}
-            onClick={handleGenerateQuestions}
-            disabled={loading}
-          >
-            {loading ? '⏳ Generating…' : '🗂 Generate Defense Questions'}
-          </button>
-        </div>
-      )}
-
-      {/* ── Phase: Defense ── */}
-      {phase === 'defense' && currentQ && !evaluation && (
-        <div className={styles.defenseCard}>
-          {/* Progress bar */}
-          <div className={styles.progressBar}>
-            <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-          </div>
-
-          {/* Question card */}
-          <div className={styles.questionCard}>
-            <div className={styles.questionMeta}>
-              <span className={styles.personaBadge}>
-                {PERSONA_EMOJI[currentQ.persona] || '🎓'} {currentQ.persona}
-              </span>
-              <span className={styles.categoryBadge}>
-                {CATEGORY_LABELS[currentQ.category] || currentQ.category}
-              </span>
-              <span
-                className={styles.difficultyBadge}
-                style={{ background: DIFFICULTY_COLOR[currentQ.difficulty] }}
-              >
-                {currentQ.difficulty}
-              </span>
-            </div>
-
-            <p className={styles.questionText}>{currentQ.question_text}</p>
-
-            {currentQ.source_excerpt && (
-              <blockquote className={styles.sourceExcerpt}>
-                📄 {currentQ.source_excerpt}
-              </blockquote>
-            )}
-          </div>
-
-          {/* Answer box */}
-          <div className={styles.answerBox}>
-            <label className={styles.answerLabel}>Your Answer:</label>
-            <textarea
-              className={styles.answerTextarea}
-              placeholder="Type your answer here. Be specific — reference your methodology, data, and evidence."
-              value={answer}
-              onChange={e => setAnswer(e.target.value)}
-              rows={6}
-              disabled={loading}
-            />
-            <div className={styles.answerActions}>
-              <span className={styles.wordCount}>{answer.trim().split(/\s+/).filter(Boolean).length} words</span>
+        {/* Mode selector */}
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Reasoning Mode</h3>
+          <div className={styles.modeGrid}>
+            {MODE_OPTIONS.map(opt => (
               <button
-                className={styles.btnPrimary}
-                onClick={handleSubmitAnswer}
-                disabled={loading || !answer.trim()}
+                key={opt.id}
+                className={`${styles.modeCard} ${mode === opt.id ? styles.modeCardActive : ''}`}
+                onClick={() => setMode(opt.id)}
+                style={mode === opt.id ? { borderColor: opt.badgeColor } : undefined}
               >
-                {loading ? '⏳ Evaluating…' : '✅ Submit Answer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Evaluation result ── */}
-      {phase === 'defense' && evaluation && (
-        <div className={styles.evalCard}>
-          <h3>📊 Answer Evaluation</h3>
-          <div className={styles.overallScore}>
-            <span className={styles.scoreNumber}>{evaluation.overall_score.toFixed(1)}</span>
-            <span className={styles.scoreLabel}>/ 10 overall</span>
-          </div>
-
-          <div className={styles.scoreGrid}>
-            <ScoreBar label="Relevance"              score={evaluation.score_relevance} />
-            <ScoreBar label="Evidence Support"       score={evaluation.score_evidence} />
-            <ScoreBar label="Clarity"                score={evaluation.score_clarity} />
-            <ScoreBar label="Completeness"           score={evaluation.score_completeness} />
-            <ScoreBar label="Methodology"            score={evaluation.score_methodology} />
-            <ScoreBar label="Critical Thinking"      score={evaluation.score_critical_thinking} />
-          </div>
-
-          <div className={styles.feedbackGrid}>
-            <FeedbackBlock emoji="✅" label="Strength"            text={evaluation.strength} />
-            <FeedbackBlock emoji="⚠️" label="Weakness"           text={evaluation.weakness} />
-            <FeedbackBlock emoji="🔍" label="Missing Evidence"   text={evaluation.missing_evidence} />
-            <FeedbackBlock emoji="💡" label="Suggested Improvement" text={evaluation.suggested_improvement} />
-          </div>
-
-          {evaluation.follow_up_needed && evaluation.follow_up_question && (
-            <div className={styles.followUp}>
-              <strong>🔁 Follow-up Question:</strong>
-              <p>{evaluation.follow_up_question}</p>
-            </div>
-          )}
-
-          <div className={styles.evalActions}>
-            {currentIdx < questions.length - 1 ? (
-              <button className={styles.btnPrimary} onClick={handleNextQuestion}>
-                ➡️ Next Question
-              </button>
-            ) : (
-              <button className={styles.btnPrimary} onClick={() => setPhase('report')}>
-                📊 Generate Readiness Report
-              </button>
-            )}
-            <button className={styles.btnSecondary} onClick={handleNextQuestion}>
-              Skip
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Phase: Report ── */}
-      {phase === 'report' && (
-        <div className={styles.reportPhase}>
-          {!report ? (
-            <div className={styles.reportGenerate}>
-              <h3>🎉 Mock Defense Complete!</h3>
-              <p>You answered {answeredCount} out of {questions.length} questions.</p>
-              <button
-                className={styles.btnPrimary}
-                onClick={handleGenerateReport}
-                disabled={loading}
-              >
-                {loading ? '⏳ Generating Report…' : '📊 Generate Readiness Report'}
-              </button>
-            </div>
-          ) : (
-            <ReadinessReportView report={report} onRestart={() => {
-              setPhase('questions');
-              setEvaluation(null);
-              setAnswer('');
-              setCurrentIdx(0);
-            }} />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Sub-components ──────────────────────────────────────────────────────────
-
-function ProfileField({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
-  return (
-    <div className={styles.profileField}>
-      <span className={styles.fieldLabel}>{label}</span>
-      <span className={styles.fieldValue}>{value}</span>
-    </div>
-  );
-}
-
-function ScoreBar({ label, score }: { label: string; score: number }) {
-  const pct = Math.min(100, Math.max(0, (score / 10) * 100));
-  const color = score >= 7 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444';
-  return (
-    <div className={styles.scoreBarRow}>
-      <span className={styles.scoreBarLabel}>{label}</span>
-      <div className={styles.scoreBarTrack}>
-        <div className={styles.scoreBarFill} style={{ width: `${pct}%`, background: color }} />
-      </div>
-      <span className={styles.scoreBarValue}>{score.toFixed(1)}</span>
-    </div>
-  );
-}
-
-function FeedbackBlock({ emoji, label, text }: { emoji: string; label: string; text?: string | null }) {
-  if (!text) return null;
-  return (
-    <div className={styles.feedbackBlock}>
-      <div className={styles.feedbackLabel}>{emoji} {label}</div>
-      <p className={styles.feedbackText}>{text}</p>
-    </div>
-  );
-}
-
-function ReadinessReportView({ report, onRestart }: { report: ReadinessReport; onRestart: () => void }) {
-  const score = report.overall_readiness ?? 0;
-  const color = score >= 70 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
-  const label = score >= 70 ? 'Defense Ready ✅' : score >= 50 ? 'Needs More Preparation ⚠️' : 'Significant Gaps Found 🔴';
-
-  return (
-    <div className={styles.reportView}>
-      <div className={styles.reportHeader}>
-        <div className={styles.overallCircle} style={{ borderColor: color }}>
-          <span className={styles.circleScore} style={{ color }}>{score.toFixed(0)}</span>
-          <span className={styles.circleLabel}>/ 100</span>
-        </div>
-        <div>
-          <h3 className={styles.readinessLabel} style={{ color }}>{label}</h3>
-          <p className={styles.recommendation}>{report.next_recommendation}</p>
-        </div>
-      </div>
-
-      {/* Dimension scores */}
-      <div className={styles.dimGrid}>
-        {[
-          { label: 'Research Clarity',   val: report.research_clarity },
-          { label: 'Methodology',         val: report.methodology_score },
-          { label: 'Evidence',            val: report.evidence_score },
-          { label: 'Critical Thinking',   val: report.critical_thinking },
-          { label: 'Communication',       val: report.communication },
-        ].filter(d => d.val != null).map(d => (
-          <div key={d.label} className={styles.dimCard}>
-            <span className={styles.dimLabel}>{d.label}</span>
-            <span className={styles.dimScore}>{d.val!.toFixed(0)}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Improvement plan */}
-      {report.improvement_plan && report.improvement_plan.length > 0 && (
-        <section className={styles.reportSection}>
-          <h4>📋 Improvement Plan</h4>
-          <div className={styles.planList}>
-            {report.improvement_plan.map((item: any, i: number) => (
-              <div key={i} className={`${styles.planItem} ${styles[`priority_${item.priority}`]}`}>
-                <span className={styles.planPriority}>{item.priority}</span>
-                <div>
-                  <strong>{item.area}</strong>
-                  <p>{item.action}</p>
+                <div className={styles.modeEmoji}>{opt.emoji}</div>
+                <div className={styles.modeLabel}>{opt.label}</div>
+                <div className={styles.modeDesc}>{opt.description}</div>
+                <div
+                  className={styles.modeCost}
+                  style={{ color: opt.badgeColor }}
+                >
+                  {opt.costHint}
                 </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Persona preview */}
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>AI Committee Personas</h3>
+          <p className={styles.hint}>
+            After analysis, the AI will suggest 6 committee members tailored
+            to your specific research domain and methodology.
+          </p>
+          <div className={styles.personaPreviewGrid}>
+            {[
+              { role: 'Advisor', icon: '🧑‍🏫', desc: 'Alignment with research goals' },
+              { role: 'Methodology Professor', icon: '🔬', desc: 'Methods, baselines, validity' },
+              { role: 'Domain Expert', icon: '📚', desc: 'Domain correctness, contribution' },
+              { role: 'Skeptical Reviewer', icon: '🤨', desc: 'Weak claims, unsupported assumptions' },
+              { role: 'Friendly Professor', icon: '😊', desc: 'Clarity and confidence-building' },
+              { role: 'External Examiner', icon: '🎓', desc: 'Defense-level challenge' },
+            ].map(p => (
+              <div key={p.role} className={styles.personaPreviewCard}>
+                <span className={styles.personaIcon}>{p.icon}</span>
+                <div className={styles.personaRole}>{p.role}</div>
+                <div className={styles.personaDesc}>{p.desc}</div>
               </div>
             ))}
           </div>
-        </section>
-      )}
+        </div>
 
-      {/* Likely questions */}
-      {report.likely_questions && report.likely_questions.length > 0 && (
-        <section className={styles.reportSection}>
-          <h4>🔮 Likely Committee Questions in Real Defense</h4>
-          <ul className={styles.likelyList}>
-            {report.likely_questions.map((q, i) => <li key={i}>{q}</li>)}
-          </ul>
-        </section>
-      )}
+        <button className={styles.primaryBtn} onClick={handleAnalyzeAndSuggest}>
+          Analyse Research &amp; Suggest Committee →
+        </button>
+      </div>
+    );
+  }
 
-      {/* Weak answers */}
-      {report.weak_answers && report.weak_answers.length > 0 && (
-        <section className={styles.reportSection}>
-          <h4>⚠️ Answers That Need Work</h4>
-          {report.weak_answers.map((a: any, i: number) => (
-            <div key={i} className={styles.weakItem}>
-              <span className={styles.weakScore}>{Number(a.score).toFixed(1)}/10</span>
-              <div>
-                <p className={styles.weakQ}>{a.question}</p>
-                <p className={styles.weakSummary}>{a.summary}</p>
-              </div>
+  // ── Loading states ─────────────────────────────────────────────────────────
+
+  if (phase === 'analyzing' || phase === 'suggesting') {
+    const msg = phase === 'suggesting'
+      ? 'Generating tailored committee personas…'
+      : 'Analysing your research materials…';
+    return (
+      <div className={styles.container}>
+        <div className={styles.loadingBox}>
+          <div className={styles.spinner} />
+          <p className={styles.loadingText}>{msg}</p>
+          <p className={styles.loadingHint}>
+            Using <strong>{modeInfo.emoji} {modeInfo.label}</strong> mode — this may take a moment
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error state ────────────────────────────────────────────────────────────
+
+  if (phase === 'error') {
+    return (
+      <div className={styles.container}>
+        <div className={styles.errorBox}>
+          <h3>Something went wrong</h3>
+          <p>{error}</p>
+          <button className={styles.secondaryBtn} onClick={() => setPhase('setup')}>
+            ← Back to Setup
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Questions / pre-defense ────────────────────────────────────────────────
+
+  if (phase === 'questions') {
+    return (
+      <div className={styles.container}>
+        {/* Mode badge */}
+        <div className={styles.modeBadgeRow}>
+          <span
+            className={styles.modeBadge}
+            style={{ background: modeInfo.badgeColor }}
+          >
+            {modeInfo.emoji} {modeInfo.label} Mode
+          </span>
+          {answeredCount > 0 && (
+            <span className={styles.progressBadge}>
+              {answeredCount}/{questions.length} answered
+            </span>
+          )}
+        </div>
+
+        {/* Suggested personas */}
+        {personas.length > 0 && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Your AI Committee</h3>
+            <div className={styles.personaGrid}>
+              {personas.map((p, i) => (
+                <div key={i} className={styles.personaCard}>
+                  <div className={styles.personaCardRole}>{p.role}</div>
+                  <div className={styles.personaCardName}>{p.name}</div>
+                  <div className={styles.personaCardExpertise}>{p.expertise}</div>
+                  <div className={styles.personaCardFocus}>
+                    🎯 {p.focus_area}
+                  </div>
+                  <div className={styles.personaModel}>
+                    Model: <code>{p.model_id}</code>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </section>
-      )}
+          </div>
+        )}
 
-      <button className={styles.btnSecondary} onClick={onRestart}>
-        🔄 Practice Again
-      </button>
-    </div>
-  );
+        {/* Research profile summary */}
+        {profile && (
+          <div className={styles.section}>
+            <button
+              className={styles.toggleBtn}
+              onClick={() => setShowProfile(v => !v)}
+            >
+              {showProfile ? '▲ Hide' : '▼ Show'} Research Profile
+            </button>
+            {showProfile && (
+              <div className={styles.profileGrid}>
+                {[
+                  ['Research Problem', profile.research_problem],
+                  ['Main Claim',        profile.main_claim],
+                  ['Methodology',       profile.methodology],
+                  ['Contribution',      profile.contribution],
+                  ['Limitations',       profile.limitations],
+                ].map(([label, val]) => val ? (
+                  <div key={label as string} className={styles.profileItem}>
+                    <div className={styles.profileLabel}>{label}</div>
+                    <div className={styles.profileValue}>{val as string}</div>
+                  </div>
+                ) : null)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Question list */}
+        {questions.length > 0 ? (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>
+              Defense Questions ({questions.length})
+            </h3>
+            <div className={styles.questionList}>
+              {questions.map((q, i) => (
+                <div
+                  key={q.question_id}
+                  className={`${styles.questionListItem} ${answeredIds.has(q.question_id) ? styles.answered : ''}`}
+                >
+                  <span className={styles.qNum}>{i + 1}</span>
+                  <div className={styles.qMeta}>
+                    <span className={styles.qPersona}>{q.persona}</span>
+                    <span className={`${styles.qDiff} ${styles[q.difficulty]}`}>{q.difficulty}</span>
+                    <span className={styles.qCat}>{q.category}</span>
+                  </div>
+                  <div className={styles.qText}>{q.question_text}</div>
+                  {answeredIds.has(q.question_id) && (
+                    <span className={styles.answeredBadge}>✓ Answered</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.actionRow}>
+              <button className={styles.primaryBtn} onClick={() => { setQIndex(0); setPhase('defense'); }}>
+                Start Defense →
+              </button>
+              {answeredCount > 0 && (
+                <button className={styles.reportBtn} onClick={handleGenerateReport}>
+                  Generate Readiness Report
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className={styles.section}>
+            <p className={styles.hint}>No questions yet. Generate them to begin.</p>
+            <button className={styles.primaryBtn} onClick={handleGenerateQuestions}>
+              Generate Defense Questions →
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Active defense ─────────────────────────────────────────────────────────
+
+  if (phase === 'defense' && currentQuestion) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.modeBadgeRow}>
+          <span className={styles.modeBadge} style={{ background: modeInfo.badgeColor }}>
+            {modeInfo.emoji} {modeInfo.label}
+          </span>
+          <span className={styles.qCounter}>
+            Question {qIndex + 1} of {questions.length}
+          </span>
+        </div>
+
+        {/* Persona + question card */}
+        <div className={styles.questionCard}>
+          <div className={styles.personaHeader}>
+            <div className={styles.personaAvatar}>
+              {getPersonaEmoji(currentQuestion.persona)}
+            </div>
+            <div>
+              <div className={styles.activePersonaRole}>{currentQuestion.persona}</div>
+              {/* Show suggested persona name if available */}
+              {personas.find(p => p.role === currentQuestion.persona) && (
+                <div className={styles.activePersonaName}>
+                  {personas.find(p => p.role === currentQuestion.persona)!.name}
+                </div>
+              )}
+            </div>
+            <div className={styles.questionMeta}>
+              <span className={`${styles.diffBadge} ${styles[currentQuestion.difficulty]}`}>
+                {currentQuestion.difficulty}
+              </span>
+              <span className={styles.catBadge}>{currentQuestion.category}</span>
+            </div>
+          </div>
+
+          <p className={styles.questionText}>{currentQuestion.question_text}</p>
+
+          {currentQuestion.source_excerpt && (
+            <blockquote className={styles.sourceExcerpt}>
+              📄 {currentQuestion.source_excerpt}
+            </blockquote>
+          )}
+        </div>
+
+        {/* Answer box */}
+        <div className={styles.answerSection}>
+          <label className={styles.answerLabel}>Your Answer</label>
+          <textarea
+            className={styles.answerTextarea}
+            value={answerText}
+            onChange={e => setAnswerText(e.target.value)}
+            placeholder="Type your answer here. Be specific — reference your methodology, evidence, and document sources."
+            rows={7}
+            disabled={submitting}
+          />
+          <div className={styles.wordCount}>
+            {answerText.trim().split(/\s+/).filter(Boolean).length} words
+          </div>
+        </div>
+
+        {error && <div className={styles.inlineError}>{error}</div>}
+
+        <div className={styles.actionRow}>
+          <button
+            className={styles.secondaryBtn}
+            onClick={() => setPhase('questions')}
+            disabled={submitting}
+          >
+            ← Back to Questions
+          </button>
+          <button
+            className={styles.primaryBtn}
+            onClick={handleSubmitAnswer}
+            disabled={submitting || answerText.trim().length < 10}
+          >
+            {submitting ? 'Evaluating…' : 'Submit Answer →'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Evaluation result ──────────────────────────────────────────────────────
+
+  if (phase === 'evaluated' && evaluation && currentQuestion) {
+    const score = Math.round(evaluation.overall_score * 10) / 10;
+    const scoreColor = score >= 7 ? '#16a34a' : score >= 5 ? '#d97706' : '#dc2626';
+    const followUp = evaluation.follow_up_needed && evaluation.follow_up_question;
+
+    return (
+      <div className={styles.container}>
+        <div className={styles.modeBadgeRow}>
+          <span className={styles.modeBadge} style={{ background: modeInfo.badgeColor }}>
+            {modeInfo.emoji} {modeInfo.label}
+          </span>
+        </div>
+
+        <div className={styles.evalCard}>
+          <div className={styles.evalHeader}>
+            <div className={styles.overallScore} style={{ color: scoreColor }}>
+              {score}/10
+            </div>
+            <div>
+              <div className={styles.evalTitle}>Answer Evaluation</div>
+              <div className={styles.evalQuestion}>{currentQuestion.question_text}</div>
+            </div>
+          </div>
+
+          {/* 6-axis scores */}
+          <div className={styles.scoreGrid}>
+            {Object.entries(SCORE_LABELS).map(([key, label]) => {
+              const val = (evaluation as any)[key] ?? 0;
+              const pct = (val / 10) * 100;
+              const barColor = val >= 7 ? '#16a34a' : val >= 5 ? '#d97706' : '#dc2626';
+              return (
+                <div key={key} className={styles.scoreRow}>
+                  <span className={styles.scoreLabel}>{label}</span>
+                  <div className={styles.scoreBar}>
+                    <div
+                      className={styles.scoreBarFill}
+                      style={{ width: `${pct}%`, background: barColor }}
+                    />
+                  </div>
+                  <span className={styles.scoreVal}>{val}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Feedback */}
+          <div className={styles.feedbackGrid}>
+            <div className={`${styles.feedbackCard} ${styles.strength}`}>
+              <h4>✅ Strength</h4>
+              <p>{evaluation.strength}</p>
+            </div>
+            <div className={`${styles.feedbackCard} ${styles.weakness}`}>
+              <h4>⚠️ Weakness</h4>
+              <p>{evaluation.weakness}</p>
+            </div>
+          </div>
+
+          {evaluation.missing_evidence && (
+            <div className={styles.missingEvidence}>
+              <h4>📄 Missing Evidence</h4>
+              <p>{evaluation.missing_evidence}</p>
+            </div>
+          )}
+
+          {evaluation.suggested_improvement && (
+            <div className={styles.improvement}>
+              <h4>💡 Suggested Improvement</h4>
+              <p>{evaluation.suggested_improvement}</p>
+            </div>
+          )}
+
+          {followUp && (
+            <div className={styles.followUp}>
+              <h4>🔄 Follow-up Question</h4>
+              <p>{evaluation.follow_up_question}</p>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.actionRow}>
+          {qIndex + 1 < questions.length ? (
+            <button className={styles.primaryBtn} onClick={handleNextQuestion}>
+              Next Question →
+            </button>
+          ) : (
+            <button className={styles.reportBtn} onClick={handleGenerateReport}>
+              All Done — Generate Readiness Report 📊
+            </button>
+          )}
+          <button className={styles.secondaryBtn} onClick={() => setPhase('questions')}>
+            ← Back to Overview
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Readiness report ───────────────────────────────────────────────────────
+
+  if (phase === 'report' && report) {
+    const overall = report.overall_readiness ?? 0;
+    const color = overall >= 70 ? '#16a34a' : overall >= 50 ? '#d97706' : '#dc2626';
+    const label = overall >= 70 ? 'Ready for Defense' : overall >= 50 ? 'Needs More Preparation' : 'Significant Work Required';
+
+    return (
+      <div className={styles.container}>
+        <div className={styles.modeBadgeRow}>
+          <span className={styles.modeBadge} style={{ background: modeInfo.badgeColor }}>
+            {modeInfo.emoji} {modeInfo.label}
+          </span>
+        </div>
+
+        <div className={styles.reportHeader}>
+          <div className={styles.bigScore} style={{ color }}>
+            {Math.round(overall)}%
+          </div>
+          <div>
+            <h2 className={styles.reportTitle}>Defense Readiness Report</h2>
+            <div className={styles.readinessLabel} style={{ color }}>{label}</div>
+          </div>
+        </div>
+
+        {/* Dimension scores */}
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Dimension Scores</h3>
+          <div className={styles.dimGrid}>
+            {[
+              ['Research Clarity',  report.research_clarity],
+              ['Methodology',       report.methodology_score],
+              ['Evidence',          report.evidence_score],
+              ['Critical Thinking', report.critical_thinking],
+              ['Communication',     report.communication],
+            ].map(([label, val]) => {
+              const v = (val as number) ?? 0;
+              const c = v >= 70 ? '#16a34a' : v >= 50 ? '#d97706' : '#dc2626';
+              return (
+                <div key={label as string} className={styles.dimCard}>
+                  <div className={styles.dimScore} style={{ color: c }}>{Math.round(v)}%</div>
+                  <div className={styles.dimLabel}>{label as string}</div>
+                  <div className={styles.dimBar}>
+                    <div style={{ width: `${v}%`, background: c, height: '100%', borderRadius: '4px' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Strong / Weak */}
+        <div className={styles.swGrid}>
+          {report.strong_answers && report.strong_answers.length > 0 && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>💪 Strong Answers</h3>
+              {report.strong_answers.map((a: any, i: number) => (
+                <div key={i} className={styles.swItem}>
+                  <span className={styles.swScore}>
+                    {typeof a.overall_score === 'number' ? `${a.overall_score}/10` : ''}
+                  </span>
+                  <span>{a.question_text || a.question || JSON.stringify(a)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {report.weak_answers && report.weak_answers.length > 0 && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>⚠️ Weak Answers</h3>
+              {report.weak_answers.map((a: any, i: number) => (
+                <div key={i} className={styles.swItemWeak}>
+                  <span className={styles.swScore}>
+                    {typeof a.overall_score === 'number' ? `${a.overall_score}/10` : ''}
+                  </span>
+                  <span>{a.question_text || a.question || JSON.stringify(a)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Improvement plan */}
+        {report.improvement_plan && report.improvement_plan.length > 0 && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>📋 Improvement Plan</h3>
+            <ol className={styles.planList}>
+              {report.improvement_plan.map((item: any, i: number) => (
+                <li key={i} className={styles.planItem}>
+                  {typeof item === 'string' ? item : JSON.stringify(item)}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Likely questions */}
+        {report.likely_questions && report.likely_questions.length > 0 && (
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>🔮 Likely Committee Questions</h3>
+            <ul className={styles.likelyList}>
+              {report.likely_questions.map((q: string, i: number) => (
+                <li key={i}>{q}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {report.next_recommendation && (
+          <div className={styles.nextRec}>
+            <h4>🚀 Next Practice Recommendation</h4>
+            <p>{report.next_recommendation}</p>
+          </div>
+        )}
+
+        <div className={styles.actionRow}>
+          <button className={styles.secondaryBtn} onClick={() => setPhase('questions')}>
+            ← Back to Questions
+          </button>
+          <button
+            className={styles.primaryBtn}
+            onClick={() => {
+              setAnsweredIds(new Set());
+              setEvaluation(null);
+              setPhase('setup');
+            }}
+          >
+            Start New Session
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function getPersonaEmoji(role: string): string {
+  const map: Record<string, string> = {
+    'Advisor':                 '🧑‍🏫',
+    'Methodology Professor':   '🔬',
+    'Domain Expert':           '📚',
+    'Skeptical Reviewer':      '🤨',
+    'Friendly Professor':      '😊',
+    'External Examiner':       '🎓',
+  };
+  return map[role] ?? '👤';
 }

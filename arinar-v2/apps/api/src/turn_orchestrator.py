@@ -15,6 +15,7 @@ from .agent_reasoning import AgentReasoningEngine
 from .agent_response_generator import AgentResponseGenerator
 from .agent_constitutional_validator import ConstitutionalValidator
 from .agent_thinking_service import AgentThinkingService
+from .services.reasoning_modes import get_persona_model, mode_from_policy
 
 
 # ── Persona lane definitions ──────────────────────────────────────────────
@@ -210,12 +211,15 @@ class TurnOrchestrator:
             # Get agent config
             agent_config = next_participant['agent_config'] or {}
             agent_name = agent_config.get('name') or next_participant['role_name']
-            model_id = agent_config.get('model_id', 'openai/gpt-4o-mini')
-            
-            # CRITICAL FIX: If model_id is empty string or None, use default
+            model_id = agent_config.get('model_id', '')
+
+            # Apply reasoning mode: if model_id not explicitly set, use mode-based default
             if not model_id or model_id.strip() == '':
-                print(f"⚠️ WARNING: Agent {agent_name} has empty model_id, using default")
-                model_id = 'openai/gpt-4o-mini'
+                _mode = mode_from_policy(policy_config)
+                # Try matching persona name from agent_name or role_name
+                _role = next_participant.get('role_name', '') or agent_name
+                model_id = get_persona_model(_role, _mode)
+                print(f"⚡ Reasoning mode '{_mode}' → model: {model_id} for {agent_name}")
             
             system_prompt = agent_config.get('system_prompt', '')
             

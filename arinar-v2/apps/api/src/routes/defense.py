@@ -4,19 +4,21 @@ Academic Defense Readiness — API routes
 All endpoints are scoped to an existing debate/session ID.
 
 Flow:
-  POST /debates/{id}/analyze-research        → trigger research analysis
-  GET  /debates/{id}/research-profile        → get completed profile
+  POST /debates/{id}/analyze-research            → trigger research analysis
+  GET  /debates/{id}/research-profile            → get completed profile
+  POST /debates/{id}/suggest-personas            → AI-suggested committee personas
   POST /debates/{id}/defense-questions/generate  → generate questions
-  GET  /debates/{id}/defense-questions       → list questions
-  POST /debates/{id}/answers                 → submit + evaluate answer
-  GET  /debates/{id}/answers                 → list evaluated answers
-  POST /debates/{id}/readiness-report        → generate report
-  GET  /debates/{id}/readiness-report        → get report
+  GET  /debates/{id}/defense-questions           → list questions
+  POST /debates/{id}/answers                     → submit + evaluate answer
+  GET  /debates/{id}/answers                     → list evaluated answers
+  POST /debates/{id}/readiness-report            → generate report
+  GET  /debates/{id}/readiness-report            → get report
+  GET  /reasoning-modes                          → list available modes + model info
 """
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Header, Depends, status
 from pydantic import BaseModel, Field
@@ -27,9 +29,13 @@ from ..services.research_analyzer import analyze_research, get_research_profile
 from ..services.question_generator import generate_questions, get_questions
 from ..services.answer_evaluator import evaluate_answer, get_answers
 from ..services.readiness_reporter import generate_readiness_report, get_readiness_report
+from ..services.persona_suggester import suggest_personas
+from ..services.reasoning_modes import MODES, mode_from_policy
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["defense"])
+
+ReasoningModeType = Literal["light", "medium", "heavy"]
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -54,26 +60,40 @@ def _require_key(x_openrouter_key: Optional[str]) -> str:
 # ── Pydantic models ────────────────────────────────────────────────────────
 
 class AnalyzeRequest(BaseModel):
-    model_id: str = Field(default="anthropic/claude-sonnet-4-5")
-    max_chunks: int = Field(default=20, ge=5, le=50)
+    model_id:   str              = Field(default="")
+    max_chunks: int              = Field(default=20, ge=5, le=50)
+    mode:       ReasoningModeType = Field(default="medium")
+
+
+class SuggestPersonasRequest(BaseModel):
+    mode: ReasoningModeType = Field(default="medium")
 
 
 class GenerateQuestionsRequest(BaseModel):
-    model_id: str = Field(default="anthropic/claude-sonnet-4-5")
-    n_questions: int = Field(default=15, ge=5, le=30)
+    model_id:    str              = Field(default="")
+    n_questions: int              = Field(default=15, ge=5, le=30)
+    mode:        ReasoningModeType = Field(default="medium")
 
 
 class SubmitAnswerRequest(BaseModel):
     question_id: str
-    answer_text: str = Field(..., min_length=10)
-    model_id: str = Field(default="anthropic/claude-sonnet-4-5")
+    answer_text: str             = Field(..., min_length=10)
+    model_id:    str             = Field(default="")
+    mode:        ReasoningModeType = Field(default="medium")
 
 
 class ReadinessReportRequest(BaseModel):
-    model_id: str = Field(default="anthropic/claude-sonnet-4-5")
+    model_id: str              = Field(default="")
+    mode:     ReasoningModeType = Field(default="medium")
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────
+
+@router.get("/reasoning-modes")
+async def list_reasoning_modes():
+    """Return the three reasoning mode definitions and their model assignments."""
+    return {"modes": MODES}
+
 
 @router.post("/debates/{debate_id}/analyze-research")
 async def trigger_research_analysis(
@@ -87,14 +107,18 @@ async def trigger_research_analysis(
     debate = _get_debate_or_404(debate_id)
     check_workspace_access(current_user, debate["workspace_id"])
 
+    # Resolve mode: body > policy_config fallback
+    mode = body.mode or mode_from_policy(debate.get("policy_config") or {})
+
     try:
         profile = analyze_research(
             debate_id=debate_id,
             openrouter_key=key,
             model_id=body.model_id,
             max_chunks=body.max_chunks,
+            mode=mode,
         )
-        return {"status": "complete", "profile": _serialize(profile)}
+        return {"status": "complete", "profile": _serialize(profile), "mode_used": mode}
     except Exception as exc:
         logger.exception("Research analysis failed for %s", debate_id)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -118,6 +142,50 @@ async def get_research_profile_route(
     return _serialize(profile)
 
 
+@router.post("/debates/{debate_id}/suggest-personas")
+async def suggest_committee_personas(
+    debate_id: str,
+    body: SuggestPersonasRequest = SuggestPersonasRequest(),
+    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Use the existing research profile to suggest 6 AI committee personas
+    tailored to the research domain, methodology, and weak areas.
+
+    Returns personas with names, roles, expertise, and model assignments
+    based on the chosen reasoning mode.
+    """
+    key = _require_key(x_openrouter_key)
+    debate = _get_debate_or_404(debate_id)
+    check_workspace_access(current_user, debate["workspace_id"])
+
+    profile = get_research_profile(debate_id)
+    if not profile:
+        raise HTTPException(
+            status_code=400,
+            detail="Research profile not found. Run /analyze-research first."
+        )
+
+    mode = body.mode or mode_from_policy(debate.get("policy_config") or {})
+
+    try:
+        personas = suggest_personas(
+            research_profile=dict(profile),
+            openrouter_key=key,
+            mode=mode,
+        )
+        return {
+            "status":   "complete",
+            "mode":     mode,
+            "personas": personas,
+            "mode_info": MODES.get(mode, {}),
+        }
+    except Exception as exc:
+        logger.exception("Persona suggestion failed for %s", debate_id)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/debates/{debate_id}/defense-questions/generate")
 async def trigger_question_generation(
     debate_id: str,
@@ -130,14 +198,22 @@ async def trigger_question_generation(
     debate = _get_debate_or_404(debate_id)
     check_workspace_access(current_user, debate["workspace_id"])
 
+    mode = body.mode or mode_from_policy(debate.get("policy_config") or {})
+
     try:
         questions = generate_questions(
             debate_id=debate_id,
             openrouter_key=key,
             model_id=body.model_id,
             n_questions=body.n_questions,
+            mode=mode,
         )
-        return {"status": "complete", "count": len(questions), "questions": questions}
+        return {
+            "status":    "complete",
+            "count":     len(questions),
+            "questions": questions,
+            "mode_used": mode,
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
@@ -171,6 +247,8 @@ async def submit_answer(
     debate = _get_debate_or_404(debate_id)
     check_workspace_access(current_user, debate["workspace_id"])
 
+    mode = body.mode or mode_from_policy(debate.get("policy_config") or {})
+
     try:
         result = evaluate_answer(
             debate_id=debate_id,
@@ -178,6 +256,7 @@ async def submit_answer(
             answer_text=body.answer_text,
             openrouter_key=key,
             model_id=body.model_id,
+            mode=mode,
         )
         return result
     except ValueError as exc:
@@ -212,11 +291,14 @@ async def trigger_readiness_report(
     debate = _get_debate_or_404(debate_id)
     check_workspace_access(current_user, debate["workspace_id"])
 
+    mode = body.mode or mode_from_policy(debate.get("policy_config") or {})
+
     try:
         report = generate_readiness_report(
             debate_id=debate_id,
             openrouter_key=key,
             model_id=body.model_id,
+            mode=mode,
         )
         return _serialize(report)
     except ValueError as exc:
