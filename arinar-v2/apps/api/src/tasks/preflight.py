@@ -342,45 +342,26 @@ def prepare_participant_preflight(participant_run_id: str, participant_id: str, 
         elif not tavily_key:
             print(f"    ⚠️ TAVILY_API_KEY not set — skipping web research")
         
-        # 3b. Build prep prompt
-        # Get current date/time for temporal context
+        # 3b. Build role-specific prep prompt using the persona_prompts module
+        from src.services.persona_prompts import get_preflight_prep_prompt, resolve_role
+
         current_datetime = datetime.utcnow()
         current_date_str = current_datetime.strftime("%A, %B %d, %Y")
         current_time_str = current_datetime.strftime("%I:%M %p UTC")
-        
-        prep_prompt = f"""You are preparing YOUR private reviewer preparation memo for an academic peer-review session.
 
-**Date**: {current_date_str} at {current_time_str}
-
-**Research Title**: {debate_title}
-
-**Your Reviewer Role**: {system_prompt[:200] if system_prompt else 'Academic reviewer'}
-
-**Research Question / Abstract**:
-{problem_statement}
-
-**Submitted Materials (paper draft, proposals, datasets)**:
-{materials_context if materials_context else 'No materials provided by the author.'}
-
-**Imported Context from Prior Review Sessions**:
-{imported_context if imported_context else 'No prior review context imported.'}
-
-{web_research_results if web_research_results else '**No web research performed for this preparation.**'}
-
-**Task**: Write YOUR private reviewer preparation memo (400-600 words) in YOUR voice covering:
-1. Initial assessment of the contribution's novelty and significance through YOUR reviewer lens
-2. Key methodological concerns or strengths you plan to raise
-3. Relevant literature the authors may have missed — cite specific papers where you can
-4. The specific questions or experiments you want the panel to address
-5. YOUR provisional recommendation reasoning (Accept / Minor Revision / Major Revision / Reject)
-
-**CRITICAL INSTRUCTIONS**:
-- STAY IN CHARACTER as YOUR specific reviewer persona
-- Ground every claim in evidence from the submitted materials or cited literature
-- Use inline citations: "Author et al. (Year) [URL]" or "(see [material section])"
-- If literature search results are available, cite at least 5 relevant papers
-- This memo is PRIVATE — other reviewers will NOT see it before the session
-- During the review session, reference only what has been submitted or discussed openly"""
+        # Resolve the reviewer role from their config
+        role_for_prep = agent_config.get('role', '') or agent_config.get('role_description', '') or role_description
+        prep_prompt = get_preflight_prep_prompt(
+            role_label         = role_for_prep,
+            persona_name       = agent_name,
+            debate_title       = debate_title,
+            problem_statement  = problem_statement,
+            materials_context  = materials_context,
+            imported_context   = imported_context,
+            web_research_results = web_research_results,
+            current_date_str   = current_date_str,
+            current_time_str   = current_time_str,
+        )
         
         # 4. Call OpenRouter to generate prep pack
         # For V1, use a simple synchronous call (no streaming)
@@ -419,18 +400,20 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
             try:
                 client = OpenRouterClient(api_key=openrouter_key)
                 
-                # Build persona-specific system prompt by COMBINING agent's persona with research instructions
-                # This preserves each agent's unique character while ensuring they cite sources
-                persona_specific_prompt = f"""{system_prompt if system_prompt else 'You are an academic peer reviewer.'}
-
-**ADDITIONAL PREPARATION INSTRUCTIONS**:
-When writing your reviewer preparation memo:
-1. STAY IN CHARACTER as your specific academic reviewer persona
-2. Ground every assessment in evidence from the submitted materials or literature
-3. If literature/web sources are provided, cite at least 5 relevant papers or sources with their URLs
-4. Apply YOUR specific reviewer expertise lens: methodologist looks at design, statistician at numbers, etc.
-5. Your memo should be 400-600 words, citation-heavy, and written in a formal academic review voice
-6. End with a provisional recommendation: Accept / Minor Revision / Major Revision / Reject"""
+                # Use the full deep system_prompt if the agent has one (built by persona_suggester);
+                # otherwise fall back to the canonical base prompt for this role.
+                from src.services.persona_prompts import get_base_prompt, resolve_role as _resolve_role
+                if system_prompt and len(system_prompt.strip()) > 150:
+                    # Agent already has a rich deep system prompt
+                    persona_specific_prompt = system_prompt
+                else:
+                    # Build from canonical base + persona identity
+                    _canonical = _resolve_role(role_description or role_for_prep)
+                    persona_specific_prompt = (
+                        f"You are {agent_name}, serving as {_canonical.replace('_',' ').title()} "
+                        f"in an academic peer-review committee.\n\n"
+                        + get_base_prompt(_canonical)
+                    )
                 
                 # Adjust model config for longer, more detailed output
                 enhanced_config = model_config.copy()
