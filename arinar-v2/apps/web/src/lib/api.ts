@@ -492,9 +492,11 @@ export async function listDebates(
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to list debates: ${response.statusText}`);
+    const body = await response.json().catch(() => null);
+    const detail = body?.detail ?? response.statusText;
+    throw new Error(`Failed to list debates: ${detail}`);
   }
-  
+
   return response.json();
 }
 

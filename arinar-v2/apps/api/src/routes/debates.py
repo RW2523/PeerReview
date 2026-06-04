@@ -65,6 +65,8 @@ async def list_debates(
             items=items,
             next_cursor=debates_data.get("next_cursor")
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing debates: {str(e)}")
         logger.error(traceback.format_exc())
