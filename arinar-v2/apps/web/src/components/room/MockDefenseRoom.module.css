@@ -1,0 +1,376 @@
+.defenseRoom {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+.header h2 { font-size: 18px; margin: 0; color: #fff; }
+.headerMeta { display: flex; align-items: center; gap: 12px; }
+.progress { font-size: 13px; color: #888; }
+
+.phaseBadge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.phase_setup      { background: #1e293b; color: #94a3b8; }
+.phase_analyzing  { background: #1e3a5f; color: #60a5fa; }
+.phase_questions  { background: #1e3a2f; color: #4ade80; }
+.phase_defense    { background: #3a1e1e; color: #f87171; }
+.phase_report     { background: #2a1e3a; color: #c084fc; }
+
+/* ── Error ──────────────────────────────────────────────────────────────── */
+.errorBanner {
+  background: #3a1e1e;
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* ── Setup card ─────────────────────────────────────────────────────────── */
+.setupCard, .loadingCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.setupIntro { color: #aaa; font-size: 14px; max-width: 500px; line-height: 1.6; }
+.keyHint { font-size: 12px; color: #f59e0b; margin: 0; }
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top-color: #7c3aed;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Profile card ───────────────────────────────────────────────────────── */
+.profileCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 20px;
+}
+.profileCard h3 { margin: 0; font-size: 15px; color: #4ade80; }
+.profileGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.profileField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.fieldLabel { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #666; }
+.fieldValue { font-size: 13px; color: #ddd; line-height: 1.4; }
+.weakAreas {
+  background: #1e1400;
+  border: 1px solid #78350f;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 13px;
+  color: #fbbf24;
+}
+.weakAreas ul { margin: 6px 0 0 0; padding-left: 16px; }
+.weakAreas li { margin-bottom: 4px; }
+.questionConfig { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #aaa; }
+.numInput {
+  width: 60px;
+  margin-left: 8px;
+  padding: 4px 8px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 13px;
+}
+
+/* ── Defense card ───────────────────────────────────────────────────────── */
+.defenseCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.progressBar {
+  height: 4px;
+  background: #222;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: #7c3aed;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.questionCard {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.questionMeta { display: flex; gap: 8px; flex-wrap: wrap; }
+.personaBadge {
+  font-size: 12px;
+  padding: 3px 10px;
+  background: #1e1e3a;
+  color: #a78bfa;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.categoryBadge {
+  font-size: 12px;
+  padding: 3px 10px;
+  background: #1a1a1a;
+  color: #888;
+  border-radius: 20px;
+}
+.difficultyBadge {
+  font-size: 11px;
+  padding: 3px 10px;
+  color: #000;
+  border-radius: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.questionText {
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  line-height: 1.6;
+  margin: 0;
+}
+.sourceExcerpt {
+  margin: 0;
+  padding: 10px 14px;
+  background: #0f1a0f;
+  border-left: 3px solid #22c55e;
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+  color: #86efac;
+  font-style: italic;
+}
+
+/* ── Answer box ─────────────────────────────────────────────────────────── */
+.answerBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.answerLabel { font-size: 13px; color: #888; font-weight: 600; }
+.answerTextarea {
+  width: 100%;
+  background: #0d0d0d;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.answerTextarea:focus { outline: none; border-color: #7c3aed; }
+.answerActions { display: flex; justify-content: space-between; align-items: center; }
+.wordCount { font-size: 12px; color: #555; }
+
+/* ── Evaluation card ────────────────────────────────────────────────────── */
+.evalCard {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.evalCard h3 { margin: 0; font-size: 15px; color: #fff; }
+.overallScore { display: flex; align-items: baseline; gap: 6px; }
+.scoreNumber { font-size: 36px; font-weight: 800; color: #7c3aed; }
+.scoreLabel  { font-size: 14px; color: #666; }
+
+.scoreGrid { display: flex; flex-direction: column; gap: 8px; }
+.scoreBarRow { display: flex; align-items: center; gap: 10px; }
+.scoreBarLabel { width: 160px; font-size: 12px; color: #aaa; flex-shrink: 0; }
+.scoreBarTrack {
+  flex: 1;
+  height: 8px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.scoreBarFill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.scoreBarValue { width: 32px; font-size: 12px; color: #888; text-align: right; flex-shrink: 0; }
+
+.feedbackGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.feedbackBlock {
+  background: #0d0d0d;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.feedbackLabel { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #666; font-weight: 700; }
+.feedbackText  { margin: 0; font-size: 13px; color: #ccc; line-height: 1.5; }
+
+.followUp {
+  background: #0f1a2f;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 13px;
+  color: #93c5fd;
+}
+.followUp p { margin: 6px 0 0 0; font-size: 14px; color: #bfdbfe; font-weight: 500; }
+
+.evalActions { display: flex; gap: 10px; }
+
+/* ── Report phase ───────────────────────────────────────────────────────── */
+.reportPhase { display: flex; flex-direction: column; gap: 16px; }
+.reportGenerate { text-align: center; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.reportGenerate h3 { font-size: 20px; margin: 0; }
+.reportGenerate p  { color: #aaa; margin: 0; }
+
+.reportView { display: flex; flex-direction: column; gap: 20px; }
+.reportHeader {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+}
+.overallCircle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 4px solid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.circleScore { font-size: 26px; font-weight: 800; line-height: 1; }
+.circleLabel { font-size: 10px; color: #666; }
+.readinessLabel { font-size: 17px; font-weight: 700; margin: 0 0 6px 0; }
+.recommendation { font-size: 13px; color: #aaa; margin: 0; line-height: 1.5; }
+
+.dimGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.dimCard {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 8px;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.dimLabel { font-size: 10px; color: #888; text-align: center; }
+.dimScore { font-size: 22px; font-weight: 800; color: #a78bfa; }
+
+.reportSection { display: flex; flex-direction: column; gap: 10px; }
+.reportSection h4 { margin: 0; font-size: 14px; color: #fff; }
+
+.planList { display: flex; flex-direction: column; gap: 8px; }
+.planItem {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 8px;
+  background: #111;
+  border-left: 3px solid #333;
+}
+.priority_high   { border-left-color: #ef4444; }
+.priority_medium { border-left-color: #f59e0b; }
+.priority_low    { border-left-color: #22c55e; }
+.planPriority {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #1a1a1a;
+  color: #888;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.planItem strong { font-size: 13px; color: #ddd; }
+.planItem p { margin: 2px 0 0 0; font-size: 12px; color: #888; line-height: 1.5; }
+
+.likelyList { padding-left: 20px; margin: 0; }
+.likelyList li { font-size: 13px; color: #ccc; margin-bottom: 6px; line-height: 1.5; }
+
+.weakItem {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #1a0e0e;
+  border-radius: 8px;
+  border: 1px solid #3a1e1e;
+}
+.weakScore { font-size: 18px; font-weight: 800; color: #ef4444; flex-shrink: 0; width: 50px; }
+.weakQ     { margin: 0; font-size: 13px; color: #fca5a5; font-weight: 500; }
+.weakSummary { margin: 4px 0 0 0; font-size: 12px; color: #888; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btnPrimary {
+  padding: 10px 20px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btnPrimary:hover:not(:disabled) { background: #6d28d9; }
+.btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnSecondary {
+  padding: 10px 20px;
+  background: transparent;
+  color: #888;
+  border: 1px solid #333;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btnSecondary:hover { border-color: #555; color: #ccc; }

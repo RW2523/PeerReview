@@ -3,6 +3,7 @@ import uuid
 import random
 import asyncio
 import os
+import re
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import psycopg2.extras
@@ -14,6 +15,82 @@ from .agent_reasoning import AgentReasoningEngine
 from .agent_response_generator import AgentResponseGenerator
 from .agent_constitutional_validator import ConstitutionalValidator
 from .agent_thinking_service import AgentThinkingService
+
+
+# ── Persona lane definitions ──────────────────────────────────────────────
+# Each committee member stays in their expert lane to prevent repetition
+# and ensure each turn adds unique value.
+_PERSONA_LANE: Dict[str, str] = {
+    "advisor": (
+        "Focus on: alignment with research goals, feasibility, overall contribution. "
+        "Ask: Does the work achieve what it set out to do? Is the scope appropriate?"
+    ),
+    "methodology professor": (
+        "Focus on: research design, baselines, validity threats, statistical rigour. "
+        "Ask: Are the methods appropriate? Are controls adequate? Are results reproducible?"
+    ),
+    "domain expert": (
+        "Focus on: domain-specific correctness, related work, whether the contribution is meaningful to the field. "
+        "Ask: Is this actually novel in this domain? Are key references missing?"
+    ),
+    "skeptical reviewer": (
+        "Focus on: unsupported claims, logical gaps, weak evidence, over-generalised conclusions. "
+        "Ask: What would disprove this? What assumptions are buried?"
+    ),
+    "friendly professor": (
+        "Focus on: clarity, communication, confidence-building. "
+        "Ask: Can the student explain this to a non-expert? Are terms defined clearly?"
+    ),
+    "external examiner": (
+        "Focus on: defense-level challenge, depth of understanding, ability to defend under pressure. "
+        "Ask: Can the student justify every design choice? What would they change in hindsight?"
+    ),
+}
+
+
+def _persona_lane_from_description(description: str) -> str:
+    """Match persona lane from a free-text description if name not in dict."""
+    desc_lower = description.lower()
+    for key, lane in _PERSONA_LANE.items():
+        if any(word in desc_lower for word in key.split()):
+            return lane
+    return (
+        "Raise one unique, substantive critique not yet raised by others. "
+        "Back it with evidence from the submitted materials."
+    )
+
+
+def _build_repetition_blacklist(history_events: List[Dict], current_agent: str) -> str:
+    """
+    Extract the key points each agent has already raised so the current
+    agent knows what NOT to repeat.
+    """
+    points: List[str] = []
+    seen_agents: Dict[str, List[str]] = {}
+
+    for ev in history_events[-10:]:  # last 10 events is enough context
+        if ev.get("event_type") != "agent_message":
+            continue
+        content = ev.get("content", {})
+        speaker = content.get("agent_name", "")
+        text = (content.get("text") or "")[:200]
+        if not text:
+            continue
+        # Extract first sentence as the "point"
+        first_sentence = re.split(r"[.!?]", text)[0].strip()[:120]
+        if first_sentence:
+            seen_agents.setdefault(speaker, []).append(first_sentence)
+
+    if not seen_agents:
+        return "No previous points recorded yet — you are free to open with any angle."
+
+    lines = []
+    for agent, agent_points in seen_agents.items():
+        tag = "(YOU)" if agent == current_agent else ""
+        for p in agent_points[:2]:
+            lines.append(f"- {agent} {tag}: {p}")
+
+    return "\n".join(lines) or "No repeated points to avoid yet."
 
 
 class TurnOrchestrator:
@@ -438,6 +515,13 @@ How to respond:
                 urgency = f"Review Turn {total_turns + 1}"
                 length_instruction = "Advance the review arc. Respond to other reviewers with cited evidence. 150-250 words."
             
+            # ── Persona lane + repetition blacklist ──────────────────
+            _lane = _PERSONA_LANE.get(
+                agent_name.lower().strip(),
+                _persona_lane_from_description(agent_config.get('description', ''))
+            )
+            _blacklist = _build_repetition_blacklist(history_events, agent_name)
+
             # Add turn instruction with conversational guidance
             role_context = agent_config.get('description', f"You are {agent_name}")
             
@@ -475,6 +559,12 @@ Final Round ({max_rounds}): Clear recommendation with full rationale"""
 
 **Context:** {urgency} | Turn {turn_in_round}/{len(participants)} in this round
 **Other Participants:** {participant_list}
+
+🎯 YOUR REVIEWER LANE (stay within this focus area):
+{_lane}
+
+🚫 DO NOT REPEAT (these points have already been raised — raise something NEW):
+{_blacklist}
 
 🚨🚨🚨 TAGGING RULES - READ CAREFULLY:
    - ONLY tag people from the "Active participants" list above

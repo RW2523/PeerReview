@@ -55,6 +55,9 @@ app.include_router(documents.router, tags=["documents"])
 app.include_router(literature_router, tags=["literature"])
 app.include_router(web_search_router, tags=["web-search"])
 
+from .routes.defense import router as defense_router
+app.include_router(defense_router, tags=["defense"])
+
 # Document WebSocket endpoint
 from .websocket.document_hub import handle_document_websocket
 

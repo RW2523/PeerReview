@@ -1429,3 +1429,199 @@ export async function listSavedWebResults(debateId: string): Promise<{
 
   return response.json();
 }
+
+// ============================================================================
+// DEFENSE PLATFORM API
+// ============================================================================
+
+export interface ResearchProfile {
+  profile_id: string;
+  debate_id: string;
+  status: 'pending' | 'running' | 'complete' | 'failed';
+  research_problem?: string;
+  research_gap?: string;
+  research_questions?: string[];
+  main_claim?: string;
+  methodology?: string;
+  dataset_details?: string;
+  contribution?: string;
+  evidence_summary?: string;
+  limitations?: string;
+  weak_areas?: { area: string; reason: string }[];
+  possible_questions?: string[];
+  error_message?: string;
+  model_used?: string;
+  chunk_count?: number;
+}
+
+export interface DefenseQuestion {
+  question_id: string;
+  debate_id: string;
+  question_text: string;
+  category: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  persona: string;
+  expected_answer?: string;
+  follow_up_rule?: string;
+  follow_up_q?: string;
+  source_excerpt?: string;
+  asked: boolean;
+  seq_order: number;
+}
+
+export interface AnswerEvaluation {
+  answer_id: string;
+  question_id: string;
+  overall_score: number;
+  score_relevance: number;
+  score_evidence: number;
+  score_clarity: number;
+  score_completeness: number;
+  score_methodology: number;
+  score_critical_thinking: number;
+  strength: string;
+  weakness: string;
+  missing_evidence: string;
+  suggested_improvement: string;
+  follow_up_needed: boolean;
+  follow_up_question?: string;
+}
+
+export interface ReadinessReport {
+  report_id: string;
+  debate_id: string;
+  status: string;
+  overall_readiness?: number;
+  research_clarity?: number;
+  methodology_score?: number;
+  evidence_score?: number;
+  critical_thinking?: number;
+  communication?: number;
+  strong_answers?: any[];
+  weak_answers?: any[];
+  repeated_issues?: any[];
+  likely_questions?: string[];
+  improvement_plan?: any[];
+  next_recommendation?: string;
+  generated_at?: string;
+}
+
+async function defenseHeaders(openrouterKey?: string): Promise<HeadersInit> {
+  const base = await getAuthHeaders() as Record<string, string>;
+  if (openrouterKey) base['X-OpenRouter-Key'] = openrouterKey;
+  return base;
+}
+
+export async function analyzeResearch(
+  debateId: string,
+  openrouterKey: string,
+  modelId = 'anthropic/claude-sonnet-4-5'
+): Promise<{ status: string; profile: ResearchProfile }> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/analyze-research`, {
+    method: 'POST',
+    headers: await defenseHeaders(openrouterKey),
+    body: JSON.stringify({ model_id: modelId }),
+  });
+  if (!response.ok) {
+    const b = await response.json().catch(() => null);
+    throw new Error(b?.detail ?? response.statusText);
+  }
+  return response.json();
+}
+
+export async function getResearchProfile(debateId: string): Promise<ResearchProfile> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/research-profile`, {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 404) throw new Error('not_found');
+    const b = await response.json().catch(() => null);
+    throw new Error(b?.detail ?? response.statusText);
+  }
+  return response.json();
+}
+
+export async function generateDefenseQuestions(
+  debateId: string,
+  openrouterKey: string,
+  nQuestions = 15,
+  modelId = 'anthropic/claude-sonnet-4-5'
+): Promise<{ count: number; questions: DefenseQuestion[] }> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/defense-questions/generate`, {
+    method: 'POST',
+    headers: await defenseHeaders(openrouterKey),
+    body: JSON.stringify({ n_questions: nQuestions, model_id: modelId }),
+  });
+  if (!response.ok) {
+    const b = await response.json().catch(() => null);
+    throw new Error(b?.detail ?? response.statusText);
+  }
+  return response.json();
+}
+
+export async function getDefenseQuestions(
+  debateId: string,
+  unansweredOnly = false
+): Promise<{ count: number; questions: DefenseQuestion[] }> {
+  const params = unansweredOnly ? '?unanswered_only=true' : '';
+  const response = await fetch(`${API_URL}/debates/${debateId}/defense-questions${params}`, {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  return response.json();
+}
+
+export async function submitAnswer(
+  debateId: string,
+  questionId: string,
+  answerText: string,
+  openrouterKey: string,
+  modelId = 'anthropic/claude-sonnet-4-5'
+): Promise<AnswerEvaluation> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/answers`, {
+    method: 'POST',
+    headers: await defenseHeaders(openrouterKey),
+    body: JSON.stringify({ question_id: questionId, answer_text: answerText, model_id: modelId }),
+  });
+  if (!response.ok) {
+    const b = await response.json().catch(() => null);
+    throw new Error(b?.detail ?? response.statusText);
+  }
+  return response.json();
+}
+
+export async function getAnswers(debateId: string): Promise<{ count: number; answers: any[] }> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/answers`, {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  return response.json();
+}
+
+export async function generateReadinessReport(
+  debateId: string,
+  openrouterKey: string,
+  modelId = 'anthropic/claude-sonnet-4-5'
+): Promise<ReadinessReport> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/readiness-report`, {
+    method: 'POST',
+    headers: await defenseHeaders(openrouterKey),
+    body: JSON.stringify({ model_id: modelId }),
+  });
+  if (!response.ok) {
+    const b = await response.json().catch(() => null);
+    throw new Error(b?.detail ?? response.statusText);
+  }
+  return response.json();
+}
+
+export async function getReadinessReport(debateId: string): Promise<ReadinessReport> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/readiness-report`, {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 404) throw new Error('not_found');
+    throw new Error(response.statusText);
+  }
+  return response.json();
+}

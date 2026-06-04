@@ -11,6 +11,7 @@ import AgentBehaviorsPanel from '@/components/room/AgentBehaviorsPanel';
 import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
 import DocumentPanel from './DocumentPanel';
+import MockDefenseRoom from '@/components/room/MockDefenseRoom';
 import { useDebateRoom } from '@/hooks/useDebateRoom';
 import * as api from '@/lib/api';
 import styles from './room.module.css';
@@ -41,7 +42,7 @@ function RoomPageContent() {
   const [participantTurnCounts, setParticipantTurnCounts] = useState<Record<string, number>>({});
   const [debateStartedAt, setDebateStartedAt] = useState<string | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'transcript' | 'document'>('transcript');
+  const [activeTab, setActiveTab] = useState<'transcript' | 'document' | 'defense'>('transcript');
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
@@ -335,11 +336,19 @@ function RoomPageContent() {
                   📄 Document
                 </button>
               )}
+              {debateId && (
+                <button
+                  className={`${styles.tab} ${activeTab === 'defense' ? styles.tabActive : ''}`}
+                  onClick={() => setActiveTab('defense')}
+                >
+                  🎓 Mock Defense
+                </button>
+              )}
             </div>
 
             {/* Tab Content */}
             <div className={styles.tabContent}>
-              {activeTab === 'transcript' ? (
+              {activeTab === 'transcript' && (
                 <>
                   <EventFeed 
                     events={events}
@@ -353,7 +362,8 @@ function RoomPageContent() {
                     sendCommand={sendCommand}
                   />
                 </>
-              ) : (
+              )}
+              {activeTab === 'document' && (
                 <div className={styles.documentView}>
                   {documentId && (
                     <DocumentPanel 
@@ -363,6 +373,11 @@ function RoomPageContent() {
                       userName="User"
                     />
                   )}
+                </div>
+              )}
+              {activeTab === 'defense' && debateId && (
+                <div style={{ padding: '16px 0', height: '100%' }}>
+                  <MockDefenseRoom debateId={debateId} />
                 </div>
               )}
             </div>
