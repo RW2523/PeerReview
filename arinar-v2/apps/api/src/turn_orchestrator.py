@@ -529,31 +529,36 @@ How to respond:
             # Add turn instruction with conversational guidance
             role_context = agent_config.get('description', f"You are {agent_name}")
             
-            # Build strategic context about review structure
+            # Build round-aware strategy guide with enforced debate structure
             if max_rounds:
-                if max_rounds <= 2:
-                    strategy_guide = f"""
+                if current_round == 1:
+                    round_requirement = (
+                        "ROUND 1 — INDEPENDENT EVALUATION:\n"
+                        "  Assess the submission from your reviewer lens without referencing what others said.\n"
+                        "  State your most important strength, your most critical weakness, and one specific recommendation.\n"
+                        "  Every claim MUST cite a specific section, method, figure, or result from the source materials."
+                    )
+                elif current_round == max_rounds:
+                    round_requirement = (
+                        f"ROUND {current_round} — FINAL POSITION (your last turn):\n"
+                        "  State your definitive recommendation: Accept / Minor Revision / Major Revision / Reject.\n"
+                        "  Address at least ONE unresolved concern raised by another reviewer — name them directly.\n"
+                        "  List required revisions with evidence-backed justification.\n"
+                        "  Be decisive. This is your final contribution."
+                    )
+                else:
+                    round_requirement = (
+                        f"ROUND {current_round} — CHALLENGE AND ENGAGE:\n"
+                        "  You MUST challenge, rebut, qualify, or refine at least ONE specific claim made by another reviewer.\n"
+                        "  Use their exact @name. Quote or paraphrase their claim. Explain the flaw or provide counter-evidence.\n"
+                        "  Then advance to a new aspect of the review not yet covered.\n"
+                        "  Cite evidence from the source materials or the discussion. Do not simply repeat your Round 1 points."
+                    )
+
+                strategy_guide = f"""
 REVIEW STRUCTURE: {max_rounds} round(s) | Current: Round {current_round}/{max_rounds}
 
-REVIEW ARC STRATEGY:
-Round 1: Assess the core contribution, identify the most important strength AND the most critical weakness. Cite evidence.
-Round 2 (FINAL): Address literature gaps, confirm or revise your provisional recommendation, synthesise with other reviewers."""
-                elif max_rounds == 3:
-                    strategy_guide = f"""
-REVIEW STRUCTURE: {max_rounds} rounds | Current: Round {current_round}/{max_rounds}
-
-REVIEW ARC STRATEGY:
-Round 1: Contribution assessment and initial methodological observations (cite submitted materials)
-Round 2: Deep engagement — challenge other reviewers' points, raise literature gaps, unresolved questions
-Round 3 (FINAL): Finalise your recommendation (Accept/Minor/Major/Reject) with synthesised rationale"""
-                else:
-                    strategy_guide = f"""
-REVIEW STRUCTURE: {max_rounds} rounds | Current: Round {current_round}/{max_rounds}
-
-REVIEW ARC STRATEGY:
-Rounds 1-2: Contribution assessment, initial strengths and concerns (cite submitted materials)
-Middle Rounds: Deep methodological and literature engagement — challenge, evidence, counter-evidence
-Final Round ({max_rounds}): Clear recommendation with full rationale"""
+{round_requirement}"""
             else:
                 strategy_guide = ""
             
@@ -763,9 +768,30 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                 "content": conversational_instruction
             })
             
+            # Load source materials once per turn — shared across pipeline stages
+            _material_ctx = self._load_material_context(debate_id)
+            if _material_ctx:
+                print(f"    [materials] Loaded material context ({len(_material_ctx)} chars) for {agent_name}")
+                # Inject into legacy prompt messages as well
+                messages.append({
+                    "role": "system",
+                    "content": (
+                        "SOURCE MATERIALS (ground every claim in these — cite title and section):\n\n"
+                        + _material_ctx
+                    ),
+                })
+            else:
+                print(f"    [materials] No source materials found for this session")
+
+            # All valid participant names for hallucination prevention
+            _all_participant_names = [
+                (p['agent_config'] or {}).get('name') or p['role_name']
+                for p in participants
+            ]
+
             # Generate agent response using Constitutional AI pipeline or legacy approach
             if self.use_constitutional_pipeline:
-                print(f"\n🧠 CONSTITUTIONAL AI PIPELINE for {agent_name}")
+                print(f"\n[pipeline] Constitutional AI for {agent_name}")
                 agent_message = self._generate_with_constitutional_pipeline(
                     debate_id=debate_id,
                     agent_name=agent_name,
@@ -787,7 +813,8 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                         "turn_number": total_turns + 1
                     },
                     participants=participants,
-                    history_events=history_events
+                    history_events=history_events,
+                    material_context=_material_ctx if _material_ctx else None,
                 )
                 # For consistency with legacy, create a mock response dict
                 response = {
@@ -1557,6 +1584,74 @@ Requirements:
             print(f"⚠️ Section content generation error: {e}")
             return ""
     
+    # ── Material context loader ──────────────────────────────────────────────
+
+    def _load_material_context(self, debate_id: str) -> str:
+        """
+        Load meeting_materials (text, literature, web) for this debate and
+        return a structured string that can be injected into every reviewer
+        and reasoning prompt.
+
+        Includes up to 5 document chunks per material item for grounding.
+        """
+        try:
+            with get_db_connection() as conn:
+                cursor = get_cursor(conn)
+
+                # Fetch all source materials
+                cursor.execute(
+                    """
+                    SELECT material_id, kind, title, body_text, url
+                    FROM meeting_materials
+                    WHERE debate_id = %s
+                    ORDER BY created_at ASC
+                    """,
+                    (debate_id,),
+                )
+                materials = cursor.fetchall()
+                if not materials:
+                    return ""
+
+                parts: List[str] = []
+                for m in materials:
+                    title = m["title"] or "(untitled)"
+                    kind = (m["kind"] or "document").upper()
+                    body = (m["body_text"] or "").strip()
+
+                    # Fetch up to 5 text chunks from memory_chunks for this material
+                    cursor.execute(
+                        """
+                        SELECT chunk_text
+                        FROM memory_chunks
+                        WHERE source_debate_id = %s
+                          AND agent_id IS NULL
+                          AND chunk_metadata->>'material_id' = %s
+                        ORDER BY (chunk_metadata->>'chunk_index')::int ASC NULLS LAST
+                        LIMIT 5
+                        """,
+                        (debate_id, str(m["material_id"])),
+                    )
+                    chunk_rows = cursor.fetchall()
+                    chunks = [r["chunk_text"] for r in chunk_rows if r["chunk_text"]]
+
+                    entry_lines = [f"[{kind}] {title}"]
+                    if body:
+                        entry_lines.append(f"  Summary/Body: {body[:600]}{'...' if len(body) > 600 else ''}")
+                    if chunks:
+                        entry_lines.append("  Relevant excerpts:")
+                        for i, ch in enumerate(chunks, 1):
+                            entry_lines.append(f"    ({i}) {ch[:400]}{'...' if len(ch) > 400 else ''}")
+                    if m["url"]:
+                        entry_lines.append(f"  Source URL: {m['url']}")
+
+                    parts.append("\n".join(entry_lines))
+
+                return "\n\n".join(parts)
+
+        except Exception as exc:
+            print(f"    [material_context] Failed to load materials: {exc}")
+            return ""
+
     def _generate_with_constitutional_pipeline(
         self,
         debate_id: str,
@@ -1568,15 +1663,15 @@ Requirements:
         debate_context: Dict[str, Any],
         turn_info: Dict[str, Any],
         participants: List[Dict[str, Any]],
-        history_events: List[Dict[str, Any]]
+        history_events: List[Dict[str, Any]],
+        material_context: Optional[str] = None,
     ) -> str:
         """
-        Generate agent response using 3-stage Constitutional AI pipeline
-        
-        Stage 1: Reasoning - Agent evaluates stance
-        Stage 2: Response - Generate message
-        Stage 3: Validation - Constitutional checks
-        
+        Generate agent response using 3-stage Constitutional AI pipeline:
+          Stage 1: Reasoning — evaluate stance (with material context + validation)
+          Stage 2: Response  — generate role-specific message
+          Stage 3: Validation — constitutional checks
+
         Returns:
             Final validated agent message
         """
@@ -1586,52 +1681,52 @@ Requirements:
             past_messages = agent_memory.get_past_messages(limit=3)
             past_messages_text = [msg["text"] for msg in past_messages]
             memory_context = agent_memory.build_memory_context()
-            
+
             # Get user interventions
             user_interventions = agent_memory.get_user_interventions()
             latest_intervention = user_interventions[0]["text"] if user_interventions else None
-            
+
             # Extract recent conversation for reasoning
             recent_conversation = "\n".join([
                 f"{msg['role']}: {msg['content'][:300]}..."
                 for msg in conversation_history[-5:]
                 if msg['role'] in ['user', 'assistant']
             ])
-            
-            # Get list of ALL valid participant names (for hallucination check)
-            # The validator needs ALL names to detect if agent mentions someone who doesn't exist
+
+            # Get ALL valid participant names (used for validation and hallucination check)
             all_participant_names = [
                 (p['agent_config'] or {}).get('name') or p['role_name']
                 for p in participants
             ]
-            
-            # Get list of participants who have spoken (for prompt context)
+
+            # Get participants who have spoken (for prompt context)
             participants_who_spoke = list(set(
                 event.get('content', {}).get('agent_name')
                 for event in history_events
-                if event.get('event_type') == 'agent_message' and event.get('content', {}).get('agent_name')
+                if event.get('event_type') == 'agent_message'
+                and event.get('content', {}).get('agent_name')
             ))
-            
+
             # Start thinking session
             turn_num = turn_info.get('turn_number', 0)
-            print(f"\n🧠🧠🧠 STARTING THINKING SESSION FOR {agent_name} 🧠🧠🧠")
+            print(f"\n[thinking] Starting session for {agent_name}")
             session_id = self.thinking_service.start_thinking_session(debate_id, agent_name, turn_num)
             print(f"    Session ID: {session_id}")
-            
-            # STAGE 1: REASONING
-            print(f"  Stage 1: Reasoning...")
-            print(f"🧠 About to emit reasoning thinking step...")
+
+            # ── STAGE 1: REASONING ───────────────────────────────────────
+            print(f"  Stage 1: Reasoning (with material context + validation)...")
             self.thinking_service.emit_thinking_step(debate_id, agent_name, "reasoning", {
                 "stage": "Stage 1: Reasoning",
-                "status": "Evaluating stance and analyzing recent messages...",
+                "status": "Evaluating stance and analysing recent messages...",
                 "details": [
                     f"Reading {len(past_messages)} past messages from this agent",
-                    f"Analyzing {len(conversation_history[-5:])} recent conversation turns",
+                    f"Analysing {len(conversation_history[-5:])} recent conversation turns",
                     f"Checking for user interventions: {'Yes' if latest_intervention else 'None'}",
-                    f"Comparing with {len(participants_who_spoke)} agents who have spoken"
+                    f"Comparing with {len(participants_who_spoke)} agents who have spoken",
+                    f"Source materials available: {'Yes' if material_context else 'No'}",
                 ]
             })
-            
+
             reasoning = self.reasoning_engine.evaluate_stance(
                 agent_name=agent_name,
                 agent_role=agent_config.get('description', agent_config.get('system_prompt', '')[:100]),
@@ -1639,6 +1734,9 @@ Requirements:
                 recent_conversation=recent_conversation,
                 user_intervention=latest_intervention,
                 debate_id=debate_id,
+                valid_participant_names=all_participant_names,
+                session_title=debate_context.get('title'),
+                material_context=material_context,
             )
             print(f"    Stance: {reasoning['current_stance'][:60]}...")
             print(f"    Confidence: {reasoning['confidence']}")
@@ -1676,6 +1774,8 @@ Requirements:
                 debate_context=debate_context,
                 turn_info=turn_info,
                 debate_id=debate_id,
+                material_context=material_context,
+                valid_participant_names=all_participant_names,
             )
             print(f"    Generated {len(agent_message)} chars")
             

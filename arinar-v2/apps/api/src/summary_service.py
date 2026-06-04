@@ -69,8 +69,15 @@ class SummaryService:
             _stage="summary",
         )
 
-        # Parse structured output
+        # Parse and validate structured output — raises RuntimeError if unparseable
         outputs = self._parse_summary_response(response['content'])
+
+        # Final validation: ensure outputs round-trip as valid JSON before storage
+        try:
+            _probe = json.dumps(outputs)
+            json.loads(_probe)  # verify
+        except (TypeError, ValueError) as _ve:
+            raise RuntimeError(f"Generated summary failed JSON validation: {_ve}") from _ve
 
         # Store in database
         self._save_outputs(
@@ -214,11 +221,22 @@ Requirements:
 START WITH {{ AND END WITH }}"""
     
     def _parse_summary_response(self, content: str) -> Dict[str, Any]:
-        """Parse LLM response into structured outputs"""
+        """
+        Parse LLM response into structured outputs.
+
+        Strategies (applied in order):
+          1. Strip markdown fences, then direct JSON parse
+          2. Extract JSON object from anywhere in the text (first {...})
+          3. Structural repair: close unclosed brackets/braces
+          4. Targeted key extraction as last resort
+          5. Reject and raise RuntimeError — do NOT store garbage
+
+        The returned dict is always valid and contains all required keys.
+        """
         import re
-        
-        # Try multiple parsing strategies
-        
+
+        REQUIRED = ['summary', 'minutes', 'action_items']
+
         def _extract(parsed: dict) -> dict:
             return {
                 'summary': parsed.get('summary', ''),
@@ -228,50 +246,85 @@ START WITH {{ AND END WITH }}"""
                 'recommendation_rationale': parsed.get('recommendation_rationale', ''),
             }
 
-        # Strategy 1: Direct JSON parse
-        try:
-            parsed = json.loads(content)
-            if not all(k in parsed for k in ['summary', 'minutes', 'action_items']):
-                raise ValueError("Missing required keys")
-            return _extract(parsed)
-        except json.JSONDecodeError as e:
-            print(f"⚠️ JSON parse failed: {str(e)}")
+        def _has_required(parsed: dict) -> bool:
+            return all(k in parsed for k in REQUIRED)
 
-        # Strategy 2: Extract from markdown code block
-        try:
-            if '```json' in content:
-                json_str = content.split('```json')[1].split('```')[0].strip()
-                return _extract(json.loads(json_str))
-            elif '```' in content:
-                json_str = content.split('```')[1].split('```')[0].strip()
-                return _extract(json.loads(json_str))
-        except (json.JSONDecodeError, IndexError) as e:
-            print(f"⚠️ Markdown extraction failed: {str(e)}")
+        def _strip_fences(text: str) -> str:
+            """Remove leading/trailing markdown code fences."""
+            text = text.strip()
+            text = re.sub(r'^```(?:json)?\s*\n?', '', text)
+            text = re.sub(r'\n?```\s*$', '', text)
+            return text.strip()
 
-        # Strategy 3: Fix incomplete JSON
-        try:
-            content_cleaned = content.strip()
-            if content_cleaned.startswith('{') and not content_cleaned.endswith('}'):
-                open_count = content_cleaned.count('{')
-                close_count = content_cleaned.count('}')
-                content_cleaned += '}' * (open_count - close_count)
-                open_arrays = content_cleaned.count('[')
-                close_arrays = content_cleaned.count(']')
-                if open_arrays > close_arrays:
-                    content_cleaned = content_cleaned.rstrip(',') + ']' * (open_arrays - close_arrays)
-                return _extract(json.loads(content_cleaned))
-        except Exception as e:
-            print(f"⚠️ JSON repair failed: {str(e)}")
+        def _repair(text: str) -> str:
+            """Close unclosed JSON brackets and braces."""
+            # Remove trailing commas before closing delimiters
+            text = re.sub(r',\s*([}\]])', r'\1', text)
+            # Balance braces and brackets
+            open_braces = text.count('{') - text.count('}')
+            open_brackets = text.count('[') - text.count(']')
+            if open_brackets > 0:
+                text = text.rstrip().rstrip(',') + ']' * open_brackets
+            if open_braces > 0:
+                text = text.rstrip().rstrip(',') + '}' * open_braces
+            return text
 
-        # Strategy 4: Fallback
-        print("⚠️ All parsing strategies failed. Creating fallback report...")
-        return {
-            'summary': 'Report generation failed — unable to parse AI response',
-            'minutes': f'Raw content (first 500 chars):\n\n{content[:500]}',
-            'action_items': [],
-            'recommendation': 'Major Revision',
-            'recommendation_rationale': 'Report generation failed; manual review required.',
-        }
+        # ── Strategy 1: strip fences, then parse ────────────────────────
+        try:
+            candidate = _strip_fences(content)
+            parsed = json.loads(candidate)
+            if _has_required(parsed):
+                return _extract(parsed)
+            print(f"[summary] JSON parsed but missing required keys: {list(parsed.keys())}")
+        except json.JSONDecodeError as exc:
+            print(f"[summary] Strategy 1 (strip+parse) failed: {exc}")
+
+        # ── Strategy 2: extract first {...} block ────────────────────────
+        try:
+            match = re.search(r'\{[\s\S]+\}', content)
+            if match:
+                parsed = json.loads(match.group(0))
+                if _has_required(parsed):
+                    return _extract(parsed)
+        except json.JSONDecodeError as exc:
+            print(f"[summary] Strategy 2 (extract block) failed: {exc}")
+
+        # ── Strategy 3: repair + parse ───────────────────────────────────
+        try:
+            candidate = _strip_fences(content)
+            if candidate.startswith('{'):
+                repaired = _repair(candidate)
+                parsed = json.loads(repaired)
+                if _has_required(parsed):
+                    print("[summary] Strategy 3 (repair) succeeded")
+                    return _extract(parsed)
+        except Exception as exc:
+            print(f"[summary] Strategy 3 (repair) failed: {exc}")
+
+        # ── Strategy 4: targeted key extraction ─────────────────────────
+        # Pull individual string values for each required key
+        def _pull_value(key: str, text: str) -> str:
+            pattern = rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"'
+            m = re.search(pattern, text, re.DOTALL)
+            return m.group(1) if m else ''
+
+        summary_val = _pull_value('summary', content)
+        minutes_val = _pull_value('minutes', content)
+        if summary_val and minutes_val:
+            print("[summary] Strategy 4 (key extraction) partially succeeded")
+            return {
+                'summary': summary_val,
+                'minutes': minutes_val,
+                'action_items': [],
+                'recommendation': _pull_value('recommendation', content),
+                'recommendation_rationale': _pull_value('recommendation_rationale', content),
+            }
+
+        # ── All strategies failed — raise to prevent storing garbage ────
+        raise RuntimeError(
+            f"Summary generation produced non-JSON output that could not be repaired. "
+            f"Raw response (first 300 chars): {content[:300]!r}"
+        )
     
     def _save_outputs(
         self,
