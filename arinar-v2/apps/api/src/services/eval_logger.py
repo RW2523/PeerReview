@@ -116,6 +116,27 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Keys that must never appear in eval log files
+_SENSITIVE_KEYS = frozenset({
+    "openrouter_key", "openrouter_api_key", "api_key", "apikey",
+    "secret", "password", "token", "authorization",
+})
+
+
+def _scrub(obj, depth: int = 0):
+    """Recursively remove sensitive keys from dicts/lists."""
+    if depth > 20:
+        return obj
+    if isinstance(obj, dict):
+        return {
+            k: "[REDACTED]" if k.lower() in _SENSITIVE_KEYS else _scrub(v, depth + 1)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_scrub(item, depth + 1) for item in obj]
+    return obj
+
+
 # One lock per debate_id so concurrent threads don't corrupt the same file
 _locks: Dict[str, threading.Lock] = {}
 _lock_registry = threading.Lock()
@@ -198,7 +219,7 @@ class DebateEvalLogger:
             "participant": participant,
             "model":      model,
             "request": {
-                "messages":    messages,
+                "messages":    _scrub(messages),
                 "temperature": temperature,
                 "max_tokens":  max_tokens,
             },
@@ -329,9 +350,9 @@ class DebateEvalLogger:
             "problem_statement": problem_statement,
             "agenda":            agenda or [],
             "desired_outcomes":  desired_outcomes or [],
-            "participants":      participants,
+            "participants":      _scrub(participants or []),
             "materials":         materials or [],
-            "policy_config":     policy_config or {},
+            "policy_config":     _scrub(policy_config or {}),
         }
 
     @staticmethod
