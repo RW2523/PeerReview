@@ -12,7 +12,9 @@ import InterveneComposer from '@/components/room/InterveneComposer';
 import SummaryReport from '@/components/room/SummaryReport';
 import DocumentPanel from './DocumentPanel';
 import MockDefenseRoom from '@/components/room/MockDefenseRoom';
+import VoiceDefenseRoom from '@/components/room/VoiceDefenseRoom';
 import { useDebateRoom } from '@/hooks/useDebateRoom';
+import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import * as api from '@/lib/api';
 import styles from './room.module.css';
 
@@ -29,6 +31,7 @@ import styles from './room.module.css';
  */
 function RoomPageContent() {
   const searchParams = useSearchParams();
+  const { apiKey: openrouterKey } = useOpenRouterKey();
   const [debateId, setDebateId] = useState<string | null>(null);
   const [debateTitle, setDebateTitle] = useState<string>('');
   const [debateState, setDebateState] = useState<string>('pending');
@@ -42,13 +45,18 @@ function RoomPageContent() {
   const [participantTurnCounts, setParticipantTurnCounts] = useState<Record<string, number>>({});
   const [debateStartedAt, setDebateStartedAt] = useState<string | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'transcript' | 'document' | 'defense'>('transcript');
+  const [activeTab, setActiveTab] = useState<'transcript' | 'document' | 'defense' | 'voice'>('transcript');
 
   const handleDebateLoaded = (id: string, title: string, state: string) => {
     setDebateId(id);
     setDebateTitle(title);
-    setDebateState(state.toLowerCase()); // Normalize to lowercase
+    setDebateState(state.toLowerCase());
     console.log('🎯 Debate loaded:', { id, title, state: state.toLowerCase() });
+    // Auto-switch to requested tab from URL
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'defense' || tabParam === 'voice') {
+      setActiveTab(tabParam);
+    }
   };
 
   // Auto-load debate from URL params (e.g., from setup flow)
@@ -67,7 +75,7 @@ function RoomPageContent() {
           console.log('🚀 YOLO Mode:', debate.autonomous_mode);
           
           // Check for document
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/debates/${debate.debate_id}/document`)
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/debates/${debate.debate_id}/document`)
             .then(res => res.ok ? res.json() : null)
             .then(doc => {
               if (doc && doc.document_id) {
@@ -275,7 +283,7 @@ function RoomPageContent() {
               )}
 
               <section className={styles.section}>
-                <h3>Participants</h3>
+                <h3>Committee Members</h3>
                 <div className={styles.participantsList}>
                   {participants.length === 0 ? (
                     <p className={styles.empty}>No participants yet</p>
@@ -307,26 +315,21 @@ function RoomPageContent() {
       <main className={styles.center}>
         {!debateId ? (
           <div className={styles.emptyState}>
-            <h2>Welcome to the Decision Room</h2>
-            <p>Load an existing debate or create a new one to get started.</p>
+            <h2>Mock Defense Room</h2>
+            <p>Load an existing defense session or create a new one to get started.</p>
             <div className={styles.selectorWrapper}>
               <DebateSelector onDebateLoaded={handleDebateLoaded} />
             </div>
           </div>
-        ) : debateState === 'ended' ? (
-          <SummaryReport
-            debateId={debateId}
-            agendaData={getAgendaData()}
-          />
         ) : (
           <>
-            {/* Tab Navigation */}
+            {/* Tab Navigation — always visible once debate is loaded */}
             <div className={styles.tabNav}>
               <button
                 className={`${styles.tab} ${activeTab === 'transcript' ? styles.tabActive : ''}`}
                 onClick={() => setActiveTab('transcript')}
               >
-                Live Transcript
+                {debateState === 'ended' ? 'Session Report' : 'Live Transcript'}
               </button>
               {documentId && (
                 <button
@@ -336,32 +339,44 @@ function RoomPageContent() {
                   Document
                 </button>
               )}
-              {debateId && (
-                <button
-                  className={`${styles.tab} ${activeTab === 'defense' ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab('defense')}
-                >
-                  Mock Defense
-                </button>
-              )}
+              <button
+                className={`${styles.tab} ${activeTab === 'defense' ? styles.tabActive : ''}`}
+                onClick={() => setActiveTab('defense')}
+              >
+                Mock Defense
+              </button>
+              <button
+                className={`${styles.tab} ${activeTab === 'voice' ? styles.tabActive : ''}`}
+                onClick={() => setActiveTab('voice')}
+                title="Voice-powered defense — speak your answers aloud"
+              >
+                🎤 Voice Defense
+              </button>
             </div>
 
             {/* Tab Content */}
             <div className={styles.tabContent}>
               {activeTab === 'transcript' && (
-                <>
-                  <EventFeed 
-                    events={events}
-                    connectionStatus={connectionStatus}
-                    onPresenceUpdate={handlePresenceUpdate}
-                    onTyping={handleTyping}
+                debateState === 'ended' ? (
+                  <SummaryReport
+                    debateId={debateId}
+                    agendaData={getAgendaData()}
                   />
-                  <InterveneComposer 
-                    debateId={debateId} 
-                    participants={participants}
-                    sendCommand={sendCommand}
-                  />
-                </>
+                ) : (
+                  <>
+                    <EventFeed 
+                      events={events}
+                      connectionStatus={connectionStatus}
+                      onPresenceUpdate={handlePresenceUpdate}
+                      onTyping={handleTyping}
+                    />
+                    <InterveneComposer 
+                      debateId={debateId} 
+                      participants={participants}
+                      sendCommand={sendCommand}
+                    />
+                  </>
+                )
               )}
               {activeTab === 'document' && (
                 <div className={styles.documentView}>
@@ -375,9 +390,14 @@ function RoomPageContent() {
                   )}
                 </div>
               )}
-              {activeTab === 'defense' && debateId && (
+              {activeTab === 'defense' && (
                 <div style={{ padding: '16px 0', height: '100%' }}>
-                  <MockDefenseRoom debateId={debateId} />
+                  <MockDefenseRoom debateId={debateId} openrouterKey={openrouterKey || ''} />
+                </div>
+              )}
+              {activeTab === 'voice' && (
+                <div style={{ padding: '16px 0', height: '100%' }}>
+                  <VoiceDefenseRoom debateId={debateId} openrouterKey={openrouterKey || ''} />
                 </div>
               )}
             </div>

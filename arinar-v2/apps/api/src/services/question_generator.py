@@ -13,13 +13,13 @@ committee persona, and includes:
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from typing import Any, Dict, List, Optional
 
 from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
 from .reasoning_modes import get_model, ReasoningMode
+from ..utils.json_repair import parse_llm_json
 
 QUESTION_CATEGORIES = [
     "problem_statement",
@@ -146,10 +146,7 @@ def generate_questions(
     )
 
     raw = response["content"].strip()
-    raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"^```\s*",     "", raw)
-    raw = re.sub(r"```\s*$",     "", raw)
-    questions: List[Dict] = json.loads(raw)
+    questions: List[Dict] = parse_llm_json(raw, stage="question_generation")
     if not isinstance(questions, list):
         questions = questions.get("questions", [])
 
@@ -218,8 +215,10 @@ def _fetch_excerpts(debate_id: str, limit: int = 12) -> str:
             SELECT mc.chunk_text,
                    COALESCE(mm.title, 'uploaded document') AS doc_title
             FROM   memory_chunks mc
-            LEFT JOIN meeting_materials mm ON mc.material_id = mm.material_id
-            WHERE  mc.debate_id = %s
+            LEFT JOIN meeting_materials mm
+                   ON (mc.chunk_metadata->>'material_id')::uuid = mm.material_id
+            WHERE  mc.source_debate_id = %s
+              AND  mc.agent_id IS NULL
             ORDER BY mc.created_at
             LIMIT %s
         """, (debate_id, limit))

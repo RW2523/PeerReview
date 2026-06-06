@@ -1,0 +1,37 @@
+{
+  "debate_id": "0717adb6-399c-41bc-a0c6-d5492cdc13a5",
+  "created_at": "2026-06-06T05:38:24.293700+00:00",
+  "updated_at": "2026-06-06T05:38:24.295498+00:00",
+  "setup": {
+    "title": "Impact of Large Language Models on Academic Integrity in Universities",
+    "problem_statement": "This study investigates how LLMs affect academic integrity policies in higher education institutions, examining the gap between existing policies and emerging AI capabilities, and proposing a framework for responsible AI use in academic settings.",
+    "agenda": [],
+    "desired_outcomes": [],
+    "participants": [],
+    "materials": [],
+    "policy_config": {
+      "problem_statement": "This study investigates how LLMs affect academic integrity policies in higher education institutions, examining the gap between existing policies and emerging AI capabilities, and proposing a framework for responsible AI use in academic settings.",
+      "timebox_minutes": 30,
+      "reasoning_mode": "medium"
+    }
+  },
+  "lifecycle": [
+    {
+      "event": "created",
+      "at": "2026-06-06T05:38:24.295487+00:00"
+    }
+  ],
+  "llm_calls": [],
+  "turns": [],
+  "preflight": {
+    "participants": []
+  },
+  "summary": null,
+  "metadata": {
+    "total_llm_calls": 0,
+    "total_prompt_tokens": 0,
+    "total_completion_tokens": 0,
+    "total_turns": 0,
+    "stages_seen": []
+  }
+}

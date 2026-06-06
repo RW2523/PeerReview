@@ -120,16 +120,9 @@ export function PreflightStep({
   }, [isStarted]);
 
   const handleStartPreflight = async () => {
-    if (!debateId) {
-      alert('Debate not created yet. Please go back and complete previous steps.');
-      return;
-    }
-    
-    if (!apiKey) {
-      alert('⚠️ OpenRouter API Key Required\n\nPlease add your OpenRouter API key in Settings before running preflight preparation.');
-      return;
-    }
-    
+    if (!debateId) return;
+    if (!apiKey) return;
+
     setIsStarting(true);
     try {
       await startPreflight(debateId, apiKey);
@@ -221,7 +214,7 @@ export function PreflightStep({
     const statusMap: Record<string, { label: string; className: string }> = {
       queued: { label: '⏳ Waiting...', className: styles.statusQueued },
       running: { label: '🚀 Preparing...', className: styles.statusRunning },
-      success: { label: '✅ Ready for debate', className: styles.statusSuccess },
+      success: { label: '✅ Ready for defense', className: styles.statusSuccess },
       failed: { label: '❌ Failed', className: styles.statusFailed },
       skipped: { label: '⏭️ Skipped', className: styles.statusSkipped },
     };
@@ -238,9 +231,9 @@ export function PreflightStep({
   if (!debateId) {
     return (
       <div className={styles.stepContent}>
-        <h2>Prepare your panel</h2>
+        <h2>Prepare your committee</h2>
         <div className={styles.alert} style={{ marginTop: '1.5rem' }}>
-          <p>⚠️ Debate not created yet. Please complete previous steps first.</p>
+          <p>⚠️ Defense session not created yet. Please complete previous steps first.</p>
         </div>
       </div>
     );
@@ -248,9 +241,9 @@ export function PreflightStep({
 
   return (
     <div className={styles.stepContent}>
-      <h2>Prepare your panel</h2>
+      <h2>Prepare your committee</h2>
       <p className={styles.stepDescription}>
-        Agents review your materials and allowed past context before the room starts.
+        Committee members review your research materials and context before the mock defense starts.
       </p>
 
       {error && (
@@ -261,10 +254,41 @@ export function PreflightStep({
 
       {!isStarted && !isStarting && (
         <div style={{ marginTop: '2rem' }}>
+          {!apiKey && (
+            <div style={{
+              background: 'var(--warning-bg, #fff8e1)',
+              border: '1px solid var(--warning, #f5a623)',
+              borderRadius: '8px',
+              padding: '14px 18px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              fontSize: '0.9rem',
+            }}>
+              <span style={{ fontSize: '1.3rem' }}>🔑</span>
+              <div>
+                <strong style={{ color: 'var(--warning-dark, #b45309)' }}>OpenRouter API Key Required</strong>
+                <p style={{ margin: '2px 0 0', color: 'var(--warning-dark, #b45309)' }}>
+                  Add your key in{' '}
+                  <a href="/settings" style={{ textDecoration: 'underline', fontWeight: 600 }}>
+                    Settings
+                  </a>{' '}
+                  to prepare your committee.
+                </p>
+              </div>
+            </div>
+          )}
           <button
             onClick={handleStartPreflight}
             className={styles.btnPrimary}
-            style={{ padding: '1rem 2rem', fontSize: '1rem' }}
+            disabled={!apiKey}
+            style={{
+              padding: '1rem 2rem',
+              fontSize: '1rem',
+              opacity: apiKey ? 1 : 0.45,
+              cursor: apiKey ? 'pointer' : 'not-allowed',
+            }}
           >
             Start preparation
           </button>

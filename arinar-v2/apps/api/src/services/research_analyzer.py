@@ -9,7 +9,6 @@ absent rather than inventing claims.
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -18,6 +17,7 @@ from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
 from ..services.memory_retrieval import retrieve_allowed_chunks
 from .reasoning_modes import get_model, mode_from_policy, ReasoningMode
+from ..utils.json_repair import parse_llm_json
 
 
 # ── System prompt ──────────────────────────────────────────────────────────
@@ -101,20 +101,25 @@ def analyze_research(
 
     try:
         # ── Retrieve document chunks via existing RAG service ─────────────
-        chunks = retrieve_allowed_chunks(
-            query=f"research problem methodology contribution evidence limitations",
-            debate_id=debate_id,
-            workspace_id=None,   # allow all workspaces for this debate
-            limit=max_chunks,
-        )
-        if not chunks:
-            # Fall back: pull raw chunks directly
-            chunks = _fetch_raw_chunks(debate_id, max_chunks)
+        try:
+            retrieval_resp = retrieve_allowed_chunks(
+                debate_id=debate_id,
+                participant_id=None,   # no specific participant — all materials
+                query="research problem methodology contribution evidence limitations",
+                top_k=max_chunks,
+            )
+            raw_chunks = retrieval_resp.chunks if retrieval_resp else []
+        except Exception:
+            raw_chunks = []
 
-        chunk_ids = [str(c.chunk_id) for c in chunks]
+        if not raw_chunks:
+            # Fall back: pull raw chunks directly from DB
+            raw_chunks = _fetch_raw_chunks(debate_id, max_chunks)
+
+        chunk_ids = [str(c.chunk_id) for c in raw_chunks]
         chunk_text = "\n\n---\n\n".join(
-            f"[Chunk {i+1} | {c.source_document_title or 'uploaded doc'}]\n{c.chunk_text[:800]}"
-            for i, c in enumerate(chunks)
+            f"[Chunk {i+1} | {getattr(c, 'source_document_title', None) or 'uploaded doc'}]\n{c.chunk_text[:800]}"
+            for i, c in enumerate(raw_chunks)
         )
 
         # ── LLM call ──────────────────────────────────────────────────────
@@ -124,7 +129,7 @@ def analyze_research(
             messages=[
                 {"role": "system", "content": _SYSTEM},
                 {"role": "user",   "content": _USER_TEMPLATE.format(
-                    n=len(chunks), chunks=chunk_text
+                    n=len(raw_chunks), chunks=chunk_text
                 )},
             ],
             temperature=0.2,
@@ -134,11 +139,7 @@ def analyze_research(
         )
 
         raw = response["content"].strip()
-        # Strip accidental markdown fences
-        raw = re.sub(r"^```json\s*", "", raw)
-        raw = re.sub(r"^```\s*",     "", raw)
-        raw = re.sub(r"```\s*$",     "", raw)
-        profile_data: Dict = json.loads(raw)
+        profile_data: Dict = parse_llm_json(raw, stage="research_analysis")
 
         # ── Persist ───────────────────────────────────────────────────────
         with get_db_connection() as conn:
@@ -177,7 +178,7 @@ def analyze_research(
                 json.dumps(profile_data.get("possible_questions", [])),
                 json.dumps(profile_data),
                 chunk_ids,
-                len(chunks),
+                len(raw_chunks),
                 response.get("model", model_id),
                 profile_id,
             ))
@@ -229,8 +230,9 @@ def _fetch_raw_chunks(debate_id: str, limit: int) -> List[Any]:
                    mm.title AS source_document_title
             FROM   memory_chunks mc
             LEFT JOIN meeting_materials mm
-                   ON mc.material_id = mm.material_id
-            WHERE  mc.debate_id = %s
+                   ON (mc.chunk_metadata->>'material_id')::uuid = mm.material_id
+            WHERE  mc.source_debate_id = %s
+              AND  mc.agent_id IS NULL
             ORDER BY mc.created_at
             LIMIT  %s
         """, (debate_id, limit))

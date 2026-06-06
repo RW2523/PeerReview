@@ -458,6 +458,42 @@
   cursor: not-allowed;
 }
 
+.btnDefense {
+  padding: 8px 14px;
+  background: var(--accent-subtle);
+  border: 1px solid rgba(0, 112, 243, 0.25);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+  flex: 1;
+}
+
+.btnDefense:hover {
+  background: rgba(0, 112, 243, 0.15);
+  border-color: var(--accent);
+}
+
+.btnVoice {
+  padding: 8px 12px;
+  background: rgba(255, 77, 77, 0.08);
+  border: 1px solid rgba(255, 77, 77, 0.25);
+  border-radius: 6px;
+  color: #ff4d4d;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+  flex-shrink: 0;
+}
+
+.btnVoice:hover {
+  background: rgba(255, 77, 77, 0.15);
+  border-color: #ff4d4d;
+}
+
 /* Transcript View */
 .transcriptView, .summaryView {
   background: var(--bg-1);

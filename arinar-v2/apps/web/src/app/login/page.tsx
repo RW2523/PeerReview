@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       await signInWithPassword(email, password);
       setStatus('Success! Redirecting...');
-      router.push('/operator');
+      router.push('/setup');
     } catch (err: any) {
       setStatus(`Error: ${err.message}`);
     } finally {
@@ -48,10 +48,10 @@ export default function LoginPage() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.loginHeader}>
-          <span className={styles.loginIcon}>🔬</span>
+          <span className={styles.loginIcon}>🎓</span>
           <h1>PeerForge</h1>
         </div>
-        <p className={styles.subtitle}>Sign in to access your research review platform</p>
+        <p className={styles.subtitle}>Sign in to your Academic Defense Readiness Platform</p>
 
         <div className={styles.toggle}>
           <button

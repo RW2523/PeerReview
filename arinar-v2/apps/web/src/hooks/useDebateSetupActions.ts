@@ -195,7 +195,7 @@ export function useDebateSetupActions(
       } catch { /* ignore — getDebate failing shouldn't block launch */ }
 
       if (currentState === 'ended') {
-        alert('This review session has already ended. Please create a new one.');
+        alert('This defense session has already ended. Please create a new one.');
         return;
       }
 

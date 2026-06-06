@@ -201,7 +201,7 @@ export function BasicInfoStep({
         </div>
       )}
 
-      <label>Review Agenda (optional)</label>
+      <label>Defense Agenda (optional)</label>
       <div className={styles.listInput}>
         <input
           type="text"
@@ -243,7 +243,7 @@ export function BasicInfoStep({
         </ul>
       )}
 
-      <label>Review Objectives (optional)</label>
+      <label>Defense Objectives (optional)</label>
       <div className={styles.listInput}>
         <input
           type="text"
@@ -294,7 +294,7 @@ export function BasicInfoStep({
               <span className={styles.betaBadge}>AUTO</span>
             </div>
             <div className={styles.yoloDescription}>
-              Fully autonomous review — reviewers run without manual intervention
+              Fully autonomous defense — committee members run without manual intervention
             </div>
           </label>
           <label className={styles.toggleSwitch}>
@@ -329,7 +329,7 @@ export function BasicInfoStep({
       </div>
 
       {/* Review Limit Cards */}
-      <label>Review Session Length</label>
+      <label>Defense Session Length</label>
       <div className={styles.limitCards}>
         <div 
           className={`${styles.limitCard} ${meetingType === 'rounds' ? styles.limitCardActive : ''}`}

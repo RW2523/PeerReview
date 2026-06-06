@@ -36,8 +36,8 @@ export default function CreateDebateCard({ workspaceId, onDebateCreated }: Creat
 
   return (
     <div className={styles.card}>
-      <h2>Start a New Review Session</h2>
-      <p className={styles.description}>Name your research project and describe the core question — the more specific, the better the review</p>
+      <h2>Start a New Defense Session</h2>
+      <p className={styles.description}>Name your research project and describe the core research question — the more specific, the better the committee preparation</p>
 
       {error && (
         <div className={styles.error}>
@@ -74,7 +74,7 @@ export default function CreateDebateCard({ workspaceId, onDebateCreated }: Creat
           disabled={!title.trim()}
           className={styles.btnPrimary}
         >
-          Next: Configure Review Session →
+          Next: Configure Defense Committee →
         </button>
       </div>
     </div>

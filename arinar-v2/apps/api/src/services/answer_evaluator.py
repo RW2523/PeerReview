@@ -10,13 +10,13 @@ Returns structured feedback and optionally triggers a follow-up.
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from typing import Any, Dict, Optional
 
 from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
 from .reasoning_modes import get_model, ReasoningMode
+from ..utils.json_repair import parse_llm_json
 
 _SYSTEM = """\
 You are a PhD defense committee evaluator.
@@ -125,10 +125,7 @@ def evaluate_answer(
     )
 
     raw = response["content"].strip()
-    raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"^```\s*",     "", raw)
-    raw = re.sub(r"```\s*$",     "", raw)
-    ev: Dict = json.loads(raw)
+    ev: Dict = parse_llm_json(raw, stage="answer_evaluation")
 
     # Compute overall as mean of 6 axes
     axes = [

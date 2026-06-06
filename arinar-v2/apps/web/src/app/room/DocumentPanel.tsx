@@ -34,7 +34,7 @@ export default function DocumentPanel({
     const fetchDoc = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/documents/${documentId}`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/documents/${documentId}`);
         if (response.ok) {
           const data = await response.json();
           setDocument(data);

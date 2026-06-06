@@ -1,5 +1,5 @@
 export const APP_NAME = 'PeerForge';
-export const APP_TAGLINE = 'AI-Powered Academic Peer Review';
+export const APP_TAGLINE = 'AI Academic Defense Readiness Platform';
 export const APP_DESCRIPTION =
-  'Deep-research peer review for PhD students and researchers — assemble an AI reviewer panel, search the literature, and produce a structured review report.';
-export const APP_ICON = '🔬';
+  'Prepare for your thesis defense with AI-powered academic questioning and readiness reports. Upload your research, discover weak areas, practice with AI committee members, and get a readiness report before your real defense.';
+export const APP_ICON = '🎓';

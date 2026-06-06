@@ -29,15 +29,21 @@ export default function AppNav() {
           <div className={styles.links}>
             <Link
               href="/"
-              className={`${styles.link} ${isActive('/') && !pathname.includes('/room') && !pathname.includes('/settings') && !pathname.includes('/history') ? styles.active : ''}`}
+              className={`${styles.link} ${isActive('/') && !pathname.includes('/room') && !pathname.includes('/setup') && !pathname.includes('/settings') && !pathname.includes('/history') ? styles.active : ''}`}
             >
-              New Review
+              Home
+            </Link>
+            <Link
+              href="/setup"
+              className={`${styles.link} ${isActive('/setup') ? styles.active : ''}`}
+            >
+              New Session
             </Link>
             <Link
               href="/room"
               className={`${styles.link} ${isActive('/room') ? styles.active : ''}`}
             >
-              Review Room
+              Mock Defense
             </Link>
             <Link
               href="/history"

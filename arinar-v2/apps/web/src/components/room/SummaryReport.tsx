@@ -62,9 +62,9 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
     return (
       <div className={styles.generatePanel}>
         <div className={styles.icon} />
-        <h3>Generate Meeting Summary</h3>
+        <h3>Generate Readiness Report</h3>
         <p>
-          Create a comprehensive summary with minutes and action items using AI.
+          Create a comprehensive readiness report with scores and improvement recommendations using AI.
         </p>
 
         {!apiKey && (
@@ -86,7 +86,7 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
           disabled={loading}
           className={styles.generateBtn}
         >
-          {loading ? 'Generating...' : 'Generate Summary'}
+          {loading ? 'Generating...' : 'Generate Readiness Report'}
         </button>
       </div>
     );
@@ -95,7 +95,7 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
   return (
     <div className={styles.report}>
       <div className={styles.reportHeader}>
-        <h2>Meeting Report</h2>
+        <h2>Defense Session Report</h2>
         <div className={styles.headerActions}>
           <button
             onClick={() => router.push('/history')}
@@ -115,7 +115,7 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
       {/* Agenda & Outcome Review */}
       {(agendaData.items.length > 0 || agendaData.outcome.desired) && (
         <section className={styles.section}>
-          <h3>Meeting Context</h3>
+          <h3>Defense Context</h3>
           
           {agendaData.items.length > 0 && (
             <div className={styles.agendaReview}>

@@ -452,7 +452,12 @@ export async function getOpenRouterAccount(
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to fetch account info: ${response.statusText}`);
+    const body = await response.json().catch(() => null);
+    const detail = body?.detail ?? response.statusText;
+    if (response.status === 401) {
+      throw new Error(`Invalid API key — ${detail}`);
+    }
+    throw new Error(`Failed to validate key: ${detail}`);
   }
   
   return response.json();

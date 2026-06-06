@@ -108,10 +108,10 @@ export function ParticipantsStep({
 
   return (
     <div className={styles.section}>
-      <h2>Select AI Reviewers ({participants.length}/8)</h2>
+      <h2>Select AI Committee Members ({participants.length}/8)</h2>
       <p className={styles.hint}>
-        Assemble your peer-review panel. Mix domain experts, methodologists, statisticians, critical reviewers, and writing editors for thorough coverage.
-        <strong> Min 2, Max 8 reviewers.</strong>
+        Assemble your mock defense committee. Mix domain experts, methodologists, skeptical reviewers, and external examiners for thorough defense preparation.
+        <strong> Min 2, Max 8 committee members.</strong>
       </p>
 
       {/* Compact Ultimate Host Toggle */}
@@ -119,8 +119,8 @@ export function ParticipantsStep({
         <div className={styles.hostToggleRow}>
           <label htmlFor="enable-host" className={styles.hostToggleLabel}>
             <span className={styles.hostIcon} />
-            <span className={styles.hostName}>Enable Review Chair</span>
-            <span className={styles.hostHint}>Neutral chair synthesizes all reviewer positions and delivers final recommendation</span>
+            <span className={styles.hostName}>Enable Defense Chair</span>
+            <span className={styles.hostHint}>Neutral chair synthesizes all committee positions and delivers final recommendation</span>
           </label>
           
           <div className={styles.hostControls}>
@@ -173,7 +173,7 @@ export function ParticipantsStep({
                   title="Document Template"
                   style={{marginRight: '8px'}}
                 >
-                  <option value="meeting-summary">Peer-Review Report</option>
+                  <option value="meeting-summary">Defense Readiness Report</option>
                   <option value="medical-consultation">Research Summary</option>
                   <option value="technical-decision">Technical Review</option>
                   <option value="business-strategy">Methodology Assessment</option>

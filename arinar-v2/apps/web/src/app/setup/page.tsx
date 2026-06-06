@@ -125,12 +125,12 @@ export default function SetupPage() {
     reasoningMode,
   });
   const steps = [
-    { id: 1, label: 'Idea & Scope' },
-    { id: 2, label: 'Documents' },
-    { id: 3, label: 'Reviewers' },
-    { id: 4, label: 'Prior Memory' },
+    { id: 1, label: 'Research Topic' },
+    { id: 2, label: 'Materials' },
+    { id: 3, label: 'Committee' },
+    { id: 4, label: 'Prior Sessions' },
     { id: 5, label: 'Literature' },
-    { id: 6, label: 'Review & Launch' },
+    { id: 6, label: 'Prepare & Launch' },
   ];
 
   useEffect(() => {
@@ -228,8 +228,8 @@ export default function SetupPage() {
       <AppNav />
       <div className={styles.container}>
       <header className={styles.header}>
-        <h1>New Review Session</h1>
-        <p className={styles.subtitle}>Configure your AI-powered peer review</p>
+        <h1>New Defense Session</h1>
+        <p className={styles.subtitle}>Configure your AI mock defense committee</p>
       </header>
 
       {!apiKey && (
@@ -247,7 +247,7 @@ export default function SetupPage() {
           <div>
             <strong style={{ color: '#856404' }}>OpenRouter API Key Required</strong>
             <p style={{ margin: '4px 0 0 0', color: '#856404', fontSize: '14px' }}>
-              Add your OpenRouter API key in <a href="/settings" style={{ color: '#0066cc', textDecoration: 'underline' }}>Settings</a> before launching the review. AI reviewers need this key to participate.
+              Add your OpenRouter API key in <a href="/settings" style={{ color: '#0066cc', textDecoration: 'underline' }}>Settings</a> before launching the defense session. AI committee members need this key to participate.
             </p>
           </div>
         </div>
@@ -429,11 +429,11 @@ export default function SetupPage() {
               onClick={handleLaunchAfterPreflight}
               disabled={isLoading || !canEnterRoom || !apiKey}
               className={styles.btnLaunch}
-              title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete reviewer preparation first' : ''}
+              title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete committee preparation first' : ''}
             >
               <span className={styles.launchIcon} />
               <span>
-                {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Review'}
+                {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Mock Defense'}
               </span>
             </button>
           )}

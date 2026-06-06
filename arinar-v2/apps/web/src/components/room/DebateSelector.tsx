@@ -56,7 +56,7 @@ export default function DebateSelector({ onDebateLoaded }: DebateSelectorProps) 
   return (
     <div className={styles.selector}>
       <div className={styles.header}>
-        <h2>Load or Create Debate</h2>
+        <h2>Load or Create Defense Session</h2>
       </div>
 
       <div className={styles.modeToggle}>

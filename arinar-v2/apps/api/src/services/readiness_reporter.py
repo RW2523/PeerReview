@@ -13,7 +13,6 @@ readiness report that tells the student:
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from collections import Counter
 from typing import Any, Dict, List, Optional
@@ -21,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from ..database import get_db_connection, get_cursor
 from ..openrouter_client import OpenRouterClient
 from .reasoning_modes import get_model, ReasoningMode
+from ..utils.json_repair import parse_llm_json
 
 
 _SYSTEM = """\
@@ -194,10 +194,7 @@ def generate_readiness_report(
         )
 
         raw = response["content"].strip()
-        raw = re.sub(r"^```json\s*", "", raw)
-        raw = re.sub(r"^```\s*",     "", raw)
-        raw = re.sub(r"```\s*$",     "", raw)
-        report_data: Dict = json.loads(raw)
+        report_data: Dict = parse_llm_json(raw, stage="readiness_report")
 
         # ── Persist ───────────────────────────────────────────────────────
         with get_db_connection() as conn:

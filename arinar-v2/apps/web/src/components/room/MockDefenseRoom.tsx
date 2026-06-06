@@ -121,6 +121,11 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleAnalyzeAndSuggest = useCallback(async () => {
+    if (!openrouterKey) {
+      setError('OpenRouter API key is required. Add it in Settings.');
+      setPhase('error');
+      return;
+    }
     setError('');
     setPhase('analyzing');
     try {
@@ -214,6 +219,29 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
           </p>
         </div>
 
+        {!openrouterKey && (
+          <div style={{
+            background: '#fff8e1',
+            border: '1px solid #f5a623',
+            borderRadius: '10px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+          }}>
+            <span style={{ fontSize: '1.6rem' }}>🔑</span>
+            <div>
+              <strong style={{ color: '#92400e', fontSize: '0.95rem' }}>API Key Required</strong>
+              <p style={{ margin: '4px 0 0', color: '#92400e', fontSize: '0.875rem' }}>
+                Add your OpenRouter API key in{' '}
+                <a href="/settings" style={{ fontWeight: 700, textDecoration: 'underline' }}>Settings</a>
+                {' '}to run the AI mock defense.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Reasoning Mode</div>
           <div className={styles.modeGrid}>
@@ -254,7 +282,12 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
           </div>
         </div>
 
-        <button className={styles.primaryBtn} onClick={handleAnalyzeAndSuggest}>
+        <button
+          className={styles.primaryBtn}
+          onClick={handleAnalyzeAndSuggest}
+          disabled={!openrouterKey}
+          style={{ opacity: openrouterKey ? 1 : 0.45, cursor: openrouterKey ? 'pointer' : 'not-allowed' }}
+        >
           Analyse Research and Generate Committee
         </button>
       </div>
@@ -264,15 +297,26 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
   // ── Loading ────────────────────────────────────────────────────────────────
 
   if (phase === 'analyzing' || phase === 'suggesting') {
-    const msg = phase === 'suggesting'
-      ? 'Generating committee personas…'
-      : 'Analysing research materials…';
+    const steps = [
+      { key: 'analyzing', label: 'Analysing research materials…', detail: 'Extracting research problem, methodology, contributions, and weak areas.' },
+      { key: 'suggesting', label: 'Generating committee personas…', detail: 'Tailoring 6 AI committee members to your research domain and methodology.' },
+    ];
+    const current = steps.find(s => s.key === phase) || steps[0];
     return (
       <div className={styles.container}>
         <div className={styles.loadingBox}>
           <div className={styles.spinner} />
-          <p className={styles.loadingText}>{msg}</p>
-          <p className={styles.loadingHint}>{modeInfo.label} mode</p>
+          <p className={styles.loadingText}>{current.label}</p>
+          <p className={styles.loadingHint}>{modeInfo.label} mode · {current.detail}</p>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '20px', justifyContent: 'center' }}>
+            {steps.map((s, i) => (
+              <div key={s.key} style={{
+                width: 10, height: 10, borderRadius: '50%',
+                background: s.key === phase ? 'var(--accent, #4f46e5)' : 'var(--border, #ccc)',
+                transition: 'background 0.3s',
+              }} />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -285,8 +329,17 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
       <div className={styles.container}>
         <div className={styles.errorBox}>
           <h3>Something went wrong</h3>
-          <p>{error}</p>
-          <button className={styles.secondaryBtn} onClick={() => setPhase('setup')}>
+          <p style={{ color: 'var(--text-2)', fontSize: '0.9rem', marginBottom: '16px' }}>{error}</p>
+          {error.toLowerCase().includes('key') || error.toLowerCase().includes('unauthorized') ? (
+            <a href="/settings" style={{
+              display: 'inline-block', marginBottom: '12px',
+              padding: '10px 20px', background: '#f5a623', color: '#fff',
+              borderRadius: '8px', fontWeight: 600, textDecoration: 'none'
+            }}>
+              🔑 Go to Settings
+            </a>
+          ) : null}
+          <button className={styles.secondaryBtn} onClick={() => { setError(''); setPhase('setup'); }}>
             Back to Setup
           </button>
         </div>

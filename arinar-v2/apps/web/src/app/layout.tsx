@@ -15,8 +15,8 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'PeerForge',
-  description: 'AI-Powered Academic Peer Review — deep-research review sessions for PhD students and researchers',
+  title: 'PeerForge — AI Academic Defense Readiness Platform',
+  description: 'Prepare for your thesis defense with AI-powered academic questioning and readiness reports. Upload your research, discover weak areas, practice with AI committee members, and get a readiness report before your real defense.',
 }
 
 export default function RootLayout({
