@@ -96,7 +96,9 @@ export class WSClient {
     reject: (error: WSErrorMessage | Error) => void;
     timeout: NodeJS.Timeout;
   }> = new Map();
-  private commandTimeout = 180000; // 3 minutes timeout for commands (users take time to read)
+  // 8 minutes — the constitutional AI pipeline (3 LLM stages × retries) can take 5–7 min.
+  // With non-blocking ACK, this only fires if the server itself crashes mid-turn.
+  private commandTimeout = 480000;
   private isManualDisconnect = false;
 
   constructor(config: WSClientConfig) {

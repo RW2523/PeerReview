@@ -1,6 +1,7 @@
 """
 WebSocket Routes - Authenticated Debate Room Transport
 """
+import asyncio
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from typing import Dict, Any
@@ -93,11 +94,13 @@ async def websocket_debate_room(
             # Send historical events
             since_sequence = int(query_params.get('since', 0))
             await ws_service.send_historical_events(websocket, debate_id, since_sequence)
-            
-            # Event loop - listen for commands
+
+            # Event loop — process each incoming message as a background task so
+            # the receive loop is never blocked by long-running commands (e.g. LLM turns).
+            # handle_command catches all exceptions internally and sends error responses.
             while True:
                 data = await websocket.receive_json()
-                await ws_service.handle_command(websocket, data)
+                asyncio.create_task(ws_service.handle_command(websocket, data))
         
         except WebSocketDisconnect:
             ws_service.manager.disconnect(websocket)

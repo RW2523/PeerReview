@@ -39,7 +39,7 @@ export default function HistoryPage() {
       
       // Provide helpful error message if backend is not running
       if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
-        setError('Unable to connect to backend server. Please ensure the API server is running on http://localhost:8080');
+        setError('Unable to connect to backend server. Please ensure the API server is running on http://localhost:8000');
       } else {
         setError(errorMessage);
       }

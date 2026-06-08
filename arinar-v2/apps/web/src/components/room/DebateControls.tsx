@@ -222,8 +222,26 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
         if (sendCommand) {
           try {
             await sendCommand('control.next_turn', { openrouter_key: apiKey });
-          } catch (wsErr) {
-            console.warn('WS unavailable for next_turn, using REST fallback:', wsErr);
+            // With non-blocking WS, ACK comes back immediately.
+            // The agent_message event will appear in the feed when the LLM finishes.
+          } catch (wsErr: any) {
+            const errMsg = wsErr instanceof Error
+              ? wsErr.message
+              : (wsErr?.error || String(wsErr));
+
+            if (errMsg.includes('already in progress')) {
+              // Another turn is running — surface a friendly message, don't REST-fallback
+              setError('A turn is already in progress. Please wait for the current agent to finish.');
+              return;
+            }
+            if (errMsg.includes('Command timeout') || errMsg.includes('WebSocket disconnected')) {
+              // LLM is still processing server-side; the event will arrive via broadcast.
+              // Don't double-trigger via REST — just let the broadcast deliver the result.
+              console.warn('WS command timed out or disconnected — waiting for broadcast:', errMsg);
+              return;
+            }
+            // Genuine WS connection issue — fall back to REST
+            console.warn('WS error for next_turn, using REST fallback:', wsErr);
             await api.triggerNextTurn(debateId, apiKey);
           }
         } else {

@@ -1009,16 +1009,20 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                 'participant_id': next_participant['participant_id'],
                 'participant_name': agent_name,
                 'message': agent_message,
-                'turn_number': total_turns + 1,
+                'model': response.get('model', model_id),
+                'turn_number': total_turns + 1,    # sequential (1, 2, 3…)
+                'round_number': round_number,       # complete round (1, 2…) — matches DB 'turn' field
                 'sequence_number': next_seq
             }
             
-            # 📄 Document Integration: Write to assigned sections (ASYNC - don't block!)
+            # 📄 Document Integration: Write to assigned sections (async, non-blocking)
             print(f"    📝 Scheduling async document writing for {agent_name}...")
             try:
-                loop = asyncio.get_event_loop()
-                if loop and loop.is_running():
-                    asyncio.create_task(
+                # run_coroutine_threadsafe is the correct way to schedule a coroutine
+                # from a thread-pool thread (asyncio.to_thread context).
+                main_loop = AgentThinkingService._event_loop
+                if main_loop and main_loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
                         self._async_document_writing(
                             debate_id=debate_id,
                             agent_id=next_participant['participant_id'],
@@ -1026,46 +1030,43 @@ Talk like a confident expert debating at a bar - opinionated, strategic, direct.
                             agent_message=agent_message,
                             model_id=model_id,
                             system_prompt=system_prompt
-                        )
+                        ),
+                        main_loop
                     )
+                    print(f"    📝 Document writing scheduled")
+                else:
+                    print(f"    ⚠️ No running event loop — document writing skipped")
             except Exception as e:
                 print(f"    ⚠️ Failed to schedule document writing: {e}")
             
-            # Post-turn autonomous behaviors (ALWAYS - need agent messaging!)
-            should_trigger_autonomy = True  # ALWAYS trigger (removed random chance)
+            # Post-turn autonomous behaviors (private DMs, coalitions, strategic actions)
+            should_trigger_autonomy = True
             if should_trigger_autonomy:
                 print(f"    🎭 Triggering autonomous behaviors for {agent_name}...")
                 try:
-                    # Get or create event loop properly
-                    try:
-                        loop = asyncio.get_running_loop()
-                        print(f"       Using existing event loop")
-                    except RuntimeError:
-                        print(f"       Creating new event loop")
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                    
-                    # Schedule the task
-                    task = asyncio.create_task(
-                        self._async_autonomous_behaviors(
-                            debate_id, agent_name, participants, history_events, 
-                            desired_outcomes, next_seq
+                    # We are inside asyncio.to_thread — use run_coroutine_threadsafe
+                    # to schedule coroutines on the main event loop.
+                    main_loop = AgentThinkingService._event_loop
+                    if main_loop and main_loop.is_running():
+                        future = asyncio.run_coroutine_threadsafe(
+                            self._async_autonomous_behaviors(
+                                debate_id, agent_name, participants, history_events,
+                                desired_outcomes, next_seq
+                            ),
+                            main_loop
                         )
-                    )
-                    
-                    # Add error callback to catch silent failures
-                    def handle_task_result(t):
-                        if t.exception():
-                            print(f"       ❌ Autonomous behavior task failed: {t.exception()}")
-                            import traceback
-                            traceback.print_exception(type(t.exception()), t.exception(), t.exception().__traceback__)
-                        else:
-                            print(f"       ✅ Autonomous behavior task completed successfully")
-                    
-                    task.add_done_callback(handle_task_result)
-                    
-                    print(f"       ✅ Autonomous behavior task scheduled (ID: {id(task)})")
-                    
+
+                        def _on_done(f):
+                            try:
+                                f.result()
+                                print(f"       ✅ Autonomous behaviors completed for {agent_name}")
+                            except Exception as exc:
+                                print(f"       ❌ Autonomous behaviors failed for {agent_name}: {exc}")
+
+                        future.add_done_callback(_on_done)
+                        print(f"       ✅ Autonomous behaviors scheduled")
+                    else:
+                        print(f"       ⚠️ No running event loop — autonomous behaviors skipped")
                 except Exception as e:
                     print(f"       ❌ Autonomy trigger failed: {e}")
                     import traceback

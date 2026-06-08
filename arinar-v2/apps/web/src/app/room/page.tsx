@@ -75,7 +75,7 @@ function RoomPageContent() {
           console.log('🚀 YOLO Mode:', debate.autonomous_mode);
           
           // Check for document
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/debates/${debate.debate_id}/document`)
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/debates/${debate.debate_id}/document`)
             .then(res => res.ok ? res.json() : null)
             .then(doc => {
               if (doc && doc.document_id) {
@@ -391,12 +391,12 @@ function RoomPageContent() {
                 </div>
               )}
               {activeTab === 'defense' && (
-                <div style={{ padding: '16px 0', height: '100%' }}>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px 0' }}>
                   <MockDefenseRoom debateId={debateId} openrouterKey={openrouterKey || ''} />
                 </div>
               )}
               {activeTab === 'voice' && (
-                <div style={{ padding: '16px 0', height: '100%' }}>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px 0' }}>
                   <VoiceDefenseRoom debateId={debateId} openrouterKey={openrouterKey || ''} />
                 </div>
               )}
