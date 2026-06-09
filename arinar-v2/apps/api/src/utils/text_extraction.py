@@ -21,29 +21,40 @@ class TextExtractor:
         'text/plain': '.txt',
         'text/markdown': '.md',
     }
-    
+
+    # Audio types allowed only for meeting transcripts (transcribed before chunking)
+    AUDIO_TYPES = {
+        'audio/mpeg': '.mp3',
+        'audio/mp4': '.m4a',
+        'audio/x-m4a': '.m4a',
+        'audio/wav': '.wav',
+        'audio/x-wav': '.wav',
+        'audio/webm': '.webm',
+    }
+
     # Max file size: 50MB
     MAX_FILE_SIZE = 50 * 1024 * 1024
-    
+
     @staticmethod
-    def validate_file(file_data: bytes, filename: str) -> Tuple[bool, str, str]:
+    def validate_file(file_data: bytes, filename: str, allow_audio: bool = False) -> Tuple[bool, str, str]:
         """
         Validate file type and size using magic bytes
-        
+
         Args:
             file_data: File contents
             filename: Original filename
-        
+            allow_audio: When True, audio MIME types are also accepted (transcript uploads)
+
         Returns:
             (is_valid, mime_type, error_message)
         """
         # Check size
         if len(file_data) > TextExtractor.MAX_FILE_SIZE:
             return False, '', f'File size exceeds {TextExtractor.MAX_FILE_SIZE // (1024*1024)}MB limit'
-        
+
         # Detect MIME type using magic bytes
         kind = filetype.guess(file_data)
-        
+
         if kind is None:
             # Fall back to text/plain or text/markdown based on extension
             if filename.endswith('.txt'):
@@ -54,11 +65,16 @@ class TextExtractor:
                 return False, '', 'Unknown file type'
         else:
             mime_type = kind.mime
-        
+
+        allowed = dict(TextExtractor.ALLOWED_TYPES)
+        if allow_audio:
+            allowed.update(TextExtractor.AUDIO_TYPES)
+
         # Check if allowed
-        if mime_type not in TextExtractor.ALLOWED_TYPES:
-            return False, mime_type, f'File type {mime_type} not allowed'
-        
+        if mime_type not in allowed:
+            suffix = ' (audio only allowed for transcripts)' if mime_type in TextExtractor.AUDIO_TYPES else ''
+            return False, mime_type, f'File type {mime_type} not allowed{suffix}'
+
         return True, mime_type, ''
     
     @staticmethod

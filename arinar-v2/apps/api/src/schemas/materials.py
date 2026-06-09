@@ -18,7 +18,9 @@ class MaterialStatus(BaseModel):
     """Status of a single material"""
     material_id: str
     title: str
-    kind: str  # 'file', 'text', 'link', 'file_placeholder'
+    kind: str  # 'file', 'audio', 'text', 'link', 'file_placeholder'
+    material_category: str = 'supplementary'  # main_research | research | transcript | supplementary
+    is_primary: bool = False
     file_size_bytes: Optional[int] = None
     file_mime_type: Optional[str] = None
     processed_status: str  # 'pending', 'processing', 'complete', 'failed', 'needs_ocr'

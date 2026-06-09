@@ -21,6 +21,77 @@ from src.services.memory_retrieval import get_query_embedding
 EMBEDDINGS_MODEL = "moonshot/kimi-embeddings-v1"
 # Max chunks to embed in a single OpenRouter API call
 EMBED_BATCH_SIZE = 20
+# Multimodal model used to transcribe uploaded audio meeting recordings.
+# Must accept `input_audio` content parts via OpenRouter chat-completions.
+AUDIO_TRANSCRIBE_MODEL = "openai/gpt-4o-audio-preview"
+# Map MIME type -> the `format` string OpenRouter expects for input_audio
+_AUDIO_FORMAT_BY_MIME = {
+    "audio/mpeg": "mp3",
+    "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/webm": "webm",
+}
+
+
+def _transcribe_audio(file_data: bytes, mime_type: str, openrouter_key: str) -> str:
+    """
+    Transcribe an audio recording to text via an OpenRouter multimodal model.
+
+    Sends the audio as a base64 `input_audio` content part to a chat model and
+    asks for a verbatim transcript. Returns the transcript text (may be empty on
+    failure — caller decides how to handle).
+    """
+    import base64
+    import httpx
+
+    audio_format = _AUDIO_FORMAT_BY_MIME.get(mime_type, "mp3")
+    b64 = base64.b64encode(file_data).decode("utf-8")
+
+    payload = {
+        "model": AUDIO_TRANSCRIBE_MODEL,
+        "modalities": ["text"],
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Transcribe this meeting recording verbatim. Return only the "
+                            "transcript text with no commentary, headers, or timestamps."
+                        ),
+                    },
+                    {
+                        "type": "input_audio",
+                        "input_audio": {"data": b64, "format": audio_format},
+                    },
+                ],
+            }
+        ],
+    }
+
+    with httpx.Client(timeout=300.0) as client:
+        response = client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {openrouter_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+
+    if response.status_code != 200:
+        raise Exception(
+            f"Audio transcription failed (status {response.status_code}): {response.text[:300]}"
+        )
+
+    data = response.json()
+    choices = data.get("choices") or []
+    if not choices:
+        raise Exception("Audio transcription returned no choices")
+    return (choices[0].get("message", {}).get("content") or "").strip()
 
 
 def _get_openrouter_key_for_debate(cursor, debate_id: str) -> Optional[str]:
@@ -135,7 +206,13 @@ def _generate_and_store_embeddings(
 
 
 @celery_app.task(name="src.tasks.material_processing.process_material", bind=True)
-def process_material(self, material_id: str, debate_id: str, openrouter_key: Optional[str] = None):
+def process_material(
+    self,
+    material_id: str,
+    debate_id: str,
+    openrouter_key: Optional[str] = None,
+    category: str = "supplementary",
+):
     """
     Main task: Process uploaded material
 
@@ -143,9 +220,9 @@ def process_material(self, material_id: str, debate_id: str, openrouter_key: Opt
     1. Fetch material metadata from DB
     2. Download file from MinIO
     3. Validate file
-    4. Extract text
+    4. (audio) transcribe to text, else extract text
     5. Chunk text
-    6. Store chunks in memory_chunks
+    6. Store chunks in memory_chunks (tagged with category)
     7. Generate embeddings (if OpenRouter key available)
     8. Update material status
 
@@ -153,6 +230,7 @@ def process_material(self, material_id: str, debate_id: str, openrouter_key: Opt
         material_id: UUID of material to process
         debate_id: UUID of debate
         openrouter_key: Optional BYOK key forwarded from the upload request
+        category: Knowledge-base category, stored on each chunk's metadata
     """
     task_id = self.request.id
     conn = None
@@ -162,7 +240,7 @@ def process_material(self, material_id: str, debate_id: str, openrouter_key: Opt
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT file_key, file_mime_type, title FROM meeting_materials WHERE material_id = %s AND debate_id = %s",
+            "SELECT file_key, file_mime_type, title, kind FROM meeting_materials WHERE material_id = %s AND debate_id = %s",
             (material_id, debate_id),
         )
 
@@ -170,7 +248,7 @@ def process_material(self, material_id: str, debate_id: str, openrouter_key: Opt
         if not result:
             raise Exception(f"Material {material_id} not found")
 
-        file_key, mime_type, title = result
+        file_key, mime_type, title, kind = result
 
         _update_material_status(
             conn, material_id,
@@ -183,13 +261,35 @@ def process_material(self, material_id: str, debate_id: str, openrouter_key: Opt
         storage_client = get_storage_client()
         file_data = storage_client.download_file(file_key)
 
-        # Validate
-        is_valid, detected_mime, error_msg = TextExtractor.validate_file(file_data, title)
-        if not is_valid:
-            raise Exception(f"File validation failed: {error_msg}")
+        # Audio recordings: transcribe to text first, then treat like a text material.
+        if kind == "audio":
+            resolved_key = openrouter_key or _get_openrouter_key_for_debate(cursor, debate_id)
+            if not resolved_key:
+                raise Exception("Audio transcription requires an OpenRouter API key")
+            print(f"Transcribing audio material {material_id} ({mime_type})")
+            transcript = _transcribe_audio(file_data, mime_type, resolved_key)
+            if not transcript.strip():
+                raise Exception("Transcription produced no text")
+            # Persist transcript so it is viewable/editable and reusable for action items
+            cursor.execute(
+                "UPDATE meeting_materials SET body_text = %s WHERE material_id = %s",
+                (transcript, material_id),
+            )
+            conn.commit()
+            extraction_result = {
+                "text": transcript,
+                "extraction_method": "audio_transcription",
+                "word_count": len(transcript.split()),
+                "sha256": None,
+            }
+        else:
+            # Validate
+            is_valid, detected_mime, error_msg = TextExtractor.validate_file(file_data, title)
+            if not is_valid:
+                raise Exception(f"File validation failed: {error_msg}")
 
-        # Extract text
-        extraction_result = TextExtractor.extract(file_data, mime_type)
+            # Extract text
+            extraction_result = TextExtractor.extract(file_data, mime_type)
 
         if extraction_result.get("is_scanned"):
             _update_material_status(
@@ -221,6 +321,7 @@ def process_material(self, material_id: str, debate_id: str, openrouter_key: Opt
         chunk_ids: List[str] = []
         chunk_texts: List[str] = []
         for chunk in chunks:
+            chunk_meta = {**chunk["chunk_metadata"], "category": category}
             cursor.execute(
                 """
                 INSERT INTO memory_chunks (
@@ -229,7 +330,7 @@ def process_material(self, material_id: str, debate_id: str, openrouter_key: Opt
                 VALUES (gen_random_uuid(), NULL, %s, %s, %s)
                 RETURNING chunk_id
                 """,
-                (debate_id, chunk["chunk_text"], Json(chunk["chunk_metadata"])),
+                (debate_id, chunk["chunk_text"], Json(chunk_meta)),
             )
             cid = str(cursor.fetchone()[0])
             chunk_ids.append(cid)

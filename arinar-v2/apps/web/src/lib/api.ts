@@ -551,10 +551,14 @@ export interface MaterialUploadResponse {
   total_files: number;
 }
 
+export type MaterialCategory = 'main_research' | 'research' | 'transcript' | 'supplementary';
+
 export interface MaterialStatus {
   material_id: string;
   title: string;
   kind: string;
+  material_category: MaterialCategory;
+  is_primary: boolean;
   file_size_bytes?: number;
   file_mime_type?: string;
   processed_status: string;
@@ -574,7 +578,9 @@ export interface MaterialsStatusResponse {
 export async function uploadMaterials(
   debateId: string,
   files: File[],
-  openrouterKey?: string | null
+  openrouterKey?: string | null,
+  category: MaterialCategory = 'supplementary',
+  isPrimary: boolean = false
 ): Promise<MaterialUploadResponse> {
   const token = await getAccessToken();
   const formData = new FormData();
@@ -582,6 +588,8 @@ export async function uploadMaterials(
   files.forEach(file => {
     formData.append('files', file);
   });
+  formData.append('category', category);
+  formData.append('is_primary', String(isPrimary));
 
   const headers: Record<string, string> = {
     'Authorization': token ? `Bearer ${token}` : '',
@@ -600,6 +608,102 @@ export async function uploadMaterials(
     throw new Error(`Failed to upload materials: ${response.statusText}`);
   }
 
+  return response.json();
+}
+
+// ============================================================================
+// TRANSCRIPT ACTION ITEMS & DECISION DEBATES
+// ============================================================================
+
+export interface TranscriptActionItem {
+  action_id: string;
+  material_id?: string | null;
+  description: string;
+  owner?: string | null;
+  priority: 'low' | 'medium' | 'high';
+  status: 'extracted' | 'debating' | 'decided';
+  decision_debate_id?: string | null;
+  decision?: string | null;
+  decision_rationale?: string | null;
+  seq_order: number;
+}
+
+export interface ActionItemDecision {
+  action_id: string;
+  status: 'debating' | 'decided';
+  decision_debate_id?: string | null;
+  decision?: string | null;
+  decision_rationale?: string | null;
+}
+
+export async function extractActionItems(
+  debateId: string,
+  materialId: string,
+  openrouterKey: string
+): Promise<TranscriptActionItem[]> {
+  const headers = await getAuthHeaders();
+  (headers as Record<string, string>)['X-OpenRouter-Key'] = openrouterKey;
+  const response = await fetch(
+    `${API_URL}/debates/${debateId}/materials/${materialId}/extract-action-items`,
+    { method: 'POST', headers }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to extract action items: ${await response.text()}`);
+  }
+  return response.json();
+}
+
+export async function listActionItems(debateId: string): Promise<TranscriptActionItem[]> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/debates/${debateId}/action-items`, {
+    method: 'GET',
+    headers,
+  });
+  if (!response.ok) throw new Error(`Failed to list action items: ${response.statusText}`);
+  return response.json();
+}
+
+export async function updateActionItem(
+  debateId: string,
+  actionId: string,
+  update: Partial<Pick<TranscriptActionItem, 'description' | 'owner' | 'priority' | 'status'>>
+): Promise<TranscriptActionItem> {
+  const headers = await getAuthHeaders();
+  (headers as Record<string, string>)['Content-Type'] = 'application/json';
+  const response = await fetch(`${API_URL}/debates/${debateId}/action-items/${actionId}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(update),
+  });
+  if (!response.ok) throw new Error(`Failed to update action item: ${response.statusText}`);
+  return response.json();
+}
+
+export async function debateActionItem(
+  debateId: string,
+  actionId: string,
+  openrouterKey: string
+): Promise<ActionItemDecision> {
+  const headers = await getAuthHeaders();
+  (headers as Record<string, string>)['X-OpenRouter-Key'] = openrouterKey;
+  const response = await fetch(
+    `${API_URL}/debates/${debateId}/action-items/${actionId}/debate`,
+    { method: 'POST', headers }
+  );
+  if (!response.ok) throw new Error(`Failed to start decision debate: ${await response.text()}`);
+  return response.json();
+}
+
+export async function getActionItemDecision(
+  debateId: string,
+  actionId: string
+): Promise<ActionItemDecision> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${API_URL}/debates/${debateId}/action-items/${actionId}/decision`,
+    { method: 'GET', headers }
+  );
+  if (!response.ok) throw new Error(`Failed to get decision: ${response.statusText}`);
   return response.json();
 }
 

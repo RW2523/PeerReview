@@ -2063,3 +2063,163 @@
   color: #888;
   font-style: italic;
 }
+
+/* ── Knowledge Base sections (MaterialsStep) ──────────────────────────────── */
+.kbSection {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid var(--border-soft, #1f1f1f);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--surface-1, #0a0a0a);
+}
+
+.kbSectionTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-0, #ededed);
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.kbSectionDesc {
+  font-size: 0.8rem;
+  color: var(--text-2, #888);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+.lockRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.lockBadge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent, #0070f3);
+  background: var(--accent-subtle, rgba(0, 112, 243, 0.1));
+  border: 1px solid rgba(0, 112, 243, 0.25);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.categoryBadge {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2, #888);
+  background: var(--surface-2, #141414);
+  border: 1px solid var(--border-soft, #1f1f1f);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* status + info bits used by file cards */
+.statusBadge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-1, #ccc);
+}
+
+.materialInfo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-1, #ccc);
+}
+
+.fileSize, .wordCount, .chunkCount {
+  font-size: 0.72rem;
+  color: var(--text-3, #666);
+}
+
+.errorMessage {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #ff6b6b;
+}
+
+/* ── Action items ─────────────────────────────────────────────────────────── */
+.transcriptBlock {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actionItemList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.actionItemRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface-2, #141414);
+  border: 1px solid var(--border-soft, #1f1f1f);
+  border-radius: 8px;
+}
+
+.actionItemMain {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actionItemInput {
+  flex: 1;
+  background: var(--surface-0, #000);
+  border: 1px solid var(--border-soft, #1f1f1f);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  color: var(--text-0, #ededed);
+}
+
+.actionItemInput:focus {
+  outline: none;
+  border-color: var(--accent, #0070f3);
+}
+
+.actionItemPriority {
+  background: var(--surface-0, #000);
+  border: 1px solid var(--border-soft, #1f1f1f);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 0.78rem;
+  color: var(--text-1, #ccc);
+}
+
+.decisionPending {
+  font-size: 0.8rem;
+  color: var(--accent, #0070f3);
+  font-style: italic;
+}
+
+.decisionBox {
+  font-size: 0.82rem;
+  color: var(--text-0, #ededed);
+  line-height: 1.5;
+  background: var(--accent-subtle, rgba(0, 112, 243, 0.08));
+  border: 1px solid rgba(0, 112, 243, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.decisionRationale {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-2, #888);
+}

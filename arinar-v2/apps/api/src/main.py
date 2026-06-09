@@ -6,7 +6,7 @@ from .routes import (
     health, agents, debates, turns, setup, summary, events, openrouter,
     personas, materials, memory, preflight, artifacts, embeddings,
     workspace_settings, presence, websocket, knowledge, analytics, ai_assist,
-    participants, autonomous, documents
+    participants, autonomous, documents, action_items
 )
 from .routes.literature import router as literature_router
 from .routes.web_search import router as web_search_router
@@ -52,6 +52,7 @@ app.include_router(ai_assist.router, tags=["ai-assist"])
 app.include_router(participants.router, tags=["participants"])
 app.include_router(autonomous.router, tags=["autonomous"])
 app.include_router(documents.router, tags=["documents"])
+app.include_router(action_items.router, tags=["action-items"])
 app.include_router(literature_router, tags=["literature"])
 app.include_router(web_search_router, tags=["web-search"])
 
