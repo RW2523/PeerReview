@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import UserMenu from './UserMenu';
+import ThemeToggle from './ThemeToggle';
 import { APP_NAME, APP_TAGLINE, APP_ICON } from '@/lib/brand';
 import styles from './AppNav.module.css';
 
@@ -53,6 +54,7 @@ export default function AppNav() {
             </Link>
           </div>
 
+          <ThemeToggle />
           <UserMenu />
         </div>
       </div>

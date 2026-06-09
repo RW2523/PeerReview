@@ -129,7 +129,7 @@
   padding: 3px 10px;
   border-radius: 4px;
   background: var(--accent-subtle);
-  border: 1px solid rgba(0, 112, 243, 0.2);
+  border: 1px solid rgba(30, 27, 75, 0.2);
   color: var(--accent);
   font-size: 0.72rem;
   font-weight: 600;
@@ -238,9 +238,9 @@
 }
 
 @keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(0, 112, 243, 0.5); }
-  70%  { box-shadow: 0 0 0 16px rgba(0, 112, 243, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 112, 243, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(30, 27, 75, 0.5); }
+  70%  { box-shadow: 0 0 0 16px rgba(30, 27, 75, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(30, 27, 75, 0); }
 }
 
 .pulsing {
@@ -554,7 +554,7 @@
 
 .improvementBox {
   background: var(--accent-subtle);
-  border: 1px solid rgba(0, 112, 243, 0.15);
+  border: 1px solid rgba(30, 27, 75, 0.15);
   border-radius: var(--radius-md);
   padding: 12px 14px;
   margin-bottom: 10px;
@@ -679,7 +679,7 @@
 
 .nextRec {
   background: var(--accent-subtle);
-  border: 1px solid rgba(0, 112, 243, 0.15);
+  border: 1px solid rgba(30, 27, 75, 0.15);
   border-radius: var(--radius-lg);
   padding: 16px;
   margin-bottom: 24px;
@@ -827,9 +827,9 @@
 .stopBtn:hover { background: rgba(255, 77, 77, 0.08); }
 
 .followUpBtn {
-  background: rgba(0, 112, 243, 0.1);
+  background: rgba(30, 27, 75, 0.1);
   color: var(--accent);
-  border: 1px solid rgba(0, 112, 243, 0.3);
+  border: 1px solid rgba(30, 27, 75, 0.3);
   border-radius: var(--radius-md);
   padding: 10px 20px;
   font-size: 0.875rem;
@@ -839,7 +839,7 @@
   transition: background 150ms;
 }
 
-.followUpBtn:hover { background: rgba(0, 112, 243, 0.15); }
+.followUpBtn:hover { background: rgba(30, 27, 75, 0.15); }
 
 .reportBtn {
   background: var(--surface-2);

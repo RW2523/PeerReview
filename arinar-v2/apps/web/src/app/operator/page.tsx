@@ -136,7 +136,7 @@ function OperatorContent() {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <h1>Arinar M2 Operator</h1>
+        <h1>PeerForge Operator</h1>
         <p className={styles.subtitle}>Realtime Debate Controls</p>
       </header>
 

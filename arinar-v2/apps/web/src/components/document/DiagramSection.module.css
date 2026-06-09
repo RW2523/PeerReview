@@ -103,7 +103,7 @@
 }
 
 .btnSave:hover {
-  background: var(--text-0);
+  background: var(--accent-hover);
 }
 
 .btnCancel {

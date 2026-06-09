@@ -57,7 +57,7 @@ export default function ArchitecturePage() {
         <div className={styles.header}>
           <h1>System Architecture</h1>
           <p className={styles.subtitle}>
-            Arinar v2 - Multi-Agent Debate Platform
+            PeerForge — Multi-Agent Defense Platform
           </p>
         </div>
 

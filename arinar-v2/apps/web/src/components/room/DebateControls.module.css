@@ -67,7 +67,7 @@
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: var(--text-0) !important;
+  background: var(--accent-hover) !important;
 }
 
 .btnDanger {
@@ -182,7 +182,7 @@
 }
 
 .btnYoloPause {
-  background: #000000;
+  background: var(--surface-0);
   border: 1px solid #ff6b6b;
   color: #ff6b6b;
   font-weight: 500;
@@ -196,15 +196,15 @@
 }
 
 .btnYoloResume {
-  background: #000000;
-  border: 1px solid #0070F3;
-  color: #0070F3;
+  background: var(--surface-0);
+  border: 1px solid var(--accent);
+  color: var(--accent);
   font-weight: 500;
 }
 
 .btnYoloResume:hover:not(:disabled) {
-  background: #0070F3;
+  background: var(--accent);
   color: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 112, 243, 0.3);
+  box-shadow: 0 4px 12px rgba(30, 27, 75, 0.3);
 }

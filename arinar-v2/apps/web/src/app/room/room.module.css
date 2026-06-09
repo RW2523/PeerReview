@@ -33,13 +33,13 @@
 
 .tab:hover {
   color: var(--text-0);
-  background: rgba(59, 130, 246, 0.05);
+  background: var(--accent-subtle);
 }
 
 .tabActive {
   color: var(--accent);
-  border-bottom-color: var(--accent);
-  background: rgba(59, 130, 246, 0.08);
+  border-bottom-color: var(--gold);
+  background: var(--accent-subtle);
 }
 
 .tabContent {
@@ -167,27 +167,27 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: #000000;
-  border: 1px solid #0070F3;
-  color: #0070F3;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--gold);
   animation: pulse-yolo 2s infinite;
 }
 
 @keyframes pulse-yolo {
   0%, 100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 rgba(0, 112, 243, 0.4);
+    box-shadow: 0 0 0 0 rgba(30, 27, 75, 0.4);
   }
   50% {
     opacity: 0.9;
-    box-shadow: 0 0 0 4px rgba(0, 112, 243, 0.2);
+    box-shadow: 0 0 0 4px rgba(30, 27, 75, 0.2);
   }
 }
 
 /* Turn Info Card */
 .turnInfo {
-  background: #000000;
-  border: 1px solid #1a1a1a;
+  background: var(--surface-0);
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 20px;
@@ -203,7 +203,7 @@
 .turnLabel {
   font-size: 10px;
   font-weight: 700;
-  color: #666666;
+  color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -211,7 +211,7 @@
 .turnValue {
   font-size: 32px;
   font-weight: 700;
-  color: #0070F3;
+  color: var(--accent);
   line-height: 1;
 }
 
@@ -231,7 +231,7 @@
 .statLabel {
   font-size: 10px;
   font-weight: 600;
-  color: #666666;
+  color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -239,20 +239,20 @@
 .statValue {
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-0);
 }
 
 .progressBar {
   width: 100%;
   height: 4px;
-  background: #0a0a0a;
+  background: var(--surface-2);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  background: #0070F3;
+  background: var(--accent);
   border-radius: 4px;
   transition: width 0.5s ease;
 }
@@ -272,15 +272,15 @@
 .section h3 {
   font-size: 13px;
   font-weight: 600;
-  color: #ededed;
+  color: var(--text-0);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0;
 }
 
 .turnInfo {
-  background: #000000;
-  border: 1px solid #1a1a1a;
+  background: var(--surface-0);
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 20px;
@@ -296,7 +296,7 @@
 .turnLabel {
   font-size: 10px;
   font-weight: 700;
-  color: #666666;
+  color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -304,7 +304,7 @@
 .turnValue {
   font-size: 32px;
   font-weight: 700;
-  color: #0070F3;
+  color: var(--accent);
   line-height: 1;
 }
 
@@ -324,7 +324,7 @@
 .statLabel {
   font-size: 10px;
   font-weight: 600;
-  color: #666666;
+  color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -332,7 +332,7 @@
 .statValue {
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-0);
 }
 
 .participantsList {
@@ -350,11 +350,11 @@
 
 .participant {
   padding: 10px 12px;
-  background: #0a0a0a;
-  border: 1px solid #1a1a1a;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
   font-size: 13px;
-  color: #ffffff;
+  color: var(--text-0);
   font-weight: 500;
   transition: all 150ms;
   display: flex;
@@ -371,11 +371,11 @@
 .participantTurns {
   font-size: 11px;
   font-weight: 700;
-  color: #0070F3;
-  background: rgba(0, 112, 243, 0.15);
+  color: var(--accent);
+  background: rgba(30, 27, 75, 0.15);
   padding: 3px 8px;
   border-radius: 12px;
-  border: 1px solid #0070F3;
+  border: 1px solid var(--accent);
   white-space: nowrap;
   flex-shrink: 0;
 }

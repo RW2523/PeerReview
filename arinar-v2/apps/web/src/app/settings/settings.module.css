@@ -24,19 +24,19 @@
 .content h1 {
   font-size: 32px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-0);
   margin-bottom: 8px;
 }
 
 .subtitle {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-2);
   margin-bottom: var(--space-5);
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
   margin-bottom: var(--space-3);
@@ -45,13 +45,13 @@
 .card h2 {
   font-size: 20px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-0);
   margin-bottom: 8px;
 }
 
 .cardDesc {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-2);
   line-height: 1.6;
   margin-bottom: var(--space-3);
 }

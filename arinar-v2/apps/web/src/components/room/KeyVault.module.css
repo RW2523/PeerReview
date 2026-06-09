@@ -207,7 +207,7 @@
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: var(--text-0);
+  background: var(--accent-hover);
   transform: translateY(-1px);
 }
 

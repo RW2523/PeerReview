@@ -259,7 +259,7 @@ export default function HomePage() {
 
         {/* ── Footer ──────────────────────────────────────────────── */}
         <footer className={styles.footer}>
-          <p>PeerForge — AI Academic Defense Readiness Platform</p>
+          <p>PeerForge — AI Academic Defense &amp; Research Readiness Platform</p>
           <p className={styles.footerSub}>
             A responsible tool for academic preparation. PeerForge does not write thesis content, generate results, or invent citations.
           </p>

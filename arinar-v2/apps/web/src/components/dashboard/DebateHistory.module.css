@@ -16,7 +16,7 @@
 .container h2 {
   font-size: 20px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-0);
   margin-bottom: var(--space-3);
 }
 
@@ -24,14 +24,14 @@
 .error,
 .empty {
   padding: var(--space-4);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
   text-align: center;
 }
 
 .loading {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-2);
   font-size: 14px;
 }
 
@@ -44,14 +44,14 @@
 }
 
 .empty p {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-2);
   font-size: 14px;
   margin: 0;
 }
 
 .empty p:first-child {
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-1);
   margin-bottom: 4px;
 }
 
@@ -66,16 +66,16 @@
 }
 
 .item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   padding: var(--space-3);
   transition: all 200ms;
 }
 
 .item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(88, 166, 255, 0.4);
+  background: var(--surface-2);
+  border-color: rgba(30, 27, 75, 0.4);
   transform: translateX(2px);
 }
 
@@ -92,7 +92,7 @@
 .itemTitle h3 {
   font-size: 16px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-0);
   margin: 0;
   flex: 1;
   line-height: 1.4;
@@ -148,7 +148,7 @@
 
 .metaTime {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-2);
 }
 
 .metaLive {
@@ -189,7 +189,7 @@
   width: 0;
   height: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--surface-2);
   transform: translate(-50%, -50%);
   transition: width 300ms, height 300ms;
 }
@@ -207,12 +207,12 @@
 
 .btnTertiary {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border-soft);
+  color: var(--text-1);
 }
 
 .btnTertiary:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(88, 166, 255, 0.5);
-  color: rgba(255, 255, 255, 0.95);
+  background: var(--surface-2);
+  border-color: rgba(30, 27, 75, 0.5);
+  color: var(--text-0);
 }

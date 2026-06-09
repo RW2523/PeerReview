@@ -9,7 +9,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  background: #000000;
+  background: var(--surface-0);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   font-size: 14px;
@@ -20,9 +20,9 @@
 }
 
 .selectorButton:hover:not(:disabled) {
-  border-color: #0070F3;
-  background: #0a0a0a;
-  box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.1);
+  border-color: var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 2px rgba(30, 27, 75, 0.1);
 }
 
 .selectorButton:disabled {
@@ -50,8 +50,8 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #000000;
-  border: 1px solid #333333;
+  background: var(--surface-0);
+  border: 1px solid var(--border-medium);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
   z-index: 9999;
@@ -76,8 +76,8 @@
 
 .searchBox {
   padding: 12px;
-  border-bottom: 1px solid #1a1a1a;
-  background: #000000;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-0);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -86,8 +86,8 @@
 .searchInput {
   width: 100%;
   padding: 8px 12px;
-  background: #0a0a0a;
-  border: 1px solid #333333;
+  background: var(--surface-2);
+  border: 1px solid var(--border-medium);
   border-radius: 6px;
   font-size: 13px;
   color: var(--text-0);
@@ -96,9 +96,9 @@
 
 .searchInput:focus {
   outline: none;
-  border-color: #0070F3;
-  background: #000000;
-  box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.2);
+  border-color: var(--accent);
+  background: var(--surface-0);
+  box-shadow: 0 0 0 2px rgba(30, 27, 75, 0.2);
 }
 
 .searchInput::placeholder {
@@ -117,17 +117,17 @@
 }
 
 .modelsList::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: var(--surface-2);
   border-radius: 3px;
 }
 
 .modelsList::-webkit-scrollbar-thumb {
-  background: #333333;
+  background: var(--border-medium);
   border-radius: 3px;
 }
 
 .modelsList::-webkit-scrollbar-thumb:hover {
-  background: #0070F3;
+  background: var(--accent);
 }
 
 .providerGroup {
@@ -138,10 +138,10 @@
   padding: 4px 8px;
   font-size: 10px;
   font-weight: 600;
-  color: #0070F3;
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: rgba(0, 112, 243, 0.1);
+  background: rgba(30, 27, 75, 0.1);
   border-radius: 4px;
   margin-bottom: 6px;
   display: inline-block;
@@ -164,19 +164,19 @@
 }
 
 .modelOption:hover {
-  background: #0a0a0a;
-  border-color: #333333;
+  background: var(--surface-2);
+  border-color: var(--border-medium);
 }
 
 .modelOptionSelected {
-  background: rgba(0, 112, 243, 0.1) !important;
-  border-color: #0070F3 !important;
+  background: rgba(30, 27, 75, 0.1) !important;
+  border-color: var(--accent) !important;
 }
 
 .modelName {
   font-size: 14px;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--text-0);
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -185,7 +185,7 @@
 
 .modelId {
   font-size: 11px;
-  color: #888888;
+  color: var(--text-2);
   font-family: 'Monaco', 'Courier New', monospace;
   margin-bottom: 3px;
   word-break: break-all;
@@ -194,7 +194,7 @@
 
 .modelMeta {
   font-size: 10px;
-  color: #666666;
+  color: var(--text-3);
 }
 
 .dropdownMessage {
