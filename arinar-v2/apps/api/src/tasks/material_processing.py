@@ -18,7 +18,7 @@ from src.database import get_db_connection
 from src.services.memory_retrieval import get_query_embedding
 
 # Embedding model used for document chunks
-EMBEDDINGS_MODEL = "moonshot/kimi-embeddings-v1"
+EMBEDDINGS_MODEL = "openai/text-embedding-3-small"
 # Max chunks to embed in a single OpenRouter API call
 EMBED_BATCH_SIZE = 20
 # Multimodal model used to transcribe uploaded audio meeting recordings.

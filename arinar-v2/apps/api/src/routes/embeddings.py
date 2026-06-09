@@ -18,7 +18,7 @@ router = APIRouter()
 
 # Default embeddings model (system-wide fallback, TICKET-12.3)
 # Kimi 2.5: Moonshot AI's multilingual embeddings model
-DEFAULT_EMBEDDINGS_MODEL = "moonshot/kimi-embeddings-v1"
+DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small"
 
 # Default OCR post-processing model (system-wide fallback, TICKET-12.3)
 # Qwen 2.5: Alibaba's strong text cleanup/structuring model

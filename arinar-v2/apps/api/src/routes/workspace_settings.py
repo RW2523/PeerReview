@@ -20,8 +20,8 @@ router = APIRouter()
 # ============================================================================
 
 # Default embeddings model: Kimi 2.5 (Moonshot AI - excellent multilingual embeddings)
-# OpenRouter ID: moonshot/kimi-embeddings-v1
-DEFAULT_EMBEDDINGS_MODEL = "moonshot/kimi-embeddings-v1"
+# OpenRouter ID: openai/text-embedding-3-small
+DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small"
 
 # Default OCR post-processing model: Qwen 2.5 (Alibaba - strong at text cleanup/structuring)
 # OpenRouter ID: qwen/qwen-2.5-72b-instruct

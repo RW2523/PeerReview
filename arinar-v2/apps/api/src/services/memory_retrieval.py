@@ -47,7 +47,7 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
 def get_query_embedding(
     query: str,
     openrouter_key: Optional[str],
-    embeddings_model_id: str = 'moonshot/kimi-embeddings-v1'
+    embeddings_model_id: str = 'openai/text-embedding-3-small'
 ) -> Optional[List[float]]:
     """
     Generate embedding for a query using OpenRouter
@@ -191,7 +191,7 @@ def retrieve_allowed_chunks(
             """, (debate_id,))
             
             model_result = cursor.fetchone()
-            embeddings_model_id = model_result[0] if model_result and model_result[0] else 'moonshot/kimi-embeddings-v1'
+            embeddings_model_id = model_result[0] if model_result and model_result[0] else 'openai/text-embedding-3-small'
             
             # Generate query embedding
             actual_query_embedding = get_query_embedding(query, openrouter_key, embeddings_model_id)

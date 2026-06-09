@@ -175,7 +175,7 @@ def start_preflight(
         
         # Get common data for query embedding generation (TICKET-13C.1)
         policy_config = participants[0]['policy_config'] if participants else {}
-        embeddings_model_id = participants[0]['embeddings_model'] if participants and participants[0]['embeddings_model'] else 'moonshot/kimi-embeddings-v1'
+        embeddings_model_id = participants[0]['embeddings_model'] if participants and participants[0]['embeddings_model'] else 'openai/text-embedding-3-small'
         problem_statement = policy_config.get('problem_statement', '') if policy_config else ''
         
         # Store OpenRouter key in policy_config for preflight task to use (temporary)
