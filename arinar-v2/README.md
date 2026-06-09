@@ -36,6 +36,64 @@ git clone https://github.com/vprasanna7/arinar-2026.git
 cd arinar-2026/arinar-v2
 ```
 
+#### 1A. Run the Application Using the Startup Script
+
+The easiest way to run the full application locally is to use the provided startup script.
+
+From the `arinar-v2` folder, run:
+
+```bash
+chmod +x run_app.sh
+./run_app.sh
+```
+
+This script will automatically:
+
+* Start the required Docker services: PostgreSQL, Redis, and MinIO
+* Create the backend `.env.local` file
+* Create the frontend `.env.local` file
+* Set up the Python virtual environment if needed
+* Install backend dependencies if needed
+* Run database migrations
+* Install frontend dependencies if needed
+* Start the FastAPI backend
+* Start the Next.js frontend
+
+After the script starts successfully, open the frontend at:
+
+```bash
+http://localhost:3001
+```
+
+If running on a remote VM, use the network URL shown in the terminal, for example:
+
+```bash
+http://<VM-IP>:3001
+```
+
+The backend API runs at:
+
+```bash
+http://localhost:8000
+```
+
+API documentation is available at:
+
+```bash
+http://localhost:8000/docs
+```
+
+To stop the application, press:
+
+```bash
+Ctrl + C
+```
+
+in the terminal where `./run_app.sh` is running.
+
+> Note: The script uses the local Docker setup in `infra/docker/docker-compose.yml` and runs the frontend on port `3001`.
+
+
 #### 2. Start PostgreSQL Database
 ```bash
 # Start Docker Desktop first, then:
