@@ -57,7 +57,7 @@ export default function ArchitecturePage() {
         <div className={styles.header}>
           <h1>System Architecture</h1>
           <p className={styles.subtitle}>
-            PeerForge — Multi-Agent Defense Platform
+            PeerForge — Multi-Agent Academic Review Platform
           </p>
         </div>
 

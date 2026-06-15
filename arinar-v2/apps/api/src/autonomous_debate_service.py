@@ -209,10 +209,28 @@ class AutonomousDebateService:
             return False
     
     async def _conclude_debate(self, debate_id: str, openrouter_api_key: str):
-        """Generate summary and mark as completed"""
+        """Mark as completed, then generate the summary.
+
+        The session must be ended BEFORE summarising — SummaryService refuses
+        to summarise a running debate, so the old order silently produced
+        auto-mode sessions without summaries.
+        """
         print(f"🏁 Auto-concluding debate: {debate_id}")
-        
-        # Generate summary
+
+        # Update status first
+        with get_db_connection() as conn:
+            cursor = get_cursor(conn)
+            cursor.execute("""
+                UPDATE debates
+                SET autonomous_status = 'completed',
+                    state = 'ended',
+                    ended_at = NOW()
+                WHERE debate_id = %s
+            """, (debate_id,))
+            conn.commit()
+            cursor.close()
+
+        # Generate summary now that the debate is ended
         summary_service = SummaryService()
         try:
             summary = summary_service.generate_summary(
@@ -222,20 +240,7 @@ class AutonomousDebateService:
             print(f"📄 Summary generated: {len(summary.get('summary', ''))} chars")
         except Exception as e:
             print(f"⚠️ Summary generation failed: {e}")
-        
-        # Update status
-        with get_db_connection() as conn:
-            cursor = get_cursor(conn)
-            cursor.execute("""
-                UPDATE debates 
-                SET autonomous_status = 'completed',
-                    state = 'ended',
-                    ended_at = NOW()
-                WHERE debate_id = %s
-            """, (debate_id,))
-            conn.commit()
-            cursor.close()
-        
+
         print(f"✅ Debate concluded: {debate_id}")
     
     def _set_status(self, debate_id: str, status: str):

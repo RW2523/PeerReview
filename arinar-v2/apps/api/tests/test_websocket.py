@@ -13,26 +13,38 @@ class TestWebSocketAuth:
     """Test WebSocket authentication and authorization"""
     
     def test_reject_without_token(self):
-        """WebSocket should reject connection without auth token"""
+        """WebSocket should reject connection without auth token (when auth enabled)"""
+        from src.config import settings
         client = TestClient(app)
         debate_id = "test-debate-id"
-        
-        with pytest.raises(Exception) as exc_info:
-            with client.websocket_connect(f"/ws/debates/{debate_id}"):
-                pass
-        
-        # Verify it's an auth rejection (status 403 or connection refused)
+
+        original = settings.require_auth
+        settings.require_auth = True
+        try:
+            with pytest.raises(Exception) as exc_info:
+                with client.websocket_connect(f"/ws/debates/{debate_id}") as ws:
+                    ws.receive_json()
+        finally:
+            settings.require_auth = original
+
+        # Verify it's an auth rejection (close 1008 / connection refused)
         assert exc_info.value is not None
-    
+
     def test_reject_invalid_token(self):
-        """WebSocket should reject connection with invalid token"""
+        """WebSocket should reject connection with invalid token (when auth enabled)"""
+        from src.config import settings
         client = TestClient(app)
         debate_id = "test-debate-id"
-        
-        with pytest.raises(Exception) as exc_info:
-            with client.websocket_connect(f"/ws/debates/{debate_id}?token=invalid"):
-                pass
-        
+
+        original = settings.require_auth
+        settings.require_auth = True
+        try:
+            with pytest.raises(Exception) as exc_info:
+                with client.websocket_connect(f"/ws/debates/{debate_id}?token=invalid") as ws:
+                    ws.receive_json()
+        finally:
+            settings.require_auth = original
+
         # Verify it's an auth rejection
         assert exc_info.value is not None
 
@@ -330,8 +342,9 @@ class TestWebSocketNextTurnNoDuplicate:
         from src.websocket_handlers import WebSocketCommandHandlers
         import inspect
         
-        # Get the source of handle_next_turn (refactored location)
+        # Get the source of handle_next_turn + its background executor
         source = inspect.getsource(WebSocketCommandHandlers.handle_next_turn)
+        source += inspect.getsource(WebSocketCommandHandlers._execute_turn_background)
         
         # Verify it does NOT call persist_event_fn for agent_message after orchestrator
         # (it should only call TurnOrchestrator and broadcast)

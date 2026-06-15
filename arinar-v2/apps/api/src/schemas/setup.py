@@ -25,7 +25,11 @@ class DebateSetupRequest(BaseModel):
     max_rounds: Optional[int] = Field(default=None, description="Number of rounds (each participant speaks once per round)")
     enable_host: Optional[bool] = Field(default=False, description="Enable Ultimate Host for final conclusion")
     host_model_id: Optional[str] = Field(default=None, description="AI model for host (only if enable_host=true)")
-    participants: List[SetupParticipant]
+    # Deferred staffing: the setup wizard creates the session with an empty
+    # panel right after Step 1 so materials can be uploaded before panel
+    # selection. The "at least one participant" rule is enforced when the
+    # session is STARTED, not when it is created.
+    participants: List[SetupParticipant] = Field(default_factory=list)
     materials: Optional[List[SetupMaterial]] = Field(default_factory=list)
     reasoning_mode: Optional[Literal["light", "medium", "heavy"]] = Field(
         default="medium",

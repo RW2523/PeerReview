@@ -127,7 +127,7 @@ export default function SetupPage() {
   const steps = [
     { id: 1, label: 'Research Topic' },
     { id: 2, label: 'Materials' },
-    { id: 3, label: 'Committee' },
+    { id: 3, label: 'Review Panel' },
     { id: 4, label: 'Prior Sessions' },
     { id: 5, label: 'Literature' },
     { id: 6, label: 'Prepare & Launch' },
@@ -228,14 +228,14 @@ export default function SetupPage() {
       <AppNav />
       <div className={styles.container}>
       <header className={styles.header}>
-        <h1>New Defense Session</h1>
-        <p className={styles.subtitle}>Configure your AI mock defense committee</p>
+        <h1>New Review Session</h1>
+        <p className={styles.subtitle}>Configure your AI review panel</p>
       </header>
 
       {!apiKey && (
         <div style={{
-          backgroundColor: '#fff3cd',
-          border: '1px solid #ffc107',
+          backgroundColor: 'var(--surface-2)',
+          border: '1px solid var(--warning, #ffc107)',
           borderRadius: '8px',
           padding: '16px 20px',
           marginBottom: '24px',
@@ -243,11 +243,11 @@ export default function SetupPage() {
           alignItems: 'center',
           gap: '12px'
         }}>
-          <span style={{ fontSize: '14px', fontWeight: 700, color: '#856404' }}>Notice</span>
+          <span style={{ fontSize: '18px' }}>🔑</span>
           <div>
-            <strong style={{ color: '#856404' }}>OpenRouter API Key Required</strong>
-            <p style={{ margin: '4px 0 0 0', color: '#856404', fontSize: '14px' }}>
-              Add your OpenRouter API key in <a href="/settings" style={{ color: '#0066cc', textDecoration: 'underline' }}>Settings</a> before launching the defense session. AI committee members need this key to participate.
+            <strong>OpenRouter API Key Required</strong>
+            <p style={{ margin: '4px 0 0 0', color: 'var(--text-2)', fontSize: '14px' }}>
+              Add your OpenRouter API key in <a href="/settings" style={{ color: 'var(--accent)', textDecoration: 'underline', fontWeight: 600 }}>Settings</a> before launching the review session. AI panel members need this key to participate.
             </p>
           </div>
         </div>
@@ -298,6 +298,8 @@ export default function SetupPage() {
               participants={participants}
               templates={templates}
               agents={agents}
+              sessionTitle={title}
+              sessionAbstract={problemStatement}
               enableHost={enableHost}
               hostModelId={hostModelId}
               enableDocuments={enableDocuments}
@@ -429,11 +431,11 @@ export default function SetupPage() {
               onClick={handleLaunchAfterPreflight}
               disabled={isLoading || !canEnterRoom || !apiKey}
               className={styles.btnLaunch}
-              title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete committee preparation first' : ''}
+              title={!apiKey ? 'Add OpenRouter API key in Settings first' : !canEnterRoom ? 'Complete panel preparation first' : ''}
             >
               <span className={styles.launchIcon} />
               <span>
-                {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Mock Defense'}
+                {isLoading ? 'Loading...' : !apiKey ? 'API Key Required' : 'Launch Review Session'}
               </span>
             </button>
           )}

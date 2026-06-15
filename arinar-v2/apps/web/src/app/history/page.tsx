@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AppNav from '@/components/layout/AppNav';
+import PracticeJourneyCard from '@/components/room/PracticeJourneyCard';
 import * as api from '@/lib/api';
 import type { DebateListItem } from '@/lib/api';
 import styles from './history.module.css';
@@ -82,7 +83,7 @@ export default function HistoryPage() {
   const handleDelete = async (debateId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     
-    if (!confirm('Are you sure you want to delete this defense session? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to delete this review session? This action cannot be undone.')) {
       return;
     }
     
@@ -161,8 +162,8 @@ export default function HistoryPage() {
         <div className={styles.container}>
           <header className={styles.header}>
             <div>
-              <h1>Defense Session History</h1>
-              <p className={styles.subtitle}>View past mock defense sessions, transcripts, and readiness reports</p>
+              <h1>Session History</h1>
+              <p className={styles.subtitle}>View past review sessions, transcripts, and feedback reports</p>
             </div>
             {viewMode !== 'list' && (
               <button onClick={() => { setViewMode('list'); setSelectedDebate(null); }} className={styles.btnBack}>
@@ -235,7 +236,7 @@ export default function HistoryPage() {
                     <span className={styles.searchIcon}>&#x2315;</span>
                     <input
                       type="text"
-                      placeholder="Search defense sessions by title or ID..."
+                      placeholder="Search sessions by title or ID..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={styles.searchInput}
@@ -271,7 +272,7 @@ export default function HistoryPage() {
               {loading ? (
                 <div className={styles.loading}>
                   <div className={styles.spinner}></div>
-                  <p>Loading defense sessions...</p>
+                  <p>Loading sessions...</p>
                 </div>
               ) : filteredAndSortedDebates.length === 0 && (searchQuery || statusFilter !== 'all') ? (
                 <div className={styles.emptyState}>
@@ -295,17 +296,17 @@ export default function HistoryPage() {
               ) : debates.length === 0 ? (
                 <div className={styles.emptyState}>
                   <span className={styles.emptyIcon} aria-hidden="true" />
-                  <h3>No defense sessions yet</h3>
-                  <p>Start your first mock defense session to begin practicing</p>
+                  <h3>No review sessions yet</h3>
+                  <p>Start your first review session to begin practicing</p>
                   <button onClick={() => router.push('/setup')} className={styles.btnPrimary}>
-                    New Defense Session
+                    New Review Session
                   </button>
                 </div>
               ) : (
                 <>
                   {filteredAndSortedDebates.length > 0 && (searchQuery || statusFilter !== 'all') && (
                     <div className={styles.resultsCount}>
-                      Showing {filteredAndSortedDebates.length} of {debates.length} defense sessions
+                      Showing {filteredAndSortedDebates.length} of {debates.length} review sessions
                       {searchQuery && ` matching "${searchQuery}"`}
                     </div>
                   )}
@@ -313,7 +314,7 @@ export default function HistoryPage() {
                   {filteredAndSortedDebates.map((debate) => (
                     <div key={debate.debate_id} className={styles.debateCard}>
                       <div className={styles.cardHeader}>
-                        <h3 className={styles.debateTitle}>{debate.title || 'Untitled Defense Session'}</h3>
+                        <h3 className={styles.debateTitle}>{debate.title || 'Untitled Review Session'}</h3>
                         {getStateBadge(debate.state)}
                       </div>
                       
@@ -353,14 +354,14 @@ export default function HistoryPage() {
                         <button 
                           onClick={() => router.push(`/room?debate_id=${debate.debate_id}&tab=defense`)}
                           className={styles.btnDefense}
-                          title="Open Mock Defense room"
+                          title="Open Practice Q&A room"
                         >
-                          Mock Defense
+                          Practice Q&A
                         </button>
                         <button 
                           onClick={() => router.push(`/room?debate_id=${debate.debate_id}&tab=voice`)}
                           className={styles.btnVoice}
-                          title="Open Voice Defense room"
+                          title="Open Voice Practice room"
                         >
                           🎤 Voice
                         </button>
@@ -400,7 +401,7 @@ export default function HistoryPage() {
               <div className={styles.transcript}>
                 {transcript.length === 0 ? (
                   <div className={styles.emptyState}>
-                    <p>No messages in this defense session yet</p>
+                    <p>No messages in this session yet</p>
                   </div>
                 ) : (
                   transcript.map((event, idx) => {
@@ -432,7 +433,7 @@ export default function HistoryPage() {
           {viewMode === 'summary' && selectedDebate && (
             <div className={styles.summaryView}>
               <div className={styles.viewHeader}>
-                <h2>Readiness Report</h2>
+                <h2>Feedback Report</h2>
                 <div className={styles.viewActions}>
                   <button onClick={() => viewDebateTranscript(selectedDebate)} className={styles.btnSecondary}>
                     View Transcript
@@ -442,6 +443,12 @@ export default function HistoryPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Preparation funnel — keep practicing after reading the report */}
+              <PracticeJourneyCard
+                debateId={selectedDebate}
+                onStartPractice={() => router.push(`/room?debate_id=${selectedDebate}&tab=defense`)}
+              />
 
               {summary ? (
                 <div className={styles.summaryContent}>
@@ -508,7 +515,7 @@ export default function HistoryPage() {
                 <div className={styles.emptyState}>
                   <span className={styles.emptyIcon} aria-hidden="true" />
                   <h3>No Report Generated</h3>
-                  <p>This defense session hasn't produced a report yet</p>
+                  <p>This session hasn't produced a report yet</p>
                   <button onClick={() => openInRoom(selectedDebate)} className={styles.btnPrimary}>
                     Open in Room to Generate
                   </button>

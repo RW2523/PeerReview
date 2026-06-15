@@ -242,8 +242,8 @@ function RoomPageContent() {
                     {debateState?.toUpperCase()}
                   </div>
                   {isYoloMode && (
-                    <div className={styles.yoloBadge} title="Running autonomously">
-                      YOLO
+                    <div className={styles.yoloBadge} title="Auto Mode — turns run automatically">
+                      ⚡ AUTO
                     </div>
                   )}
                 </div>
@@ -283,7 +283,7 @@ function RoomPageContent() {
               )}
 
               <section className={styles.section}>
-                <h3>Committee Members</h3>
+                <h3>Review Panel</h3>
                 <div className={styles.participantsList}>
                   {participants.length === 0 ? (
                     <p className={styles.empty}>No participants yet</p>
@@ -315,8 +315,8 @@ function RoomPageContent() {
       <main className={styles.center}>
         {!debateId ? (
           <div className={styles.emptyState}>
-            <h2>Mock Defense Room</h2>
-            <p>Load an existing defense session or create a new one to get started.</p>
+            <h2>Review Room</h2>
+            <p>Load an existing review session or create a new one to get started.</p>
             <div className={styles.selectorWrapper}>
               <DebateSelector onDebateLoaded={handleDebateLoaded} />
             </div>
@@ -343,14 +343,14 @@ function RoomPageContent() {
                 className={`${styles.tab} ${activeTab === 'defense' ? styles.tabActive : ''}`}
                 onClick={() => setActiveTab('defense')}
               >
-                Mock Defense
+                Practice Q&amp;A
               </button>
               <button
                 className={`${styles.tab} ${activeTab === 'voice' ? styles.tabActive : ''}`}
                 onClick={() => setActiveTab('voice')}
-                title="Voice-powered defense — speak your answers aloud"
+                title="Voice-powered practice — speak your answers aloud"
               >
-                🎤 Voice Defense
+                🎤 Voice Practice
               </button>
             </div>
 
@@ -358,10 +358,13 @@ function RoomPageContent() {
             <div className={styles.tabContent}>
               {activeTab === 'transcript' && (
                 debateState === 'ended' ? (
-                  <SummaryReport
-                    debateId={debateId}
-                    agendaData={getAgendaData()}
-                  />
+                  <div className={styles.reportScroll}>
+                    <SummaryReport
+                      debateId={debateId}
+                      agendaData={getAgendaData()}
+                      onStartPractice={() => setActiveTab('defense')}
+                    />
+                  </div>
                 ) : (
                   <>
                     <EventFeed 
@@ -425,6 +428,7 @@ function RoomPageContent() {
               }}
               onStateChange={(newState) => setDebateState(newState)}
               onYoloStatusChange={setYoloStatus}
+              onAutoModeChange={setIsYoloMode}
               sendCommand={sendCommand}
             />
           </>

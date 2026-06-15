@@ -285,3 +285,8 @@
   text-align: center;
   padding: 24px;
 }
+
+/* Wrapper for the pre-report state (journey card + generate panel) */
+.generateWrap {
+  padding: 24px;
+}

@@ -214,7 +214,7 @@ export function PreflightStep({
     const statusMap: Record<string, { label: string; className: string }> = {
       queued: { label: '⏳ Waiting...', className: styles.statusQueued },
       running: { label: '🚀 Preparing...', className: styles.statusRunning },
-      success: { label: '✅ Ready for defense', className: styles.statusSuccess },
+      success: { label: '✅ Ready', className: styles.statusSuccess },
       failed: { label: '❌ Failed', className: styles.statusFailed },
       skipped: { label: '⏭️ Skipped', className: styles.statusSkipped },
     };
@@ -231,9 +231,9 @@ export function PreflightStep({
   if (!debateId) {
     return (
       <div className={styles.stepContent}>
-        <h2>Prepare your committee</h2>
+        <h2>Prepare your panel</h2>
         <div className={styles.alert} style={{ marginTop: '1.5rem' }}>
-          <p>⚠️ Defense session not created yet. Please complete previous steps first.</p>
+          <p>⚠️ Review session not created yet. Please complete previous steps first.</p>
         </div>
       </div>
     );
@@ -241,9 +241,9 @@ export function PreflightStep({
 
   return (
     <div className={styles.stepContent}>
-      <h2>Prepare your committee</h2>
+      <h2>Prepare your panel</h2>
       <p className={styles.stepDescription}>
-        Committee members review your research materials and context before the mock defense starts.
+        Panel members review your research materials and context before the session starts.
       </p>
 
       {error && (
@@ -274,7 +274,7 @@ export function PreflightStep({
                   <a href="/settings" style={{ textDecoration: 'underline', fontWeight: 600 }}>
                     Settings
                   </a>{' '}
-                  to prepare your committee.
+                  to prepare your panel.
                 </p>
               </div>
             </div>

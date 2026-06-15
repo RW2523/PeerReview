@@ -54,10 +54,10 @@ _ROLE_SCHEMA: Dict[str, Dict[str, str]] = {
         "evidence_req":    "Point to specific sentences, figures, or sections that need clarification",
     },
     "external examiner": {
-        "dimensions":      "Defense-readiness, depth of understanding, ability to justify design choices",
+        "dimensions":      "Review readiness, depth of understanding, ability to justify design choices",
         "strengths":       "Strong justification for design decisions, awareness of alternatives",
-        "weaknesses":      "Inability to justify choices, unresolved committee challenges, shallow understanding",
-        "recommendations": "Preparation areas for the defense, unresolved questions the committee will raise",
+        "weaknesses":      "Inability to justify choices, unresolved panel challenges, shallow understanding",
+        "recommendations": "Preparation areas for the review, unresolved questions the panel will raise",
         "evidence_req":    "Cite specific design choices, parameter settings, or architectural decisions from the work",
     },
 }
@@ -74,6 +74,10 @@ _DEFAULT_SCHEMA = {
 def _get_schema(role_description: str) -> Dict[str, str]:
     """Match the closest role schema from the role description string."""
     desc = role_description.lower()
+    # "Independent Reviewer" is the display name for the external-examiner lane;
+    # match it before the generic word loop so "reviewer" doesn't hit the skeptical schema.
+    if "independent" in desc or "external" in desc or "examiner" in desc:
+        return _ROLE_SCHEMA["external examiner"]
     for key, schema in _ROLE_SCHEMA.items():
         if any(word in desc for word in key.split()):
             return schema

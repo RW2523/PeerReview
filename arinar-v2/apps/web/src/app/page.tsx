@@ -13,26 +13,26 @@ export default function HomePage() {
         {/* ── Hero ─────────────────────────────────────────────────── */}
         <section className={styles.hero}>
           <div className={styles.heroInner}>
-            <div className={styles.badge}>Academic Defense Readiness Platform</div>
+            <div className={styles.badge}>Academic Review & Research Feedback Platform</div>
             <h1 className={styles.heroHeadline}>
-              Prepare for your thesis defense
+              Strengthen your research
               <br />
-              <span className={styles.gradient}>with AI-powered academic questioning.</span>
+              <span className={styles.gradient}>with AI-powered academic review.</span>
             </h1>
             <p className={styles.heroSub}>
-              Upload your research, discover weak areas, practice with AI committee members,
-              and get a readiness report before your real defense.
+              Upload your research, discover weak areas, practice Q&amp;A with an AI review panel,
+              and receive structured, actionable feedback on your own work.
             </p>
             <div className={styles.heroCtas}>
               <Link href="/setup" className={styles.btnPrimary}>
-                Start Defense Practice
+                Start a Review Session
               </Link>
               <a href="#how-it-works" className={styles.btnGhost}>
                 See how it works
               </a>
             </div>
             <p className={styles.heroDisclaimer}>
-              PeerForge prepares you to defend your own work — it does not write it for you.
+              PeerForge helps you strengthen your own work — it does not write it for you.
             </p>
           </div>
         </section>
@@ -42,23 +42,23 @@ export default function HomePage() {
           <div className={styles.sectionInner}>
             <div className={styles.sectionBadge}>The Problem</div>
             <h2 className={styles.sectionHeadline}>
-              Most students walk into their defense without adequate practice.
+              Most researchers present their work without rigorous practice.
             </h2>
             <div className={styles.problemGrid}>
               <div className={styles.problemCard}>
                 <div className={styles.problemIcon}>⚠️</div>
                 <h3>No realistic rehearsal</h3>
-                <p>Mocking a committee with friends or advisors rarely captures the pressure and depth of real committee questioning.</p>
+                <p>Practicing with friends or advisors rarely captures the depth and rigour of real academic questioning.</p>
               </div>
               <div className={styles.problemCard}>
                 <div className={styles.problemIcon}>🔍</div>
                 <h3>Unknown weak areas</h3>
-                <p>Students can't see their own methodology gaps, unsupported novelty claims, or missing evidence until a committee flags them — live.</p>
+                <p>It is hard to see your own methodology gaps, unsupported claims, or missing evidence until a reviewer flags them — live.</p>
               </div>
               <div className={styles.problemCard}>
                 <div className={styles.problemIcon}>📋</div>
                 <h3>No structured feedback loop</h3>
-                <p>Generic advisor notes don't tell you which questions to practice, which answers were weak, or whether you improved between sessions.</p>
+                <p>Generic notes don&apos;t tell you which questions to practice, which answers were weak, or whether you improved between sessions.</p>
               </div>
             </div>
           </div>
@@ -69,7 +69,7 @@ export default function HomePage() {
           <div className={styles.sectionInner}>
             <div className={styles.sectionBadge}>How It Works</div>
             <h2 className={styles.sectionHeadline}>
-              From uploaded research to defense readiness in one structured loop.
+              From uploaded research to actionable feedback in one structured loop.
             </h2>
             <div className={styles.stepsGrid}>
               {STEPS.map((s, i) => (
@@ -90,7 +90,7 @@ export default function HomePage() {
           <div className={styles.sectionInner}>
             <div className={styles.sectionBadge}>Core Features</div>
             <h2 className={styles.sectionHeadline}>
-              Every tool a student needs to walk in ready.
+              Every tool a researcher needs to present with confidence.
             </h2>
             <div className={styles.featureGrid}>
               {FEATURES.map((f, i) => (
@@ -104,20 +104,20 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Mock Defense Preview ──────────────────────────────────── */}
+        {/* ── Review Session Preview ────────────────────────────────── */}
         <section className={`${styles.section} ${styles.sectionAlt}`}>
           <div className={styles.sectionInner}>
-            <div className={styles.sectionBadge}>Mock Defense Room</div>
+            <div className={styles.sectionBadge}>Practice Q&amp;A Room</div>
             <h2 className={styles.sectionHeadline}>
-              Face AI committee members that question every weak point.
+              Face AI reviewers that question every weak point.
             </h2>
             <p className={styles.sectionSub}>
-              Each AI examiner plays a distinct academic role — from a skeptical reviewer
+              Each AI reviewer plays a distinct academic role — from a skeptical reviewer
               who challenges unsupported claims, to a methodology professor who drills your research design.
             </p>
             <div className={styles.previewCard}>
               <div className={styles.previewHeader}>
-                <span className={styles.previewTitle}>Mock Defense Session</span>
+                <span className={styles.previewTitle}>Review Session</span>
                 <span className={styles.previewBadge}>LIVE</span>
               </div>
               <div className={styles.chatLines}>
@@ -132,40 +132,34 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Readiness Report Preview ──────────────────────────────── */}
+        {/* ── Feedback Report Preview ───────────────────────────────── */}
         <section className={styles.section}>
           <div className={styles.sectionInner}>
-            <div className={styles.sectionBadge}>Readiness Report</div>
+            <div className={styles.sectionBadge}>Feedback Report</div>
             <h2 className={styles.sectionHeadline}>
-              A scored report that tells you exactly what to practice next.
+              Structured feedback that tells you exactly what to strengthen next.
             </h2>
             <p className={styles.sectionSub}>
-              After each mock defense session, PeerForge generates a structured report
-              with dimension scores, weak answer analysis, and a prioritised improvement plan.
+              After each session, PeerForge generates a qualitative report — no marks, no grades —
+              with your strongest answers, the areas that need work, and a prioritised improvement plan.
             </p>
             <div className={styles.reportPreview}>
               <div className={styles.reportHeader}>
-                <span className={styles.reportTitle}>Defense Readiness Report</span>
-                <span className={styles.reportScore}>Score: 68 / 100</span>
+                <span className={styles.reportTitle}>Session Feedback Report</span>
               </div>
-              <div className={styles.scoreGrid}>
-                {REPORT_SCORES.map((s, i) => (
-                  <div key={i} className={styles.scoreRow}>
-                    <span className={styles.scoreLabel}>{s.label}</span>
-                    <div className={styles.scoreBar}>
-                      <div
-                        className={styles.scoreBarFill}
-                        style={{ width: `${s.score}%`, background: s.score >= 70 ? 'var(--accent)' : s.score >= 50 ? 'var(--warning)' : '#e00' }}
-                      />
-                    </div>
-                    <span className={styles.scoreValue}>{s.score}</span>
+              <div className={styles.problemGrid}>
+                {REPORT_HIGHLIGHTS.map((h, i) => (
+                  <div key={i} className={styles.problemCard}>
+                    <div className={styles.problemIcon}>{h.icon}</div>
+                    <h3>{h.title}</h3>
+                    <p>{h.desc}</p>
                   </div>
                 ))}
               </div>
               <div className={styles.reportNext}>
                 <span className={styles.reportNextLabel}>Next recommended action:</span>
                 <span className={styles.reportNextText}>
-                  Your methodology score is weak. Practice 5 methodology questions with the Methodology Professor persona.
+                  Your methodology answers lacked baseline comparisons. Practice five methodology questions with the Methodology Professor persona.
                 </span>
               </div>
             </div>
@@ -190,7 +184,7 @@ export default function HomePage() {
             </div>
             <div className={styles.integrityBox}>
               <strong>Academic Integrity First.</strong> PeerForge never writes your thesis, generates your results, or invents citations.
-              It only helps you defend your own work — more clearly, more completely, and with confidence.
+              It only helps you strengthen and present your own work — more clearly, more completely, and with confidence.
             </div>
           </div>
         </section>
@@ -214,8 +208,8 @@ export default function HomePage() {
                   <li>1 research workspace</li>
                   <li>Research analysis</li>
                   <li>Question bank</li>
-                  <li>Mock defense sessions</li>
-                  <li>Readiness reports</li>
+                  <li>Practice review sessions</li>
+                  <li>Qualitative feedback reports</li>
                   <li>Bring your own OpenRouter key</li>
                 </ul>
                 <Link href="/setup" className={styles.btnPrimary}>
@@ -229,8 +223,8 @@ export default function HomePage() {
                 <ul className={styles.pricingList}>
                   <li>Unlimited student seats</li>
                   <li>Advisor review mode</li>
-                  <li>Department rubric integration</li>
-                  <li>Cohort-level analytics</li>
+                  <li>Department guideline alignment</li>
+                  <li>Cohort-level insights</li>
                   <li>Audit logs &amp; compliance controls</li>
                   <li>SSO &amp; LMS integration</li>
                 </ul>
@@ -246,20 +240,20 @@ export default function HomePage() {
         <section className={`${styles.section} ${styles.ctaSection}`}>
           <div className={styles.sectionInner}>
             <h2 className={styles.ctaHeadline}>
-              Your defense date is approaching. Start practicing now.
+              Your presentation date is approaching. Start practicing now.
             </h2>
             <p className={styles.ctaSub}>
-              Upload your thesis or research paper and get your first AI committee session in minutes.
+              Upload your thesis or research paper and get your first AI review session in minutes.
             </p>
             <Link href="/setup" className={styles.btnPrimaryLg}>
-              Start Defense Practice
+              Start a Review Session
             </Link>
           </div>
         </section>
 
         {/* ── Footer ──────────────────────────────────────────────── */}
         <footer className={styles.footer}>
-          <p>PeerForge — AI Academic Defense &amp; Research Readiness Platform</p>
+          <p>PeerForge — AI Academic Review &amp; Research Feedback Platform</p>
           <p className={styles.footerSub}>
             A responsible tool for academic preparation. PeerForge does not write thesis content, generate results, or invent citations.
           </p>
@@ -275,27 +269,27 @@ export default function HomePage() {
 const STEPS = [
   {
     title: 'Create your research workspace',
-    desc: 'Enter your thesis title, research domain, project type (thesis, dissertation, proposal), and research stage.',
+    desc: 'Enter your research title, domain, project type (thesis, dissertation, proposal, paper), and research stage.',
   },
   {
     title: 'Upload your research materials',
-    desc: 'Upload your thesis draft, proposal, slides, advisor notes, rubrics, and related papers. PeerForge extracts, chunks, and indexes everything.',
+    desc: 'Upload your draft, proposal, slides, advisor notes, and related papers. PeerForge extracts, chunks, and indexes everything.',
   },
   {
     title: 'Analyze your research',
     desc: 'The AI identifies your research problem, methodology, contribution, evidence, limitations, and weak areas — all grounded in your uploaded documents.',
   },
   {
-    title: 'Generate your defense question bank',
-    desc: 'Source-grounded questions are generated across 10 categories: problem statement, methodology, novelty, evidence, limitations, results, and more.',
+    title: 'Generate your question bank',
+    desc: 'Source-grounded review questions are generated across 10 categories: problem statement, methodology, novelty, evidence, limitations, results, and more.',
   },
   {
-    title: 'Run a mock defense session',
-    desc: 'AI committee members from different roles — Methodology Professor, Skeptical Reviewer, Domain Expert, External Examiner — take turns questioning you.',
+    title: 'Run a practice review session',
+    desc: 'AI reviewers with different roles — Methodology Professor, Skeptical Reviewer, Domain Expert, Independent Reviewer — take turns questioning you.',
   },
   {
-    title: 'Receive your readiness report',
-    desc: 'Each answer is scored on 6 axes. Your report shows strong areas, weak areas, repeated issues, and a prioritised improvement plan.',
+    title: 'Receive your feedback report',
+    desc: 'Each answer receives qualitative feedback. Your report shows strong areas, answers to revisit, repeated issues, and a prioritised improvement plan.',
   },
 ];
 
@@ -307,18 +301,18 @@ const FEATURES = [
   },
   {
     icon: '❓',
-    title: 'Defense Question Bank',
+    title: 'Review Question Bank',
     desc: 'Generates grounded questions across 10 categories with source citations, difficulty levels, and follow-up rules.',
   },
   {
     icon: '🎭',
-    title: 'AI Committee Personas',
-    desc: '10 distinct roles including Advisor, Methodology Professor, Skeptical Reviewer, External Examiner, and Ethics Reviewer.',
+    title: 'AI Reviewer Personas',
+    desc: 'Distinct academic roles including Advisor, Methodology Professor, Skeptical Reviewer, Independent Reviewer, and Domain Expert.',
   },
   {
-    icon: '📊',
-    title: '6-Axis Answer Evaluation',
-    desc: 'Every answer is scored on Relevance, Evidence Support, Clarity, Completeness, Methodology Understanding, and Critical Thinking.',
+    icon: '💬',
+    title: 'Structured Answer Feedback',
+    desc: 'Every answer receives specific, qualitative feedback: what worked, what was missing, and one concrete improvement.',
   },
   {
     icon: '🔄',
@@ -327,13 +321,13 @@ const FEATURES = [
   },
   {
     icon: '📋',
-    title: 'Readiness Report',
-    desc: 'Aggregated report with overall score, dimension breakdown, weak answer analysis, and a prioritised improvement plan.',
+    title: 'Feedback Report',
+    desc: 'Aggregated qualitative report with strong answers, answers to revisit, repeated issues, and a prioritised improvement plan.',
   },
   {
     icon: '📈',
     title: 'Progress Tracking',
-    desc: 'Track readiness scores over multiple sessions, identify repeated weak areas, and measure improvement after practice.',
+    desc: 'Track your sessions over time, identify repeated weak areas, and see how your answers improve with practice.',
   },
   {
     icon: '🛡️',
@@ -360,19 +354,29 @@ const PREVIEW_CHAT = [
   },
 ];
 
-const REPORT_SCORES = [
-  { label: 'Research Clarity', score: 78 },
-  { label: 'Methodology', score: 52 },
-  { label: 'Evidence Support', score: 65 },
-  { label: 'Critical Thinking', score: 70 },
-  { label: 'Communication', score: 74 },
+const REPORT_HIGHLIGHTS = [
+  {
+    icon: '💪',
+    title: 'What went well',
+    desc: 'Your problem statement answers were clear and consistently grounded in Chapter 1 of your draft.',
+  },
+  {
+    icon: '🔍',
+    title: 'Areas to strengthen',
+    desc: 'Methodology answers lacked baseline comparisons, and two novelty claims were not tied to evidence in your materials.',
+  },
+  {
+    icon: '🗺️',
+    title: 'Improvement plan',
+    desc: 'A prioritised, step-by-step plan: which questions to re-practice, which sections to revise, and what evidence to add.',
+  },
 ];
 
 const PILLARS = [
   {
     icon: '🏛️',
     title: 'Academically responsible',
-    desc: 'PeerForge is a preparation tool, not a writing tool. It supports students in defending their own work, not producing it.',
+    desc: 'PeerForge is a preparation tool, not a writing tool. It supports students in strengthening their own work, not producing it.',
   },
   {
     icon: '🔒',
@@ -380,13 +384,13 @@ const PILLARS = [
     desc: 'Student research materials are kept private. Data access is controlled, and audit logs are maintained for institutional compliance.',
   },
   {
-    icon: '📐',
-    title: 'Rubric and guideline aware',
-    desc: 'Upload your department\'s defense rubric or dissertation evaluation criteria and the AI will align all questioning and feedback to those standards.',
+    icon: '💬',
+    title: 'Feedback, not grades',
+    desc: 'PeerForge never assigns marks or scores. All feedback is qualitative, specific, and actionable — focused on improvement, not judgement.',
   },
   {
     icon: '📊',
     title: 'Department-level insights',
-    desc: 'Aggregate, privacy-safe analytics show common weak areas across your cohort so department programs can improve their preparation approach.',
+    desc: 'Aggregate, privacy-safe insights show common weak areas across your cohort so department programs can improve their preparation approach.',
   },
 ];

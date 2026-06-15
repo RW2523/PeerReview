@@ -269,7 +269,16 @@ async def start_debate(
     
     # Check workspace access (raises HTTPException if denied)
     check_workspace_access(current_user, debate['workspace_id'])
-    
+
+    # A session cannot start without a panel (participants may be added after
+    # creation — deferred staffing — but must exist before starting).
+    participants = service.get_participants(debate_id)
+    if not participants:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Add at least one panel member before starting the session.",
+        )
+
     import logging
     logger = logging.getLogger(__name__)
     

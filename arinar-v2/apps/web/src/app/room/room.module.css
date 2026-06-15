@@ -576,3 +576,10 @@
     transform: translateX(100%);
   }
 }
+
+/* Scroll container for the Session Report tab (tabContent itself is overflow:hidden) */
+.reportScroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}

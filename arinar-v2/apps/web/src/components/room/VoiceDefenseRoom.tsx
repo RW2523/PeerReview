@@ -3,16 +3,18 @@
 /**
  * VoiceDefenseRoom
  * ─────────────────────────────────────────────────────────────────────────
- * Full voice-powered mock academic defense:
- *  • TTS   — each committee persona speaks their question aloud.
+ * Full voice-powered academic review session:
+ *  • TTS   — each reviewer persona speaks their question aloud.
  *  • STT   — the student answers by speaking; transcript shown live.
- *  • Flow  — analyze → committee → questions → answer → evaluate →
- *            follow-up (if weak) → next question → readiness report.
+ *  • Flow  — analyze → panel → questions → answer → feedback →
+ *            follow-up (if weak) → next question → feedback report.
  * Uses only the browser's built-in Web Speech API — zero extra deps.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './VoiceDefenseRoom.module.css';
+import { displayPersona } from '@/lib/persona';
+import AcademicAssessmentCard from './AcademicAssessmentCard';
 import { useSpeechSynthesis, roleToVoiceId } from '@/hooks/useSpeechSynthesis';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import {
@@ -37,7 +39,7 @@ import {
 type Phase =
   | 'setup'
   | 'loading'       // analyze + generate
-  | 'ready'         // show committee + questions list
+  | 'ready'         // show panel + questions list
   | 'speaking'      // TTS reading question
   | 'listening'     // student speaking
   | 'confirming'    // review transcript before submit
@@ -45,7 +47,7 @@ type Phase =
   | 'result'        // show evaluation
   | 'follow_up'     // TTS reading follow-up, then go to listening
   | 'reporting'     // generating final report
-  | 'report'        // show readiness report
+  | 'report'        // show feedback report
   | 'error';
 
 interface LoadingStep { label: string; done: boolean; }
@@ -68,32 +70,18 @@ function personaEmoji(role: string): string {
   if (r.includes('domain') || r.includes('expert')) return PERSONA_EMOJI.domain;
   if (r.includes('skeptic'))   return PERSONA_EMOJI.skeptical;
   if (r.includes('friendly'))  return PERSONA_EMOJI.friendly;
-  if (r.includes('examiner') || r.includes('external')) return PERSONA_EMOJI.examiner;
+  if (r.includes('examiner') || r.includes('external') || r.includes('independent')) return PERSONA_EMOJI.examiner;
   return '👤';
 }
 
 const DIFF_COLOR: Record<string, string> = {
+  easy:           '#4d9fff',
+  medium:         '#f5a623',
+  hard:           '#ff6b6b',
   beginner:       '#4d9fff',
   moderate:       '#f5a623',
   advanced:       '#ff6b6b',
-  'strict committee': '#ff3333',
 };
-
-// ── Score Bar (static component outside render) ──────────────────────────
-
-function ScoreBar({ label, value }: { label: string; value: number }) {
-  const pct   = (value / 10) * 100;
-  const color = value >= 7 ? '#4ade80' : value >= 5 ? '#f5a623' : '#ff6b6b';
-  return (
-    <div className={styles.scoreRow}>
-      <span className={styles.scoreLabel}>{label}</span>
-      <div className={styles.scoreBarTrack}>
-        <div className={styles.scoreBarFill} style={{ width: `${pct}%`, background: color }} />
-      </div>
-      <span className={styles.scoreVal} style={{ color }}>{value}</span>
-    </div>
-  );
-}
 
 // ── Main component ────────────────────────────────────────────────────────
 
@@ -177,7 +165,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
     if (isMuted || !tts.isSupported) return;
     const voiceId = roleToVoiceId(q.persona);
     // Prefix with persona name for clarity
-    const intro = `${q.persona} asks: ${q.question_text}`;
+    const intro = `${displayPersona(q.persona)} asks: ${q.question_text}`;
     tts.speak(intro, voiceId);
   }, [isMuted, tts]);
 
@@ -194,8 +182,8 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
 
     const steps: LoadingStep[] = [
       { label: 'Analysing research materials…', done: false },
-      { label: 'Generating committee personas…', done: false },
-      { label: 'Generating defense questions…', done: false },
+      { label: 'Generating reviewer personas…', done: false },
+      { label: 'Generating review questions…', done: false },
     ];
     setLoadingSteps([...steps]);
 
@@ -261,7 +249,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
       // TTS reads the strength/feedback (brief version)
       if (!isMuted && tts.isSupported && ev.strength) {
         setTimeout(() => {
-          tts.speak(`Score: ${Math.round(ev.overall_score)} out of 10. ${ev.strength}`, 'advisor');
+          tts.speak(`Here is your feedback. ${ev.strength}`, 'advisor');
         }, 600);
       }
     } catch (e: any) {
@@ -309,11 +297,10 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
       setReport(r);
       setPhase('report');
       if (!isMuted && tts.isSupported) {
-        const score = Math.round(r.overall_readiness ?? 0);
         tts.speak(
-          `Your defense readiness report is ready. Overall score: ${score} percent. ${
-            score >= 70 ? 'You appear ready for your defense.' : 'You have some areas to improve before the defense.'
-          }`,
+          r.next_recommendation
+            ? `Your feedback report is ready. ${r.next_recommendation}`
+            : 'Your feedback report is ready. Review your strengths and the areas to work on next.',
           'advisor'
         );
       }
@@ -331,9 +318,9 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
     return (
       <div className={styles.container}>
         <div className={styles.header}>
-          <h2 className={styles.title}>🎤 Voice Defense Room</h2>
+          <h2 className={styles.title}>🎤 Voice Practice Room</h2>
           <p className={styles.subtitle}>
-            Speak your answers aloud. AI committee members ask questions via voice, evaluate your responses, and generate a readiness report.
+            Speak your answers aloud. AI reviewers ask questions via voice, give structured feedback on your responses, and generate a feedback report.
           </p>
         </div>
 
@@ -403,7 +390,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
                 onClick={handleBeginDefense}
                 disabled={!openrouterKey}
               >
-                Resume Defense ({questions.length} questions)
+                Resume Session ({questions.length} questions)
               </button>
               <button className={styles.secondaryBtn} onClick={handleStart} disabled={!openrouterKey}>
                 Re-analyse Research
@@ -416,7 +403,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
               disabled={!openrouterKey}
               style={{ fontSize: '1rem', padding: '12px 28px' }}
             >
-              Analyse & Start Voice Defense
+              Analyse & Start Voice Session
             </button>
           )}
         </div>
@@ -430,7 +417,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
       <div className={styles.container}>
         <div className={styles.loadingBox}>
           <div className={styles.spinner} />
-          <h3 className={styles.loadingTitle}>Preparing your defense committee…</h3>
+          <h3 className={styles.loadingTitle}>Preparing your review panel…</h3>
           <div className={styles.loadingSteps}>
             {loadingSteps.map((s, i) => (
               <div key={i} className={`${styles.loadingStep} ${s.done ? styles.stepDone : ''}`}>
@@ -450,8 +437,8 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
       <div className={styles.container}>
         <div className={styles.loadingBox}>
           <div className={styles.spinner} />
-          <h3 className={styles.loadingTitle}>Generating your readiness report…</h3>
-          <p className={styles.loadingHint}>Analysing all your answers across 5 dimensions.</p>
+          <h3 className={styles.loadingTitle}>Generating your feedback report…</h3>
+          <p className={styles.loadingHint}>Reviewing all your answers and drafting an improvement plan.</p>
         </div>
       </div>
     );
@@ -463,8 +450,8 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
       <div className={styles.container}>
         <div className={styles.loadingBox}>
           <div className={styles.spinner} />
-          <h3 className={styles.loadingTitle}>Evaluating your answer…</h3>
-          <p className={styles.loadingHint}>Scoring across 6 dimensions.</p>
+          <h3 className={styles.loadingTitle}>Reviewing your answer…</h3>
+          <p className={styles.loadingHint}>Preparing specific, constructive feedback.</p>
         </div>
       </div>
     );
@@ -488,28 +475,27 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
     );
   }
 
-  /* READY — overview with committee + questions */
+  /* READY — overview with panel + questions */
   if (phase === 'ready') {
-    const overall = report?.overall_readiness;
     return (
       <div className={styles.container}>
         <div className={styles.header}>
           <div className={styles.headerRow}>
-            <h2 className={styles.title}>🎓 Defense Committee Ready</h2>
+            <h2 className={styles.title}>🎓 Review Panel Ready</h2>
             {answeredCount > 0 && (
               <span className={styles.progressBadge}>{answeredCount} / {questions.length} answered</span>
             )}
           </div>
         </div>
 
-        {/* Committee row */}
+        {/* Panel row */}
         {personas.length > 0 && (
           <div className={styles.committeeRow}>
             {personas.map((p, i) => (
               <div key={i} className={styles.committeeCard}>
                 <div className={styles.committeeEmoji}>{personaEmoji(p.role)}</div>
                 <div className={styles.committeeName}>{p.name}</div>
-                <div className={styles.committeeRole}>{p.role}</div>
+                <div className={styles.committeeRole}>{displayPersona(p.role)}</div>
               </div>
             ))}
           </div>
@@ -538,11 +524,11 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
 
         <div className={styles.actionRow}>
           <button className={styles.primaryBtn} onClick={handleBeginDefense}>
-            Start Voice Defense
+            Start Voice Q&amp;A
           </button>
           {answeredCount > 0 && (
             <button className={styles.reportBtn} onClick={handleGenerateReport}>
-              Generate Readiness Report
+              Generate Feedback Report
             </button>
           )}
         </div>
@@ -550,7 +536,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
     );
   }
 
-  /* SPEAKING — committee member speaking question via TTS */
+  /* SPEAKING — panel member speaking question via TTS */
   if (phase === 'speaking' && currentQuestion) {
     const emoji = personaEmoji(currentQuestion.persona);
     return (
@@ -573,7 +559,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
               ))}
             </div>
           )}
-          <div className={styles.speakingRole}>{currentQuestion.persona}</div>
+          <div className={styles.speakingRole}>{displayPersona(currentQuestion.persona)}</div>
           <p className={styles.questionText}>{currentQuestion.question_text}</p>
           <div className={styles.qMeta}>
             <span className={styles.qCat}>{currentQuestion.category}</span>
@@ -613,7 +599,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
 
         {currentQuestion && (
           <div className={styles.questionBanner}>
-            <span className={styles.questionBannerLabel}>{personaEmoji(currentQuestion.persona)} {currentQuestion.persona}:</span>
+            <span className={styles.questionBannerLabel}>{personaEmoji(currentQuestion.persona)} {displayPersona(currentQuestion.persona)}:</span>
             <p>{currentQuestion.question_text}</p>
           </div>
         )}
@@ -680,7 +666,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
 
         {currentQuestion && (
           <div className={styles.questionBanner}>
-            <span className={styles.questionBannerLabel}>{personaEmoji(currentQuestion.persona)} {currentQuestion.persona}:</span>
+            <span className={styles.questionBannerLabel}>{personaEmoji(currentQuestion.persona)} {displayPersona(currentQuestion.persona)}:</span>
             <p>{currentQuestion.question_text}</p>
           </div>
         )}
@@ -706,7 +692,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
             onClick={handleSubmitAnswer}
             disabled={editText.trim().length < 10}
           >
-            Submit for Evaluation
+            Submit for Feedback
           </button>
           <button className={styles.secondaryBtn} onClick={handleStartListening}>
             🎙 Re-record
@@ -721,8 +707,6 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
 
   /* RESULT — show evaluation */
   if (phase === 'result' && evaluation && currentQuestion) {
-    const score      = Math.round(evaluation.overall_score * 10) / 10;
-    const scoreColor = score >= 7 ? '#4ade80' : score >= 5 ? '#f5a623' : '#ff6b6b';
     const hasFollowUp = evaluation.follow_up_needed && !!evaluation.follow_up_question;
     const isLast     = qIndex + 1 >= questions.length;
 
@@ -730,31 +714,19 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
       <div className={styles.container}>
         <div className={styles.evalCard}>
           <div className={styles.evalHeader}>
-            <div className={styles.bigScore} style={{ color: scoreColor }}>
-              {score}<small>/10</small>
-            </div>
             <div>
-              <div className={styles.evalTitle}>Answer Evaluation</div>
+              <div className={styles.evalTitle}>Feedback on Your Answer</div>
               <div className={styles.evalQuestion}>{currentQuestion.question_text}</div>
             </div>
           </div>
 
-          <div className={styles.scoresGrid}>
-            <ScoreBar label="Relevance"         value={(evaluation as any).score_relevance         ?? 0} />
-            <ScoreBar label="Evidence Support"  value={(evaluation as any).score_evidence           ?? 0} />
-            <ScoreBar label="Clarity"           value={(evaluation as any).score_clarity            ?? 0} />
-            <ScoreBar label="Completeness"      value={(evaluation as any).score_completeness       ?? 0} />
-            <ScoreBar label="Methodology"       value={(evaluation as any).score_methodology        ?? 0} />
-            <ScoreBar label="Critical Thinking" value={(evaluation as any).score_critical_thinking  ?? 0} />
-          </div>
-
           <div className={styles.feedbackGrid}>
             <div className={styles.strengthCard}>
-              <h4>💪 Strength</h4>
+              <h4>💪 What Worked</h4>
               <p>{evaluation.strength}</p>
             </div>
             <div className={styles.weaknessCard}>
-              <h4>⚠️ Weakness</h4>
+              <h4>⚠️ Area to Improve</h4>
               <p>{evaluation.weakness}</p>
             </div>
           </div>
@@ -786,7 +758,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
             </button>
           ) : (
             <button className={styles.reportBtn} onClick={handleGenerateReport}>
-              📊 Generate Readiness Report
+              📋 Generate Feedback Report
             </button>
           )}
           <button className={styles.secondaryBtn} onClick={() => setPhase('ready')}>
@@ -821,50 +793,70 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
 
   /* REPORT */
   if (phase === 'report' && report) {
-    const overall   = report.overall_readiness ?? 0;
-    const color     = overall >= 70 ? '#4ade80' : overall >= 50 ? '#f5a623' : '#ff6b6b';
-    const label     = overall >= 70 ? 'Ready for Defense' : overall >= 50 ? 'More Practice Recommended' : 'Significant Gaps Found';
+    // Readiness outlook: derived internally, surfaced only as a qualitative band.
+    const v = report.overall_readiness;
+    const outlook = typeof v === 'number'
+      ? v >= 75
+        ? { label: 'On track', cls: styles.outlookStrong, hint: 'You appear well prepared — keep your momentum with a final run-through.' }
+        : v >= 50
+          ? { label: 'Almost there', cls: styles.outlookAlmost, hint: 'Most answers held up — revisit the improvement plan, then practice again.' }
+          : { label: 'Needs more practice', cls: styles.outlookPractice, hint: 'Several answers had gaps — work through the improvement plan below.' }
+      : null;
 
     return (
       <div className={styles.container}>
         <div className={styles.reportHeader}>
-          <div className={styles.reportBigScore} style={{ color }}>
-            {Math.round(overall)}%
-          </div>
           <div>
-            <h2 className={styles.reportTitle}>Defense Readiness Report</h2>
-            <p className={styles.readinessLabel} style={{ color }}>{label}</p>
+            <h2 className={styles.reportTitle}>
+              Session Feedback Report
+              {outlook && <span className={`${styles.outlookChip} ${outlook.cls}`}>{outlook.label}</span>}
+            </h2>
+            <p className={styles.readinessLabel}>
+              {outlook
+                ? `${outlook.hint} (Qualitative outlook — not a grade.)`
+                : 'Qualitative feedback from your AI review panel — what worked, and what to strengthen next.'}
+            </p>
           </div>
         </div>
 
-        <div className={styles.dimGrid}>
-          {[
-            ['Research Clarity', report.research_clarity],
-            ['Methodology',      report.methodology_score],
-            ['Evidence',         report.evidence_score],
-            ['Critical Thinking',report.critical_thinking],
-            ['Communication',    report.communication],
-          ].map(([lbl, val]) => {
-            const v = (val as number) ?? 0;
-            const c = v >= 70 ? '#4ade80' : v >= 50 ? '#f5a623' : '#ff6b6b';
-            return (
-              <div key={lbl as string} className={styles.dimCard}>
-                <div className={styles.dimScore} style={{ color: c }}>{Math.round(v)}%</div>
-                <div className={styles.dimLabel}>{lbl as string}</div>
-                <div className={styles.dimBarTrack}>
-                  <div style={{ width: `${v}%`, background: c, height: '100%', borderRadius: 2 }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {(report.strong_answers?.length ?? 0) > 0 && (
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>What Went Well</div>
+            <ul className={styles.likelyList}>
+              {(report.strong_answers ?? []).map((a: any, i: number) => (
+                <li key={i}>
+                  {(a.question_text || a.question || '')}
+                  {a.summary ? ` — ${a.summary}` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {(report.weak_answers?.length ?? 0) > 0 && (
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>Answers to Revisit</div>
+            <ul className={styles.likelyList}>
+              {(report.weak_answers ?? []).map((a: any, i: number) => (
+                <li key={i}>
+                  {(a.question_text || a.question || '')}
+                  {a.summary ? ` — ${a.summary}` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {(report.improvement_plan?.length ?? 0) > 0 && (
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Improvement Plan</div>
             <ol className={styles.planList}>
               {(report.improvement_plan ?? []).map((item: any, i: number) => (
-                <li key={i}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
+                <li key={i}>
+                  {typeof item === 'string'
+                    ? item
+                    : [item.area, item.action].filter(Boolean).join(' — ') || JSON.stringify(item)}
+                </li>
               ))}
             </ol>
           </div>
@@ -872,7 +864,7 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
 
         {(report.likely_questions?.length ?? 0) > 0 && (
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>Likely Committee Questions</div>
+            <div className={styles.sectionTitle}>Questions a Review Panel May Ask</div>
             <ul className={styles.likelyList}>
               {(report.likely_questions ?? []).map((q: string, i: number) => (
                 <li key={i}>{q}</li>
@@ -887,6 +879,8 @@ export default function VoiceDefenseRoom({ debateId, openrouterKey }: Props) {
             <p>{report.next_recommendation}</p>
           </div>
         )}
+
+        <AcademicAssessmentCard debateId={debateId} triggerSource="voice_practice" />
 
         <div className={styles.actionRow}>
           <button className={styles.primaryBtn} onClick={() => { setPhase('ready'); tts.cancel(); }}>

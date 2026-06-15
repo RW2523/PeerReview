@@ -7,6 +7,7 @@ import { KeyPersistence } from '@/lib/openrouterKeyStore';
 import { DefaultModelsCard } from '@/components/settings/DefaultModelsCard';
 import { AccountInfoCard } from '@/components/settings/AccountInfoCard';
 import { ManagementKeyCard } from '@/components/settings/ManagementKeyCard';
+import { AccountKeyCard } from '@/components/settings/AccountKeyCard';
 import * as api from '@/lib/api';
 import styles from './settings.module.css';
 
@@ -276,6 +277,9 @@ export default function SettingsPage() {
               </>
             )}
           </section>
+
+          {/* Account-stored OpenRouter key (encrypted server-side) */}
+          <AccountKeyCard />
 
           {/* Management Key Card */}
           <ManagementKeyCard

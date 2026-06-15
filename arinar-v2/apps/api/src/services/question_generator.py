@@ -1,11 +1,11 @@
 """
-Defense Question Generator
-===========================
-Generates a set of committee-style defense questions grounded in the
+Review Question Generator
+==========================
+Generates a set of panel-style review questions grounded in the
 student's research profile and uploaded document chunks.
 
 Each question belongs to one of 10 categories, is assigned to a specific
-committee persona, and includes:
+reviewer persona, and includes:
 - expected answer direction
 - source chunk reference (no invented citations)
 - follow-up rule and question
@@ -31,7 +31,7 @@ QUESTION_CATEGORIES = [
     "results",
     "future_work",
     "practical_impact",
-    "committee_challenge",
+    "panel_challenge",
 ]
 
 COMMITTEE_PERSONAS = [
@@ -40,11 +40,11 @@ COMMITTEE_PERSONAS = [
     "Domain Expert",
     "Skeptical Reviewer",
     "Friendly Professor",
-    "External Examiner",
+    "Independent Reviewer",
 ]
 
 _SYSTEM = """\
-You are a graduate committee question generator for PhD/Master defense preparation.
+You are an academic review-panel question generator for graduate research preparation.
 You generate rigorous, academically grounded questions.
 
 Rules:
@@ -67,7 +67,7 @@ _USER_TEMPLATE = """\
 
 ---
 
-Generate exactly {n_questions} defense questions as a JSON array.
+Generate exactly {n_questions} review questions as a JSON array.
 Each element must have EXACTLY these keys:
 {{
   "question_text":   "<the question>",
@@ -90,7 +90,7 @@ def generate_questions(
     mode: ReasoningMode = "medium",
 ) -> List[Dict[str, Any]]:
     """
-    Generate defense questions for *debate_id* and persist to ``defense_questions``.
+    Generate review questions for *debate_id* and persist to ``defense_questions``.
     Returns the list of generated question dicts (with ``question_id``).
     """
     # ── Load research profile ──────────────────────────────────────────────
@@ -169,9 +169,9 @@ def generate_questions(
             """, (
                 question_id, debate_id, str(profile_id),
                 q.get("question_text", ""),
-                q.get("category", "committee_challenge"),
+                q.get("category", "panel_challenge"),
                 q.get("difficulty", "medium"),
-                q.get("persona", "External Examiner"),
+                q.get("persona", "Independent Reviewer"),
                 q.get("expected_answer", ""),
                 q.get("follow_up_rule", ""),
                 q.get("follow_up_q", ""),
@@ -219,7 +219,13 @@ def _fetch_excerpts(debate_id: str, limit: int = 12) -> str:
                    ON (mc.chunk_metadata->>'material_id')::uuid = mm.material_id
             WHERE  mc.source_debate_id = %s
               AND  mc.agent_id IS NULL
-            ORDER BY mc.created_at
+            ORDER BY CASE COALESCE(mc.chunk_metadata->>'category', 'supplementary')
+                       WHEN 'main_research' THEN 0
+                       WHEN 'research'      THEN 1
+                       WHEN 'supplementary' THEN 2
+                       ELSE 3
+                     END,
+                     mc.created_at
             LIMIT %s
         """, (debate_id, limit))
         rows = cur.fetchall()

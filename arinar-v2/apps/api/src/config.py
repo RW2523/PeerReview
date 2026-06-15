@@ -26,6 +26,17 @@ class Settings(BaseSettings):
     # Optional server-side key used by Celery workers for embedding generation.
     # Set OPENROUTER_API_KEY in .env — users can still override with their BYOK key.
     openrouter_api_key: str = ""
+    # Secret used to encrypt user-stored provider keys at rest (Fernet).
+    key_encryption_secret: str = ""
+
+    # Object storage backend: 'minio' (default, local/Railway) or 's3'
+    # (boto3 — Supabase Storage / R2 / AWS for free-tier deployments).
+    storage_backend: str = "minio"
+    s3_endpoint_url: str = ""
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_bucket: str = "peerforge-materials"
+    s3_region: str = ""
     
     # Supabase Auth
     supabase_jwt_secret: str = "your-jwt-secret-here"

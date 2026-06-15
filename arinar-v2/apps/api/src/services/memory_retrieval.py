@@ -150,51 +150,79 @@ def retrieve_allowed_chunks(
                 WHERE participant_id = %s
             """, (participant_id,))
             result = cursor.fetchone()
-            if result and result[0]:
-                agent_id_for_logging = result[0]
+            if result and result.get('agent_id'):
+                agent_id_for_logging = result['agent_id']
         
         # 1. Get allowed source debate IDs based on grants
         allowed_source_debate_ids = [debate_id]  # Always include current debate
         grant_ids_used = []
-        
-        if participant_id:
-            # Check for grants that allow this participant to access imported debates
-            cursor.execute("""
-                SELECT grant_id, source_debate_id
-                FROM debate_memory_grants
-                WHERE debate_id = %s
-                  AND (
-                      scope = 'all_agents'
-                      OR (scope = 'specific_agents' AND %s = ANY(allowed_participant_ids))
-                  )
-                  AND (expires_at IS NULL OR expires_at > NOW())
-            """, (debate_id, participant_id))
-            
-            grants = cursor.fetchall()
-            for grant_id, source_debate_id in grants:
-                if source_debate_id and source_debate_id not in allowed_source_debate_ids:
-                    allowed_source_debate_ids.append(source_debate_id)
-                    grant_ids_used.append(grant_id)
+        # Sources imported as 'materials_only' must not expose agent-generated chunks
+        materials_only_sources = []
+
+        # Grants with scope='all_agents' apply even without a participant context
+        # (e.g. research analysis for practice Q&A). 'specific_agents' grants need one.
+        cursor.execute("""
+            SELECT grant_id, source_debate_id, source_type
+            FROM debate_memory_grants
+            WHERE debate_id = %s
+              AND (
+                  scope = 'all_agents'
+                  OR (scope = 'specific_agents' AND %s::text = ANY(allowed_participant_ids::text[]))
+              )
+              AND (expires_at IS NULL OR expires_at > NOW())
+        """, (debate_id, participant_id or ''))
+
+        grants = cursor.fetchall()
+        for grant in grants:
+            source_debate_id = str(grant['source_debate_id']) if grant['source_debate_id'] else None
+            if source_debate_id and source_debate_id not in allowed_source_debate_ids:
+                allowed_source_debate_ids.append(source_debate_id)
+                grant_ids_used.append(str(grant['grant_id']))
+                if grant.get('source_type') == 'materials_only':
+                    materials_only_sources.append(source_debate_id)
         
         # 2. Attempt semantic retrieval if requested
         retrieval_method = 'keyword'  # Default
         actual_query_embedding = query_embedding  # Use pre-computed if provided
         
         if use_semantic and not actual_query_embedding and openrouter_key:
-            # Generate query embedding on-the-fly (BYOK)
-            # Get workspace embeddings model default
+            # Generate query embedding on-the-fly (BYOK).
+            # The query MUST be embedded with the same model as the stored chunks
+            # (cosine similarity across different models is meaningless), so derive
+            # the model from the chunks themselves; workspace settings are only a
+            # fallback when no chunks are embedded yet.
             cursor.execute("""
-                SELECT w.settings->>'embeddings_model_id' AS model_id
-                FROM debates d
-                JOIN workspaces w ON d.workspace_id = w.workspace_id
-                WHERE d.debate_id = %s
-            """, (debate_id,))
-            
-            model_result = cursor.fetchone()
-            embeddings_model_id = model_result[0] if model_result and model_result[0] else 'openai/text-embedding-3-small'
-            
+                SELECT embedding_model_id AS model_id, COUNT(*) AS n
+                FROM memory_chunks
+                WHERE source_debate_id = ANY(%s::uuid[])
+                  AND embedding_status = 'complete'
+                  AND embedding_model_id IS NOT NULL
+                GROUP BY embedding_model_id
+                ORDER BY n DESC
+                LIMIT 1
+            """, (allowed_source_debate_ids,))
+            chunk_model = cursor.fetchone()
+
+            if chunk_model and chunk_model.get('model_id'):
+                embeddings_model_id = chunk_model['model_id']
+            else:
+                cursor.execute("""
+                    SELECT w.settings->>'embeddings_model_id' AS model_id
+                    FROM debates d
+                    JOIN workspaces w ON d.workspace_id = w.workspace_id
+                    WHERE d.debate_id = %s
+                """, (debate_id,))
+                model_result = cursor.fetchone()
+                embeddings_model_id = (
+                    model_result['model_id']
+                    if model_result and model_result.get('model_id')
+                    else 'openai/text-embedding-3-small'
+                )
+
             # Generate query embedding
             actual_query_embedding = get_query_embedding(query, openrouter_key, embeddings_model_id)
+            if actual_query_embedding is None:
+                print(f"memory_retrieval: query embedding failed (model={embeddings_model_id}) — falling back to keyword search")
         
         if actual_query_embedding:
             retrieval_method = 'semantic'
@@ -224,7 +252,9 @@ def retrieve_allowed_chunks(
                       -- Imported debate chunks (if grants exist)
                       OR (source_debate_id != %s)
                   )
-            """, (allowed_source_debate_ids, debate_id, debate_id))
+                  -- 'materials_only' imports: exclude agent-generated chunks
+                  AND NOT (source_debate_id = ANY(%s::uuid[]) AND agent_id IS NOT NULL)
+            """, (allowed_source_debate_ids, debate_id, debate_id, materials_only_sources))
             
             candidate_chunks = cursor.fetchall()
             
@@ -234,24 +264,25 @@ def retrieve_allowed_chunks(
             else:
                 # Compute cosine similarity for each chunk in Python
                 scored_chunks = []
-                
+
                 for row in candidate_chunks:
-                    chunk_id, chunk_text, source_debate_id, agent_id, chunk_metadata, embedding_vector, embedding_model_id = row
-                    
+                    embedding_vector = row['embedding_vector']
                     # JSONB vector is stored as array
                     if isinstance(embedding_vector, list):
                         similarity = cosine_similarity(actual_query_embedding, embedding_vector)
-                        scored_chunks.append((
-                            chunk_id,
-                            chunk_text,
-                            source_debate_id,
-                            agent_id,
-                            chunk_metadata,
-                            similarity
-                        ))
-                
+                        scored_chunks.append({
+                            'chunk_id': row['chunk_id'],
+                            'chunk_text': row['chunk_text'],
+                            'source_debate_id': row['source_debate_id'],
+                            'agent_id': row['agent_id'],
+                            'chunk_metadata': row['chunk_metadata'],
+                            'score': similarity,
+                        })
+                    else:
+                        print(f"memory_retrieval: chunk {row['chunk_id']} marked complete but has no usable vector — skipping")
+
                 # Sort by similarity (descending) and take top_k
-                scored_chunks.sort(key=lambda x: x[5], reverse=True)
+                scored_chunks.sort(key=lambda x: x['score'], reverse=True)
                 rows = scored_chunks[:top_k]
         
         if not rows:
@@ -282,6 +313,8 @@ def retrieve_allowed_chunks(
                           -- Imported debate chunks (if grants exist)
                           OR (source_debate_id != %s)
                       )
+                      -- 'materials_only' imports: exclude agent-generated chunks
+                      AND NOT (source_debate_id = ANY(%s::uuid[]) AND agent_id IS NOT NULL)
                 )
                 SELECT
                     chunk_id,
@@ -294,7 +327,7 @@ def retrieve_allowed_chunks(
                 WHERE score > 0
                 ORDER BY score DESC, chunk_id
                 LIMIT %s
-            """, (query_words, allowed_source_debate_ids, debate_id, debate_id, top_k))
+            """, (query_words, allowed_source_debate_ids, debate_id, debate_id, materials_only_sources, top_k))
             
             rows = cursor.fetchall()
         
@@ -303,18 +336,17 @@ def retrieve_allowed_chunks(
         chunk_ids = []
         
         for row in rows:
-            chunk_id, chunk_text, source_debate_id, agent_id, chunk_metadata, score = row
-            
+            chunk_metadata = row['chunk_metadata']
             chunks.append(MemoryChunkResult(
-                chunk_id=chunk_id,
-                chunk_text=chunk_text,
-                source_debate_id=source_debate_id,
+                chunk_id=str(row['chunk_id']),
+                chunk_text=row['chunk_text'],
+                source_debate_id=str(row['source_debate_id']),
                 source_material_id=chunk_metadata.get('material_id') if chunk_metadata else None,
-                agent_id=agent_id,
+                agent_id=str(row['agent_id']) if row['agent_id'] else None,
                 chunk_metadata=chunk_metadata or {},
-                score=float(score)
+                score=float(row['score'])
             ))
-            chunk_ids.append(chunk_id)
+            chunk_ids.append(str(row['chunk_id']))
         
         # 5. Log retrieval to memory_access_log for audit (only if agent_id resolved)
         if agent_id_for_logging:
@@ -403,14 +435,14 @@ def check_participant_has_access(
                   AND source_debate_id = %s
                   AND (
                       scope = 'all_agents'
-                      OR (scope = 'specific_agents' AND %s = ANY(allowed_participant_ids))
+                      OR (scope = 'specific_agents' AND %s::text = ANY(allowed_participant_ids::text[]))
                   )
                   AND (expires_at IS NULL OR expires_at > NOW())
-            )
+            ) AS has_access
         """, (debate_id, source_debate_id, participant_id))
-        
+
         result = cursor.fetchone()
-        return result[0] if result else False
+        return bool(result['has_access']) if result else False
     
     finally:
         cursor.close()

@@ -77,10 +77,31 @@ async def websocket_debate_room(
         query_params = dict(websocket.query_params)
         print(f"📝 Query params: {list(query_params.keys())}")
         
-        # TEMPORARY: Ultra-simple connection for debugging - accept connection immediately
-        user_id = '00000000-0000-0000-0000-000000000999'
-        workspace_id = '00000000-0000-0000-0000-000000000101'
-        
+        # Auth: mirrors HTTP behavior — open in dev (require_auth=false),
+        # JWT required via ?token= query param otherwise.
+        from ..config import settings as _settings
+        if _settings.require_auth:
+            token = query_params.get('token')
+            if not token:
+                logger.warning(f"WS rejected (no token): debate={debate_id}")
+                await websocket.close(code=1008, reason="Missing auth token")
+                return
+            try:
+                user = await get_current_user_ws(token)
+            except Exception as auth_exc:
+                logger.warning(f"WS rejected (invalid token): debate={debate_id} — {auth_exc}")
+                await websocket.close(code=1008, reason="Invalid auth token")
+                return
+            user_id = user.get('sub') or user.get('user_id') or 'unknown'
+            workspace_id = user.get('workspace_id')
+            if not workspace_id:
+                await websocket.close(code=1008, reason="User not associated with a workspace")
+                return
+        else:
+            # Local dev identity (same defaults as HTTP auth bypass)
+            user_id = 'test-user'
+            workspace_id = '00000000-0000-0000-0000-000000000101'
+
         print(f"✅ Attempting to connect WebSocket...")
         logger.info(f"✅ Attempting to connect WebSocket...")
         

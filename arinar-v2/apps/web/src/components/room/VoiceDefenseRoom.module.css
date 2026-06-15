@@ -855,3 +855,34 @@
 }
 
 .reportBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Readiness outlook chip (qualitative band, never a mark) ───────────── */
+
+.outlookChip {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}
+
+.outlookStrong {
+  background: rgba(74, 222, 128, 0.14);
+  color: #22a35a;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+
+.outlookAlmost {
+  background: rgba(245, 166, 35, 0.12);
+  color: #c47d12;
+  border: 1px solid rgba(245, 166, 35, 0.4);
+}
+
+.outlookPractice {
+  background: rgba(255, 107, 107, 0.12);
+  color: #d64545;
+  border: 1px solid rgba(255, 107, 107, 0.4);
+}

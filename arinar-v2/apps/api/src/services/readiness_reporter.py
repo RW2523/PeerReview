@@ -1,14 +1,13 @@
 """
-Readiness Reporter
-==================
+Feedback Reporter
+=================
 Aggregates all session_answers for a debate and generates a structured
-readiness report that tells the student:
-- overall readiness score
-- scores per dimension
-- strong / weak answers
+feedback report that tells the student:
+- strong / weak answers (qualitative)
 - repeated issues
-- likely follow-up questions from the committee
+- likely follow-up questions from a review panel
 - a concrete improvement plan
+(Numeric aggregates are kept internally and never shown as marks.)
 """
 from __future__ import annotations
 
@@ -24,13 +23,13 @@ from ..utils.json_repair import parse_llm_json
 
 
 _SYSTEM = """\
-You are an academic defense coach generating a readiness report.
-You are given aggregated scores from a student's mock defense session.
+You are an academic review coach generating a structured feedback report.
+You are given aggregated evaluations from a student's practice review session.
 
 Rules:
 - Be constructive, specific, and evidence-grounded.
 - Cite specific questions/answers by category when pointing out patterns.
-- Use cautious language about readiness: "appears ready", "may need more work".
+- Use cautious, qualitative language: "appears well prepared", "may need more work". Never mention marks or grades in text fields.
 - Return ONLY valid JSON — no markdown, no extra text.
 """
 
@@ -74,12 +73,12 @@ Return a JSON object with EXACTLY these keys:
     {{"issue": "<description>", "frequency": <count>}}
   ],
   "likely_questions": [
-    "<question the committee is likely to ask in the real defense>"
+    "<question a review panel is likely to ask in a formal review>"
   ],
   "improvement_plan": [
     {{"area": "<area>", "action": "<what to do>", "priority": "high|medium|low"}}
   ],
-  "next_recommendation": "<one sentence on what to do next before the real defense>"
+  "next_recommendation": "<one sentence on what to do next before the formal review>"
 }}
 """
 

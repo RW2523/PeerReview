@@ -158,7 +158,7 @@ def analyze_research(
                     weak_areas         = %s,
                     possible_questions = %s,
                     raw_analysis       = %s,
-                    chunks_used        = %s,
+                    chunks_used        = %s::uuid[],
                     chunk_count        = %s,
                     model_used         = %s,
                     status             = 'complete',

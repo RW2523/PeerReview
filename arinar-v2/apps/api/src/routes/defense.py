@@ -1,5 +1,5 @@
 """
-Academic Defense Readiness — API routes
+Academic Review & Feedback — API routes
 ========================================
 All endpoints are scoped to an existing debate/session ID.
 
@@ -193,7 +193,7 @@ async def trigger_question_generation(
     x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Generate committee-style defense questions from the research profile."""
+    """Generate panel-style review questions from the research profile."""
     key = _require_key(x_openrouter_key)
     debate = _get_debate_or_404(debate_id)
     check_workspace_access(current_user, debate["workspace_id"])
@@ -227,7 +227,7 @@ async def list_defense_questions(
     unanswered_only: bool = False,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """List generated defense questions (optionally filter to unanswered only)."""
+    """List generated review questions (optionally filter to unanswered only)."""
     debate = _get_debate_or_404(debate_id)
     check_workspace_access(current_user, debate["workspace_id"])
 

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOpenRouterKey } from '@/hooks/useOpenRouterKey';
 import * as api from '@/lib/api';
+import PracticeJourneyCard from './PracticeJourneyCard';
+import AcademicAssessmentCard from './AcademicAssessmentCard';
 import styles from './SummaryReport.module.css';
 
 interface SummaryReportProps {
@@ -12,6 +14,8 @@ interface SummaryReportProps {
     items: { id: string; text: string }[];
     outcome: { desired: string; criteria: string[] };
   };
+  /** Switches the room to the Practice Q&A tab. */
+  onStartPractice?: () => void;
 }
 
 interface Summary {
@@ -25,7 +29,7 @@ interface Summary {
   }[];
 }
 
-export default function SummaryReport({ debateId, agendaData }: SummaryReportProps) {
+export default function SummaryReport({ debateId, agendaData, onStartPractice }: SummaryReportProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -60,11 +64,14 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
 
   if (!summary) {
     return (
-      <div className={styles.generatePanel}>
+      <div className={styles.generateWrap}>
+        <PracticeJourneyCard debateId={debateId} onStartPractice={onStartPractice} />
+        <AcademicAssessmentCard debateId={debateId} triggerSource="panel_discussion" />
+        <div className={styles.generatePanel}>
         <div className={styles.icon} />
-        <h3>Generate Readiness Report</h3>
+        <h3>Generate Feedback Report</h3>
         <p>
-          Create a comprehensive readiness report with scores and improvement recommendations using AI.
+          Create a structured feedback report with strengths, areas to improve, and concrete recommendations using AI.
         </p>
 
         {!apiKey && (
@@ -86,8 +93,9 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
           disabled={loading}
           className={styles.generateBtn}
         >
-          {loading ? 'Generating...' : 'Generate Readiness Report'}
+          {loading ? 'Generating...' : 'Generate Feedback Report'}
         </button>
+        </div>
       </div>
     );
   }
@@ -95,7 +103,7 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
   return (
     <div className={styles.report}>
       <div className={styles.reportHeader}>
-        <h2>Defense Session Report</h2>
+        <h2>Review Session Report</h2>
         <div className={styles.headerActions}>
           <button
             onClick={() => router.push('/history')}
@@ -112,10 +120,16 @@ export default function SummaryReport({ debateId, agendaData }: SummaryReportPro
         </div>
       </div>
 
+      {/* Preparation funnel — the report is not the end of the journey */}
+      <PracticeJourneyCard debateId={debateId} onStartPractice={onStartPractice} />
+
+      {/* Ten-dimension academic assessment */}
+      <AcademicAssessmentCard debateId={debateId} triggerSource="panel_discussion" />
+
       {/* Agenda & Outcome Review */}
       {(agendaData.items.length > 0 || agendaData.outcome.desired) && (
         <section className={styles.section}>
-          <h3>Defense Context</h3>
+          <h3>Session Context</h3>
           
           {agendaData.items.length > 0 && (
             <div className={styles.agendaReview}>

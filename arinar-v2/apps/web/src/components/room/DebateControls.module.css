@@ -208,3 +208,21 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(30, 27, 75, 0.3);
 }
+
+/* ── Auto Mode ─────────────────────────────────────────────────────────── */
+
+.btnAuto {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover, var(--accent)));
+  color: #fff;
+  border: none;
+  font-weight: 700;
+}
+
+.btnAuto:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btnAuto:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -927,3 +927,79 @@
   color: #ff6b6b;
   margin-bottom: 12px;
 }
+
+/* ── API key warning (theme-aware) ─────────────────────────────────────── */
+
+.keyWarning {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--warning, #f5a623);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.keyWarningIcon {
+  font-size: 1.6rem;
+}
+
+.keyWarning strong {
+  color: var(--text-1, var(--text-2));
+  font-size: 0.95rem;
+}
+
+.keyWarning p {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: 0.875rem;
+}
+
+.keyWarning a {
+  font-weight: 700;
+  text-decoration: underline;
+  color: var(--accent);
+}
+
+.settingsLink {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 10px 20px;
+  background: var(--warning, #f5a623);
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ── Readiness outlook chip (qualitative band, never a mark) ───────────── */
+
+.outlookChip {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}
+
+.outlookStrong {
+  background: rgba(74, 222, 128, 0.14);
+  color: #22a35a;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+
+.outlookAlmost {
+  background: rgba(245, 166, 35, 0.12);
+  color: #c47d12;
+  border: 1px solid rgba(245, 166, 35, 0.4);
+}
+
+.outlookPractice {
+  background: rgba(255, 107, 107, 0.12);
+  color: #d64545;
+  border: 1px solid rgba(255, 107, 107, 0.4);
+}

@@ -17,10 +17,12 @@ interface DebateControlsProps {
   onPolicyUpdate?: () => void;
   onStateChange: (newState: string) => void;
   onYoloStatusChange?: (status: string | null) => void;
+  /** Called when Auto Mode is switched on from the controls. */
+  onAutoModeChange?: (enabled: boolean) => void;
   sendCommand?: (command: WSCommandType, payload?: Record<string, any>) => Promise<WSAckMessage>;
 }
 
-export default function DebateControls({ debateId, currentState, isYoloMode = false, yoloStatus, policyConfig, totalTurns = 0, participantCount = 0, onPolicyUpdate, onStateChange, onYoloStatusChange, sendCommand }: DebateControlsProps) {
+export default function DebateControls({ debateId, currentState, isYoloMode = false, yoloStatus, policyConfig, totalTurns = 0, participantCount = 0, onPolicyUpdate, onStateChange, onYoloStatusChange, onAutoModeChange, sendCommand }: DebateControlsProps) {
   const { apiKey } = useOpenRouterKey();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
   const [triggeringTurn, setTriggeringTurn] = useState(false);
   const [extending, setExtending] = useState(false);
   const [pausingYolo, setPausingYolo] = useState(false);
+  const [startingAuto, setStartingAuto] = useState(false);
   
   // Debug: Log API key status
   console.log('🔑 DebateControls API Key:', apiKey ? `EXISTS (${apiKey.substring(0, 15)}...)` : 'NOT FOUND');
@@ -128,6 +131,7 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
     setError(null);
     try {
       await api.pauseAutonomousDebate(debateId);
+      onYoloStatusChange?.('paused');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to pause autonomous debate');
     } finally {
@@ -140,16 +144,42 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
       setError('OpenRouter API key required. Please add it in Settings.');
       return;
     }
-    
+
     setPausingYolo(true);
     setError(null);
     try {
       await api.resumeAutonomousDebate(debateId, apiKey);
-      console.log('✅ YOLO autonomous loop restarted');
+      onYoloStatusChange?.('running');
+      console.log('✅ Auto mode loop restarted');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resume autonomous debate');
     } finally {
       setPausingYolo(false);
+    }
+  };
+
+  // Auto Mode: run the whole session hands-free — each panel member speaks in
+  // turn (waiting for the previous turn to finish) until all rounds complete,
+  // then the session concludes automatically.
+  const handleStartAutoMode = async () => {
+    if (!apiKey) {
+      setError('OpenRouter API key required for Auto Mode. Please add it in Settings.');
+      return;
+    }
+    setStartingAuto(true);
+    setError(null);
+    try {
+      if (currentState === 'pending') {
+        const result = await api.startDebate(debateId, apiKey);
+        onStateChange(result.state);
+      }
+      await api.startAutonomousDebate(debateId, 5, apiKey);
+      onAutoModeChange?.(true);
+      onYoloStatusChange?.('running');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start Auto Mode');
+    } finally {
+      setStartingAuto(false);
     }
   };
 
@@ -345,6 +375,41 @@ export default function DebateControls({ debateId, currentState, isYoloMode = fa
           >
             {triggeringTurn ? '🤔 Agent thinking...' : shouldConclude ? '🏁 Conclude Meeting' : '▶ Next Turn'} {!triggeringTurn && !shouldConclude && currentState === 'running' && !isYoloMode ? <span style={{opacity: 0.6, fontSize: '0.85em'}}>(Space)</span> : null}
           </button>
+        )}
+
+        {!isYoloMode && !shouldConclude && (currentState === 'pending' || currentState === 'running') && (
+          <button
+            onClick={handleStartAutoMode}
+            disabled={startingAuto || !apiKey}
+            className={styles.btnAuto}
+            title={!apiKey
+              ? 'Add OpenRouter API key in Settings'
+              : 'Run the whole session automatically — each panel member speaks in turn until all rounds are complete'}
+          >
+            {startingAuto ? '⚡ Starting Auto Mode…' : '⚡ Auto Mode'}
+          </button>
+        )}
+
+        {isYoloMode && currentState !== 'ended' && (
+          yoloStatus === 'paused' ? (
+            <button
+              onClick={handleResumeYolo}
+              disabled={pausingYolo}
+              className={styles.btnAuto}
+              title="Resume automatic turns"
+            >
+              {pausingYolo ? 'Resuming…' : '⚡ Resume Auto'}
+            </button>
+          ) : (
+            <button
+              onClick={handlePauseYolo}
+              disabled={pausingYolo}
+              className={styles.btnAuto}
+              title="Pause automatic turns — you can resume any time"
+            >
+              {pausingYolo ? 'Pausing…' : '⏸ Pause Auto'}
+            </button>
+          )
         )}
 
         {canExtend && (

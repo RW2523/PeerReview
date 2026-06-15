@@ -107,17 +107,26 @@ def test_materials_upload_and_process_e2e():
     assert processing_metadata['word_count'] > 0
     assert processing_metadata['chunk_count'] > 0
     
-    # 5. Verify memory_chunks exist with provenance
-    cursor.execute("""
-        SELECT chunk_id, chunk_text, chunk_metadata, agent_id, source_debate_id
-        FROM memory_chunks
-        WHERE chunk_metadata->>'material_id' = %s
-        ORDER BY (chunk_metadata->>'chunk_index')::int
-    """, (material_id,))
-    
-    chunks = cursor.fetchall()
+    # 5. Verify memory_chunks exist with provenance.
+    # A live Celery worker may process the same queued upload concurrently with
+    # the synchronous call above; processing is idempotent, so poll briefly
+    # until the chunk set settles instead of racing the worker.
+    import time
+    chunks = []
+    for _ in range(10):
+        cursor.execute("""
+            SELECT chunk_id, chunk_text, chunk_metadata, agent_id, source_debate_id
+            FROM memory_chunks
+            WHERE chunk_metadata->>'material_id' = %s
+            ORDER BY (chunk_metadata->>'chunk_index')::int
+        """, (material_id,))
+        chunks = cursor.fetchall()
+        if len(chunks) == processing_metadata['chunk_count']:
+            break
+        conn.rollback()  # fresh snapshot for the next poll
+        time.sleep(1)
     conn.close()
-    
+
     assert len(chunks) > 0, "No chunks created"
     assert len(chunks) == processing_metadata['chunk_count']
     

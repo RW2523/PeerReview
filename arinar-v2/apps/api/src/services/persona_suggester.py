@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 
 from ..openrouter_client import OpenRouterClient
 from .reasoning_modes import get_model, get_persona_model, ReasoningMode
-from .persona_prompts import build_system_prompt, resolve_role, BASE_PROMPTS
+from .persona_prompts import build_system_prompt, resolve_role, BASE_PROMPTS, ROLE_DISPLAY
 
 COMMITTEE_ROLES = [
     "Advisor",
@@ -33,20 +33,20 @@ COMMITTEE_ROLES = [
     "Domain Expert",
     "Skeptical Reviewer",
     "Friendly Professor",
-    "External Examiner",
+    "Independent Reviewer",
 ]
 
 # ── Persona generation system prompt ────────────────────────────────────────
 
 _SYSTEM = """\
-You are a graduate defense committee designer.
+You are an academic review panel designer.
 
-Given a research profile, generate 6 highly specific, realistic AI committee personas.
+Given a research profile, generate 6 highly specific, realistic AI reviewer personas.
 
 Each persona must be:
   - A real-sounding academic (first name, last name, institution, country)
   - Deeply matched to the research domain, methodology, and identified weak areas
-  - Assigned exactly one of the 6 committee roles
+  - Assigned exactly one of the 6 panel roles
   - Likely to ask questions UNIQUE to their role AND to this specific research
 
 Critical requirements:
@@ -96,13 +96,13 @@ Limitations (stated or apparent):
 Known weak areas:
 {weak_areas}
 
-Possible committee questions (already identified):
+Possible review questions (already identified):
 {possible_questions}
 
 Inferred domain:
 {domain_hint}
 
-## Committee Roles to Assign (one per persona — do not reuse)
+## Panel Roles to Assign (one per persona — do not reuse)
 {roles}
 
 ## Instructions
@@ -119,7 +119,7 @@ def suggest_personas(
     mode: ReasoningMode = "medium",
 ) -> List[Dict[str, Any]]:
     """
-    Return 6 fully-built committee personas for the given research profile.
+    Return 6 fully-built reviewer personas for the given research profile.
 
     Each returned dict has:
       name, role, expertise, focus_area, system_prompt, model_id
@@ -204,7 +204,7 @@ def suggest_personas(
         used_roles.add(canonical)
 
         # Decompose name
-        full_name_str = p.get("name", f"Dr. Reviewer ({canonical.title()})")
+        full_name_str = p.get("name", f"Dr. Reviewer ({ROLE_DISPLAY.get(canonical, canonical.title())})")
         # Extract just "First Last" for the build call
         name_part = full_name_str.split(",")[0].strip()
         institution = _extract_institution(full_name_str)
@@ -229,32 +229,33 @@ def suggest_personas(
 
         result.append({
             "name":         full_name_str,
-            "role":         canonical.title(),
+            "role":         ROLE_DISPLAY.get(canonical, canonical.title()),
             "expertise":    p.get("expertise", ""),
             "focus_area":   p.get("focus_area", ""),
             "system_prompt": full_prompt,
-            "model_id":     get_persona_model(canonical, mode),
+            "model_id":     get_persona_model(ROLE_DISPLAY.get(canonical, canonical.title()), mode),
         })
 
     # Fill missing roles if LLM returned fewer than 6
     all_canonicals = [resolve_role(r) for r in COMMITTEE_ROLES]
     for canonical in all_canonicals:
         if canonical not in used_roles:
+            display = ROLE_DISPLAY.get(canonical, canonical.title())
             full_prompt = build_system_prompt(
                 role=canonical,
-                persona_name=f"Dr. Committee Member ({canonical.title()})",
+                persona_name=f"Dr. Panel Member ({display})",
                 institution="Academic Institution",
-                expertise=f"{canonical.title()} expert",
+                expertise=f"{display} expert",
                 focus_area="Evaluate research quality from the assigned reviewer lane",
                 research_profile=research_profile,
             )
             result.append({
-                "name":         f"Dr. Committee Member ({canonical.title()})",
-                "role":         canonical.title(),
-                "expertise":    f"{canonical.title()} expertise",
+                "name":         f"Dr. Panel Member ({display})",
+                "role":         display,
+                "expertise":    f"{display} expertise",
                 "focus_area":   "Evaluate research quality",
                 "system_prompt": full_prompt,
-                "model_id":     get_persona_model(canonical, mode),
+                "model_id":     get_persona_model(display, mode),
             })
             used_roles.add(canonical)
 

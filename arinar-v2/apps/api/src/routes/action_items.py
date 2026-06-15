@@ -1,10 +1,10 @@
 """
-Transcript action items & committee decision debates.
+Transcript action items & panel decision discussions.
 
 Flow:
 1. Extract action items from a meeting transcript material (LLM).
 2. List / edit those action items.
-3. Spawn a short autonomous committee debate to decide one (reuses the debate engine).
+3. Spawn a short autonomous panel discussion to decide one (reuses the debate engine).
 4. Poll the decision once the child debate concludes.
 """
 
@@ -25,7 +25,7 @@ from ..autonomous_debate_service import autonomous_service
 
 router = APIRouter()
 
-# Default model for action-item extraction and the small decision committee
+# Default model for action-item extraction and the small decision panel
 DEFAULT_MODEL = "openai/gpt-4o-mini"
 # Decision debates are intentionally short
 DECISION_MAX_ROUNDS = 2
@@ -297,7 +297,7 @@ def _build_committee(cursor, debate_id: str) -> List[dict]:
                 "name": "Advisor",
                 "role_description": "Pragmatic decision advisor",
                 "system_prompt": (
-                    "You are a pragmatic advisor on a small committee deciding what to do about a "
+                    "You are a pragmatic advisor on a small panel deciding what to do about a "
                     "single action item. Argue for the most effective, feasible course of action and "
                     "respond to the critic's concerns."
                 ),
@@ -307,7 +307,7 @@ def _build_committee(cursor, debate_id: str) -> List[dict]:
                 "name": "Critic",
                 "role_description": "Risk-focused critic",
                 "system_prompt": (
-                    "You are a risk-focused critic on a small committee deciding what to do about a "
+                    "You are a risk-focused critic on a small panel deciding what to do about a "
                     "single action item. Surface risks, trade-offs and alternatives, then converge on "
                     "the soundest decision."
                 ),
@@ -324,7 +324,7 @@ async def debate_action_item(
     x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
     workspace_id: str = Depends(require_auth),
 ):
-    """Spawn a short autonomous committee debate to decide this action item."""
+    """Spawn a short autonomous panel discussion to decide this action item."""
     if not x_openrouter_key:
         raise HTTPException(status_code=400, detail="OpenRouter API key required (X-OpenRouter-Key)")
 
@@ -452,7 +452,7 @@ async def get_action_item_decision(
 
 
 def _extract_recommendation(summary: Optional[dict]) -> tuple:
-    """Pull the committee's recommendation from a debate summary.
+    """Pull the panel's recommendation from a debate summary.
 
     SummaryService encodes the recommendation as a special action_items entry
     (_type == 'recommendation'); fall back to the summary text.

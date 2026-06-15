@@ -51,11 +51,11 @@ def test_get_agent_templates():
         assert isinstance(template['model_config'], dict)
         assert isinstance(template['category'], str)
     
-    # Verify category coverage (ensure diversity of templates)
+    # Verify category coverage (ensure diversity of academic reviewer templates)
     categories = {t['category'] for t in templates}
-    assert 'Product' in categories
-    assert 'Engineering' in categories
-    assert 'Design' in categories
+    assert 'Methods' in categories
+    assert 'Domain' in categories
+    assert 'Critics' in categories
     assert len(categories) >= 3  # At least 3 different categories
 
 
@@ -219,20 +219,25 @@ def test_debate_setup_participant_limit():
     assert 'maximum' in response.json()['detail'].lower()
 
 
-def test_debate_setup_requires_at_least_one_participant():
-    """Test that debate setup requires at least one participant"""
+def test_debate_setup_allows_deferred_staffing_but_start_requires_panel():
+    """Setup may create a session with an empty panel (deferred staffing —
+    the wizard uploads materials before panel selection), but the session
+    cannot START until at least one panel member exists."""
     workspace_id = '00000000-0000-0000-0000-000000000101'
-    
+
     response = client.post("/debates/setup", json={
         "workspace_id": workspace_id,
-        "title": "No Participants",
-        "problem_statement": "Test",
+        "title": "No Participants Yet",
+        "problem_statement": "Test deferred staffing",
         "participants": [],
         "materials": []
     })
-    
-    assert response.status_code == 400
-    assert 'at least 1' in response.json()['detail'].lower()
+    assert response.status_code == 201
+    debate_id = response.json()['debate_id']
+
+    start = client.post(f"/debates/{debate_id}/start")
+    assert start.status_code == 400
+    assert 'panel member' in start.json()['detail'].lower()
 
 
 def test_debate_setup_inline_participant_validation():

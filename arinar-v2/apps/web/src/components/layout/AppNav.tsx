@@ -44,7 +44,7 @@ export default function AppNav() {
               href="/room"
               className={`${styles.link} ${isActive('/room') ? styles.active : ''}`}
             >
-              Mock Defense
+              Review Room
             </Link>
             <Link
               href="/history"

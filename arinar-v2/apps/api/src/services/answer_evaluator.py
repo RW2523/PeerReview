@@ -1,7 +1,7 @@
 """
 Answer Evaluator
 ================
-Evaluates a student's answer to a defense question on 6 axes:
+Evaluates a student's answer to a review question on 6 axes (internal only — never shown as marks):
   relevance, evidence_support, clarity, completeness,
   methodology_understanding, critical_thinking
 
@@ -19,8 +19,10 @@ from .reasoning_modes import get_model, ReasoningMode
 from ..utils.json_repair import parse_llm_json
 
 _SYSTEM = """\
-You are a PhD defense committee evaluator.
-Your task is to score and critique a student's answer to one specific defense question.
+You are an academic review panel evaluator.
+Your task is to assess and critique a student's answer to one specific review question.
+Your numeric assessments are used internally to decide follow-ups — the student only
+sees your qualitative feedback, so make it specific and actionable.
 
 Scoring scale: 0–10 for each axis.
 - 0–3  : Poor   (major gaps, inaccurate, or off-topic)
@@ -37,7 +39,7 @@ Rules:
 """
 
 _USER_TEMPLATE = """\
-## Defense Question
+## Review Question
 Category: {category}  |  Persona: {persona}  |  Difficulty: {difficulty}
 Question: {question_text}
 Expected answer direction: {expected_answer}

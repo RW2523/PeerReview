@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as api from '@/lib/api';
+import { keyStore } from '@/lib/openrouterKeyStore';
 import { ModelSelector } from './ModelSelector';
 import styles from './SetupSteps.module.css';
 
@@ -7,6 +8,9 @@ interface ParticipantsStepProps {
   participants: api.SetupParticipant[];
   templates: api.AgentTemplate[];
   agents: api.Agent[];
+  /** Session title + abstract — used by the AI panel suggester. */
+  sessionTitle?: string;
+  sessionAbstract?: string;
   enableHost: boolean;
   hostModelId?: string;
   enableDocuments?: boolean;
@@ -28,6 +32,8 @@ export function ParticipantsStep({
   participants,
   templates,
   agents,
+  sessionTitle,
+  sessionAbstract,
   enableHost,
   hostModelId,
   enableDocuments,
@@ -49,6 +55,11 @@ export function ParticipantsStep({
   const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [showAllAgents, setShowAllAgents] = useState(false);
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<
+    { template: api.AgentTemplate; reason: string }[] | null
+  >(null);
 
   const handleMoveUp = (idx: number) => {
     if (idx > 0 && onReorder) {
@@ -106,12 +117,56 @@ export function ParticipantsStep({
     return participants.some(p => p.agent_id === agentId);
   };
 
+  // ── AI panel suggestion ────────────────────────────────────────────────
+  const handleSuggestPanel = async () => {
+    setSuggestError(null);
+    const key = keyStore.getKey();
+    if (!key) {
+      setSuggestError('Add your OpenRouter API key in Settings to use AI suggestions.');
+      return;
+    }
+    if (!(sessionTitle || '').trim() && !(sessionAbstract || '').trim()) {
+      setSuggestError('Fill in the research title and abstract in Step 1 first.');
+      return;
+    }
+    setSuggesting(true);
+    try {
+      const res = await api.suggestPanelTemplates(
+        sessionTitle || '',
+        sessionAbstract || '',
+        availableTemplates,
+        key,
+        5,
+      );
+      const matched = res.suggestions
+        .map(s => {
+          const template = availableTemplates.find(t => t.template_id === s.template_id);
+          return template ? { template, reason: s.reason } : null;
+        })
+        .filter((x): x is { template: api.AgentTemplate; reason: string } => x !== null);
+      setSuggestions(matched);
+      // Auto-select the suggested templates (respect the 8-member cap)
+      let slots = 8 - participants.length;
+      for (const { template } of matched) {
+        if (slots <= 0) break;
+        if (!isTemplateSelected(template.template_id)) {
+          onAddFromTemplate(template);
+          slots -= 1;
+        }
+      }
+    } catch (e) {
+      setSuggestError(e instanceof Error ? e.message : 'Suggestion failed');
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   return (
     <div className={styles.section}>
-      <h2>Select AI Committee Members ({participants.length}/8)</h2>
+      <h2>Select AI Panel Members ({participants.length}/8)</h2>
       <p className={styles.hint}>
-        Assemble your mock defense committee. Mix domain experts, methodologists, skeptical reviewers, and external examiners for thorough defense preparation.
-        <strong> Min 2, Max 8 committee members.</strong>
+        Assemble your review panel. Mix domain experts, methodologists, skeptical reviewers, and independent reviewers for thorough preparation.
+        <strong> Min 2, Max 8 panel members.</strong>
       </p>
 
       {/* Compact Ultimate Host Toggle */}
@@ -119,8 +174,8 @@ export function ParticipantsStep({
         <div className={styles.hostToggleRow}>
           <label htmlFor="enable-host" className={styles.hostToggleLabel}>
             <span className={styles.hostIcon} />
-            <span className={styles.hostName}>Enable Defense Chair</span>
-            <span className={styles.hostHint}>Neutral chair synthesizes all committee positions and delivers final recommendation</span>
+            <span className={styles.hostName}>Enable Panel Chair</span>
+            <span className={styles.hostHint}>Neutral chair synthesizes all panel positions and delivers final recommendation</span>
           </label>
           
           <div className={styles.hostControls}>
@@ -173,7 +228,7 @@ export function ParticipantsStep({
                   title="Document Template"
                   style={{marginRight: '8px'}}
                 >
-                  <option value="meeting-summary">Defense Readiness Report</option>
+                  <option value="meeting-summary">Session Feedback Report</option>
                   <option value="medical-consultation">Research Summary</option>
                   <option value="technical-decision">Technical Review</option>
                   <option value="business-strategy">Methodology Assessment</option>
@@ -209,6 +264,14 @@ export function ParticipantsStep({
           <div className={styles.templates}>
             <div className={styles.templateHeader}>
               <h3>Agent Templates</h3>
+              <button
+                onClick={handleSuggestPanel}
+                disabled={suggesting || participants.length >= 8}
+                className={styles.suggestPanelBtn}
+                title="AI reads your title and abstract and picks the 5 most relevant panel members"
+              >
+                {suggesting ? '✨ Matching panel to your research…' : '✨ Suggest Panel from Title & Abstract'}
+              </button>
               <div className={styles.categoryFilter}>
                 {categories.map((category) => (
                   <button
@@ -221,6 +284,23 @@ export function ParticipantsStep({
                 ))}
               </div>
             </div>
+
+            {suggestError && <div className={styles.error}>{suggestError}</div>}
+
+            {suggestions && suggestions.length > 0 && (
+              <div className={styles.suggestionBox}>
+                <div className={styles.suggestionTitle}>
+                  ✨ Suggested for your research (auto-selected):
+                </div>
+                <ul className={styles.suggestionList}>
+                  {suggestions.map(({ template, reason }) => (
+                    <li key={template.template_id}>
+                      <strong>{template.label}</strong> — {reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className={styles.templateGrid}>
               {displayedTemplates.map((template) => {
                 const isSelected = isTemplateSelected(template.template_id);

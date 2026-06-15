@@ -51,7 +51,7 @@ export default function LoginPage() {
           <span className={styles.loginIcon}>🎓</span>
           <h1>PeerForge</h1>
         </div>
-        <p className={styles.subtitle}>Sign in to your Academic Defense Readiness Platform</p>
+        <p className={styles.subtitle}>Sign in to your academic review workspace</p>
 
         <div className={styles.toggle}>
           <button

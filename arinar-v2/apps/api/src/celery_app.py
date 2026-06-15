@@ -3,6 +3,8 @@ Celery application configuration for Arinar V2
 Handles asynchronous material processing tasks
 """
 
+import os
+
 from celery import Celery
 from src.config import settings
 
@@ -28,6 +30,10 @@ celery_app.conf.update(
     worker_max_tasks_per_child=50,  # Restart worker after 50 tasks (prevent memory leaks)
     task_acks_late=True,  # Only ack after task completion (safe for crashes)
     task_reject_on_worker_lost=True,  # Requeue if worker crashes
+    # Eager mode: run tasks synchronously in the API process — no worker or
+    # Redis needed. For small single-instance deployments (free tiers).
+    task_always_eager=os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true",
+    task_eager_propagates=os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true",
     result_expires=3600,  # Results expire after 1 hour
 )
 

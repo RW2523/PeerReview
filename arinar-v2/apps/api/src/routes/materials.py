@@ -354,7 +354,7 @@ async def trigger_embedding_generation(
             raise HTTPException(status_code=404, detail="Debate not found")
 
         cursor.execute(
-            "SELECT COUNT(*) FROM memory_chunks WHERE source_debate_id = %s AND agent_id IS NULL AND embedding_status IN ('not_started','failed')",
+            "SELECT COUNT(*) FROM memory_chunks WHERE source_debate_id = %s AND agent_id IS NULL AND (embedding_status IN ('not_started','failed') OR embedding_status IS NULL)",
             (debate_id,),
         )
         pending_count = cursor.fetchone()[0]

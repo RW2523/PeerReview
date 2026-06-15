@@ -11,6 +11,35 @@ import httpx
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def _no_account_key():
+    """These tests assert missing-key errors. The key-resolution middleware
+    injects the dev user's account-stored key when present, so clear it (and
+    its cache) for the duration of each test."""
+    import psycopg2
+    from src.config import settings as _settings
+    from src.routes.user_settings import invalidate_key_cache
+
+    conn = psycopg2.connect(_settings.database_url)
+    cur = conn.cursor()
+    cur.execute("SELECT openrouter_key_encrypted FROM user_settings WHERE user_id = 'test-user'")
+    row = cur.fetchone()
+    saved = row[0] if row else None
+    cur.execute("DELETE FROM user_settings WHERE user_id = 'test-user'")
+    conn.commit()
+    invalidate_key_cache('test-user')
+    yield
+    if saved is not None:
+        cur.execute("""
+            INSERT INTO user_settings (user_id, openrouter_key_encrypted)
+            VALUES ('test-user', %s)
+            ON CONFLICT (user_id) DO UPDATE SET openrouter_key_encrypted = EXCLUDED.openrouter_key_encrypted
+        """, (saved,))
+        conn.commit()
+    invalidate_key_cache('test-user')
+    conn.close()
+
+
 # ============================================================================
 # GET /openrouter/account tests
 # ============================================================================

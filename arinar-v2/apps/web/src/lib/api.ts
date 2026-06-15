@@ -5,6 +5,24 @@ import { getAccessToken } from './supabase';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+/**
+ * Render a FastAPI error `detail` as a readable message.
+ * 422 validation errors return an ARRAY of objects — stringifying them naively
+ * produces "[object Object]" in alerts.
+ */
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (!detail) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map((d: any) => {
+      const loc = Array.isArray(d?.loc) ? d.loc.filter((x: any) => x !== 'body').join('.') : '';
+      return d?.msg ? (loc ? `${loc}: ${d.msg}` : d.msg) : JSON.stringify(d);
+    });
+    return messages.join('; ') || fallback;
+  }
+  return JSON.stringify(detail);
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const token = await getAccessToken();
   
@@ -372,8 +390,8 @@ export async function setupDebate(request: DebateSetupRequest): Promise<DebateSe
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || `Failed to setup debate: ${response.statusText}`);
+    const error = await response.json().catch(() => null);
+    throw new Error(formatErrorDetail(error?.detail, `Failed to setup debate: ${response.statusText}`));
   }
   
   return response.json();
@@ -1214,7 +1232,8 @@ export async function addParticipantsToDebate(
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to add participants: ${response.statusText}`);
+    const error = await response.json().catch(() => null);
+    throw new Error(formatErrorDetail(error?.detail, `Failed to add participants: ${response.statusText}`));
   }
   
   return response.json();
@@ -1541,7 +1560,7 @@ export async function listSavedWebResults(debateId: string): Promise<{
 }
 
 // ============================================================================
-// DEFENSE PLATFORM API
+// ACADEMIC REVIEW PLATFORM API
 // ============================================================================
 
 export type ReasoningMode = 'light' | 'medium' | 'heavy';
@@ -1782,5 +1801,147 @@ export async function getReadinessReport(debateId: string): Promise<ReadinessRep
     if (response.status === 404) throw new Error('not_found');
     throw new Error(response.statusText);
   }
+  return response.json();
+}
+
+// ============================================================================
+// AI PANEL SUGGESTION
+// ============================================================================
+
+export interface PanelSuggestion {
+  template_id: string;
+  reason: string;
+}
+
+export async function suggestPanelTemplates(
+  title: string,
+  abstract: string,
+  templates: AgentTemplate[],
+  openrouterKey: string,
+  n: number = 5,
+): Promise<{ suggestions: PanelSuggestion[]; model_used: string }> {
+  const response = await fetch(`${API_URL}/ai/suggest-panel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-OpenRouter-Key': openrouterKey,
+    },
+    body: JSON.stringify({
+      title,
+      abstract,
+      n,
+      templates: templates.map(t => ({
+        template_id: t.template_id,
+        label: t.label,
+        role_title: t.role_title,
+        category: t.category,
+        character: t.character || '',
+      })),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || 'Failed to suggest panel');
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// ACADEMIC ASSESSMENT MATRIX (10 dimensions)
+// ============================================================================
+
+export interface AssessmentDimension {
+  key: string;
+  label: string;
+  score: number;
+  comment: string;
+}
+
+export interface AcademicAssessment {
+  assessment_id: string;
+  debate_id: string;
+  trigger_source: string;
+  dimensions: AssessmentDimension[];
+  overall_score: number;
+  overall_remarks: string;
+  basis?: {
+    has_profile?: boolean;
+    answer_count?: number;
+    message_count?: number;
+    has_summary?: boolean;
+  };
+  model_used?: string;
+  generated_at?: string;
+}
+
+export async function generateAcademicAssessment(
+  debateId: string,
+  openrouterKey: string,
+  triggerSource: string = 'manual',
+  mode: ReasoningMode = 'light',
+): Promise<AcademicAssessment> {
+  const headers = await getAuthHeaders() as Record<string, string>;
+  headers['X-OpenRouter-Key'] = openrouterKey;
+  const response = await fetch(`${API_URL}/debates/${debateId}/assessment/generate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ mode, trigger_source: triggerSource, model_id: '' }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail ?? response.statusText);
+  }
+  return response.json();
+}
+
+export async function getAcademicAssessment(debateId: string): Promise<AcademicAssessment> {
+  const response = await fetch(`${API_URL}/debates/${debateId}/assessment`, {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 404) throw new Error('not_found');
+    throw new Error(response.statusText);
+  }
+  return response.json();
+}
+
+// ============================================================================
+// ACCOUNT-STORED OPENROUTER KEY (encrypted server-side)
+// ============================================================================
+
+export interface AccountKeyStatus {
+  connected: boolean;
+  masked: string | null;
+}
+
+export async function getAccountOpenRouterKey(): Promise<AccountKeyStatus> {
+  const response = await fetch(`${API_URL}/me/openrouter-key`, {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  return response.json();
+}
+
+export async function saveAccountOpenRouterKey(apiKey: string): Promise<AccountKeyStatus> {
+  const response = await fetch(`${API_URL}/me/openrouter-key`, {
+    method: 'PUT',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(formatErrorDetail(body?.detail, 'Failed to save key'));
+  }
+  return response.json();
+}
+
+export async function deleteAccountOpenRouterKey(): Promise<AccountKeyStatus> {
+  const response = await fetch(`${API_URL}/me/openrouter-key`, {
+    method: 'DELETE',
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(response.statusText);
   return response.json();
 }

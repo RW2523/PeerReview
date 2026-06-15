@@ -2,7 +2,7 @@
 Reasoning Modes
 ===============
 Three tiers that control which LLM models are used across every AI activity
-in the defense platform and the debate engine.
+in the review platform and the discussion engine.
 
   Light  — Single cheap model for all tasks. Fast, low-cost, good for iteration.
   Medium — Different models per task/persona. Balanced quality vs. cost.
@@ -46,7 +46,7 @@ _MEDIUM: Dict[str, str] = {
     "persona:Domain Expert":          "anthropic/claude-sonnet-4-5",
     "persona:Skeptical Reviewer":     "openai/gpt-4o",
     "persona:Friendly Professor":     "openai/gpt-4o-mini",
-    "persona:External Examiner":      "anthropic/claude-sonnet-4-5",
+    "persona:Independent Reviewer":   "anthropic/claude-sonnet-4-5",
 }
 
 # Heavy: frontier models for everything.
@@ -67,7 +67,7 @@ _HEAVY: Dict[str, str] = {
     "persona:Domain Expert":          "anthropic/claude-opus-4",
     "persona:Skeptical Reviewer":     "anthropic/claude-opus-4",
     "persona:Friendly Professor":     "anthropic/claude-opus-4",
-    "persona:External Examiner":      "anthropic/claude-opus-4",
+    "persona:Independent Reviewer":   "anthropic/claude-opus-4",
 }
 
 # ── Public metadata (used in UI) ──────────────────────────────────────────
@@ -116,7 +116,7 @@ def get_model(task: str, mode: ReasoningMode = "medium") -> str:
 
 def get_persona_model(persona_name: str, mode: ReasoningMode = "medium") -> str:
     """
-    Return the model ID to use for a specific committee persona at the given mode.
+    Return the model ID to use for a specific reviewer persona at the given mode.
 
     Falls back to the generic task model for "response_generation" if persona
     key not found.

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import styles from './MockDefenseRoom.module.css';
+import { displayPersona } from '@/lib/persona';
+import AcademicAssessmentCard from './AcademicAssessmentCard';
 import {
   analyzeResearch,
   generateDefenseQuestions,
@@ -58,15 +60,6 @@ const MODE_OPTIONS: ModeOption[] = [
     costHint: '~$1–5 / session',
   },
 ];
-
-const SCORE_LABELS: Record<string, string> = {
-  score_relevance:         'Relevance',
-  score_evidence:          'Evidence Support',
-  score_clarity:           'Clarity',
-  score_completeness:      'Completeness',
-  score_methodology:       'Methodology',
-  score_critical_thinking: 'Critical Thinking',
-};
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -212,31 +205,22 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
     return (
       <div className={styles.container}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Mock Defense</h2>
+          <h2 className={styles.title}>Practice Q&amp;A Session</h2>
           <p className={styles.subtitle}>
             Select a reasoning mode, then analyse your uploaded research to generate a
-            tailored committee and defense questions.
+            tailored review panel and practice questions.
           </p>
         </div>
 
         {!openrouterKey && (
-          <div style={{
-            background: '#fff8e1',
-            border: '1px solid #f5a623',
-            borderRadius: '10px',
-            padding: '16px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-          }}>
-            <span style={{ fontSize: '1.6rem' }}>🔑</span>
+          <div className={styles.keyWarning}>
+            <span className={styles.keyWarningIcon}>🔑</span>
             <div>
-              <strong style={{ color: '#92400e', fontSize: '0.95rem' }}>API Key Required</strong>
-              <p style={{ margin: '4px 0 0', color: '#92400e', fontSize: '0.875rem' }}>
+              <strong>API Key Required</strong>
+              <p>
                 Add your OpenRouter API key in{' '}
-                <a href="/settings" style={{ fontWeight: 700, textDecoration: 'underline' }}>Settings</a>
-                {' '}to run the AI mock defense.
+                <a href="/settings">Settings</a>
+                {' '}to run the AI review session.
               </p>
             </div>
           </div>
@@ -260,9 +244,9 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
         </div>
 
         <div className={styles.section}>
-          <div className={styles.sectionTitle}>AI Committee Roles</div>
+          <div className={styles.sectionTitle}>AI Review Panel Roles</div>
           <p className={styles.hint}>
-            After analysis, the system generates 6 committee members tailored to your
+            After analysis, the system generates 6 panel members tailored to your
             research domain. Each member stays within their assigned role.
           </p>
           <div className={styles.personaPreviewGrid}>
@@ -272,7 +256,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
               { role: 'Domain Expert',         desc: 'Domain correctness, contribution' },
               { role: 'Skeptical Reviewer',    desc: 'Weak claims, unsupported assumptions' },
               { role: 'Friendly Professor',    desc: 'Clarity and confidence-building' },
-              { role: 'External Examiner',     desc: 'Defense-level challenge' },
+              { role: 'Independent Reviewer',  desc: 'Impartial, degree-standard scrutiny' },
             ].map(p => (
               <div key={p.role} className={styles.personaPreviewCard}>
                 <div className={styles.personaRole}>{p.role}</div>
@@ -288,7 +272,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
           disabled={!openrouterKey}
           style={{ opacity: openrouterKey ? 1 : 0.45, cursor: openrouterKey ? 'pointer' : 'not-allowed' }}
         >
-          Analyse Research and Generate Committee
+          Analyse Research and Build Review Panel
         </button>
       </div>
     );
@@ -299,7 +283,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
   if (phase === 'analyzing' || phase === 'suggesting') {
     const steps = [
       { key: 'analyzing', label: 'Analysing research materials…', detail: 'Extracting research problem, methodology, contributions, and weak areas.' },
-      { key: 'suggesting', label: 'Generating committee personas…', detail: 'Tailoring 6 AI committee members to your research domain and methodology.' },
+      { key: 'suggesting', label: 'Generating reviewer personas…', detail: 'Tailoring 6 AI panel members to your research domain and methodology.' },
     ];
     const current = steps.find(s => s.key === phase) || steps[0];
     return (
@@ -331,11 +315,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
           <h3>Something went wrong</h3>
           <p style={{ color: 'var(--text-2)', fontSize: '0.9rem', marginBottom: '16px' }}>{error}</p>
           {error.toLowerCase().includes('key') || error.toLowerCase().includes('unauthorized') ? (
-            <a href="/settings" style={{
-              display: 'inline-block', marginBottom: '12px',
-              padding: '10px 20px', background: '#f5a623', color: '#fff',
-              borderRadius: '8px', fontWeight: 600, textDecoration: 'none'
-            }}>
+            <a href="/settings" className={styles.settingsLink}>
               🔑 Go to Settings
             </a>
           ) : null}
@@ -361,14 +341,14 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
           )}
         </div>
 
-        {/* Suggested committee */}
+        {/* Suggested review panel */}
         {personas.length > 0 && (
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>AI Committee</div>
+            <div className={styles.sectionTitle}>Your Review Panel</div>
             <div className={styles.personaGrid}>
               {personas.map((p, i) => (
                 <div key={i} className={styles.personaCard}>
-                  <div className={styles.personaCardRole}>{p.role}</div>
+                  <div className={styles.personaCardRole}>{displayPersona(p.role)}</div>
                   <div className={styles.personaCardName}>{p.name}</div>
                   <div className={styles.personaCardExpertise}>{p.expertise}</div>
                   <div className={styles.personaCardFocus}>{p.focus_area}</div>
@@ -413,7 +393,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
         {questions.length > 0 ? (
           <div className={styles.section}>
             <div className={styles.sectionTitle}>
-              Defense Questions &mdash; {questions.length} total
+              Review Questions &mdash; {questions.length} total
             </div>
             <div className={styles.questionList}>
               {questions.map((q, i) => (
@@ -423,7 +403,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
                 >
                   <div className={styles.qNum}>Q{i + 1}</div>
                   <div className={styles.qMeta}>
-                    <span className={styles.qPersona}>{q.persona}</span>
+                    <span className={styles.qPersona}>{displayPersona(q.persona)}</span>
                     <span className={`${styles.qDiff} ${styles[q.difficulty]}`}>{q.difficulty}</span>
                     <span className={styles.qCat}>{q.category}</span>
                     {answeredIds.has(q.question_id) && (
@@ -437,11 +417,11 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
 
             <div className={styles.actionRow}>
               <button className={styles.primaryBtn} onClick={() => { setQIndex(0); setPhase('defense'); }}>
-                Start Defense
+                Start Q&amp;A
               </button>
               {answeredCount > 0 && (
                 <button className={styles.reportBtn} onClick={handleGenerateReport}>
-                  Generate Readiness Report
+                  Generate Feedback Report
                 </button>
               )}
             </div>
@@ -450,7 +430,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
           <div className={styles.section}>
             <p className={styles.hint}>No questions generated yet.</p>
             <button className={styles.primaryBtn} onClick={handleGenerateQuestions}>
-              Generate Defense Questions
+              Generate Review Questions
             </button>
           </div>
         )}
@@ -458,7 +438,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
     );
   }
 
-  // ── Active defense ─────────────────────────────────────────────────────────
+  // ── Active Q&A ─────────────────────────────────────────────────────────────
 
   if (phase === 'defense' && currentQuestion) {
     return (
@@ -473,7 +453,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
         <div className={styles.questionCard}>
           <div className={styles.personaHeader}>
             <div>
-              <div className={styles.activePersonaRole}>{currentQuestion.persona}</div>
+              <div className={styles.activePersonaRole}>{displayPersona(currentQuestion.persona)}</div>
               {personas.find(p => p.role === currentQuestion.persona) && (
                 <div className={styles.activePersonaName}>
                   {personas.find(p => p.role === currentQuestion.persona)!.name}
@@ -527,7 +507,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
             onClick={handleSubmitAnswer}
             disabled={submitting || answerText.trim().length < 10}
           >
-            {submitting ? 'Evaluating…' : 'Submit Answer'}
+            {submitting ? 'Reviewing…' : 'Submit Answer'}
           </button>
         </div>
       </div>
@@ -537,9 +517,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
   // ── Evaluation result ──────────────────────────────────────────────────────
 
   if (phase === 'evaluated' && evaluation && currentQuestion) {
-    const score      = Math.round(evaluation.overall_score * 10) / 10;
-    const scoreColor = score >= 7 ? 'var(--accent)' : score >= 5 ? 'var(--warning, #f5a623)' : 'var(--danger, #e00)';
-    const followUp   = evaluation.follow_up_needed && evaluation.follow_up_question;
+    const followUp = evaluation.follow_up_needed && evaluation.follow_up_question;
 
     return (
       <div className={styles.container}>
@@ -549,44 +527,19 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
 
         <div className={styles.evalCard}>
           <div className={styles.evalHeader}>
-            <div className={styles.overallScore} style={{ color: scoreColor }}>
-              {score}<span style={{ fontSize: '1rem', color: 'var(--text-3)' }}>/10</span>
-            </div>
             <div>
-              <div className={styles.evalTitle}>Answer Evaluation</div>
+              <div className={styles.evalTitle}>Feedback on Your Answer</div>
               <div className={styles.evalQuestion}>{currentQuestion.question_text}</div>
             </div>
           </div>
 
-          <div className={styles.scoreGrid}>
-            {Object.entries(SCORE_LABELS).map(([key, label]) => {
-              const val = (evaluation as any)[key] ?? 0;
-              const pct = (val / 10) * 100;
-              const barColor = val >= 7
-                ? 'var(--accent)'
-                : val >= 5 ? 'var(--warning, #f5a623)' : 'var(--danger, #e00)';
-              return (
-                <div key={key} className={styles.scoreRow}>
-                  <span className={styles.scoreLabel}>{label}</span>
-                  <div className={styles.scoreBar}>
-                    <div
-                      className={styles.scoreBarFill}
-                      style={{ width: `${pct}%`, background: barColor }}
-                    />
-                  </div>
-                  <span className={styles.scoreVal}>{val}</span>
-                </div>
-              );
-            })}
-          </div>
-
           <div className={styles.feedbackGrid}>
             <div className={`${styles.feedbackCard} ${styles.strength}`}>
-              <h4>Strength</h4>
+              <h4>What Worked</h4>
               <p>{evaluation.strength}</p>
             </div>
             <div className={`${styles.feedbackCard} ${styles.weakness}`}>
-              <h4>Weakness</h4>
+              <h4>Area to Improve</h4>
               <p>{evaluation.weakness}</p>
             </div>
           </div>
@@ -620,7 +573,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
             </button>
           ) : (
             <button className={styles.reportBtn} onClick={handleGenerateReport}>
-              Generate Readiness Report
+              Generate Feedback Report
             </button>
           )}
           <button className={styles.secondaryBtn} onClick={() => setPhase('questions')}>
@@ -634,12 +587,15 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
   // ── Readiness report ───────────────────────────────────────────────────────
 
   if (phase === 'report' && report) {
-    const overall = report.overall_readiness ?? 0;
-    const color   = overall >= 70 ? 'var(--accent)' : overall >= 50 ? 'var(--warning, #f5a623)' : 'var(--danger, #e00)';
-    const label   = overall >= 70
-      ? 'Ready for Defense'
-      : overall >= 50 ? 'Additional Preparation Recommended'
-      : 'Significant Gaps Identified';
+    // Readiness outlook: derived internally, surfaced only as a qualitative band.
+    const v = report.overall_readiness;
+    const outlook = typeof v === 'number'
+      ? v >= 75
+        ? { label: 'On track', cls: styles.outlookStrong, hint: 'You appear well prepared — keep your momentum with a final run-through.' }
+        : v >= 50
+          ? { label: 'Almost there', cls: styles.outlookAlmost, hint: 'Most answers held up — revisit the improvement plan, then practice again.' }
+          : { label: 'Needs more practice', cls: styles.outlookPractice, hint: 'Several answers had gaps — work through the improvement plan below.' }
+      : null;
 
     return (
       <div className={styles.container}>
@@ -648,63 +604,42 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
         </div>
 
         <div className={styles.reportHeader}>
-          <div className={styles.bigScore} style={{ color }}>
-            {Math.round(overall)}%
-          </div>
           <div>
-            <h2 className={styles.reportTitle}>Defense Readiness Report</h2>
-            <div className={styles.readinessLabel}>{label}</div>
-          </div>
-        </div>
-
-        <div className={styles.section}>
-          <div className={styles.sectionTitle}>Dimension Scores</div>
-          <div className={styles.dimGrid}>
-            {[
-              ['Research Clarity',  report.research_clarity],
-              ['Methodology',       report.methodology_score],
-              ['Evidence',          report.evidence_score],
-              ['Critical Thinking', report.critical_thinking],
-              ['Communication',     report.communication],
-            ].map(([lbl, val]) => {
-              const v = (val as number) ?? 0;
-              const c = v >= 70 ? 'var(--accent)' : v >= 50 ? 'var(--warning, #f5a623)' : 'var(--danger, #e00)';
-              return (
-                <div key={lbl as string} className={styles.dimCard}>
-                  <div className={styles.dimScore} style={{ color: c }}>{Math.round(v)}%</div>
-                  <div className={styles.dimLabel}>{lbl as string}</div>
-                  <div className={styles.dimBar}>
-                    <div style={{ width: `${v}%`, background: c, height: '100%', borderRadius: '2px' }} />
-                  </div>
-                </div>
-              );
-            })}
+            <h2 className={styles.reportTitle}>
+              Session Feedback Report
+              {outlook && <span className={`${styles.outlookChip} ${outlook.cls}`}>{outlook.label}</span>}
+            </h2>
+            <div className={styles.readinessLabel}>
+              {outlook
+                ? `${outlook.hint} (Qualitative outlook — not a grade.)`
+                : 'Qualitative feedback from your AI review panel — no marks, just what to strengthen next.'}
+            </div>
           </div>
         </div>
 
         <div className={styles.swGrid}>
           {report.strong_answers && report.strong_answers.length > 0 && (
             <div className={styles.section}>
-              <div className={styles.sectionTitle}>Strong Answers</div>
+              <div className={styles.sectionTitle}>What Went Well</div>
               {report.strong_answers.map((a: any, i: number) => (
                 <div key={i} className={styles.swItem}>
-                  <span className={styles.swScore}>
-                    {typeof a.overall_score === 'number' ? `${a.overall_score}/10` : ''}
+                  <span>
+                    {a.question_text || a.question || ''}
+                    {a.summary ? ` — ${a.summary}` : ''}
                   </span>
-                  <span>{a.question_text || a.question || JSON.stringify(a)}</span>
                 </div>
               ))}
             </div>
           )}
           {report.weak_answers && report.weak_answers.length > 0 && (
             <div className={styles.section}>
-              <div className={styles.sectionTitle}>Weak Answers</div>
+              <div className={styles.sectionTitle}>Answers to Revisit</div>
               {report.weak_answers.map((a: any, i: number) => (
                 <div key={i} className={styles.swItemWeak}>
-                  <span className={styles.swScore}>
-                    {typeof a.overall_score === 'number' ? `${a.overall_score}/10` : ''}
+                  <span>
+                    {a.question_text || a.question || ''}
+                    {a.summary ? ` — ${a.summary}` : ''}
                   </span>
-                  <span>{a.question_text || a.question || JSON.stringify(a)}</span>
                 </div>
               ))}
             </div>
@@ -717,7 +652,9 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
             <ol className={styles.planList}>
               {report.improvement_plan.map((item: any, i: number) => (
                 <li key={i} className={styles.planItem}>
-                  {typeof item === 'string' ? item : JSON.stringify(item)}
+                  {typeof item === 'string'
+                    ? item
+                    : [item.area, item.action].filter(Boolean).join(' — ') || JSON.stringify(item)}
                 </li>
               ))}
             </ol>
@@ -726,7 +663,7 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
 
         {report.likely_questions && report.likely_questions.length > 0 && (
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>Likely Committee Questions</div>
+            <div className={styles.sectionTitle}>Questions a Review Panel May Ask</div>
             <ul className={styles.likelyList}>
               {report.likely_questions.map((q: string, i: number) => (
                 <li key={i}>{q}</li>
@@ -741,6 +678,8 @@ export default function MockDefenseRoom({ debateId, openrouterKey }: Props) {
             <p>{report.next_recommendation}</p>
           </div>
         )}
+
+        <AcademicAssessmentCard debateId={debateId} triggerSource="practice_qa" />
 
         <div className={styles.actionRow}>
           <button className={styles.secondaryBtn} onClick={() => setPhase('questions')}>

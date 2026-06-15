@@ -179,7 +179,7 @@ def test_summarize_debate_not_ended():
     )
     
     assert response.status_code == 400
-    assert 'must be ended' in response.json()['detail'].lower()
+    assert "must be in 'ended' state" in response.json()['detail'].lower()
 
 
 def test_get_summary_not_generated():
@@ -196,7 +196,7 @@ def test_get_summary_not_generated():
     response = client.get(f"/debates/{debate_id}/summary")
     
     assert response.status_code == 404
-    assert 'not generated' in response.json()['detail'].lower()
+    assert 'no summary found' in response.json()['detail'].lower()
 
 
 def test_summarize_debate_not_found():

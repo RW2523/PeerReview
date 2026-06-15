@@ -39,12 +39,13 @@ export function MaterialsStep({
 }: MaterialsStepProps) {
   const mainInputRef = useRef<HTMLInputElement>(null);
   const researchInputRef = useRef<HTMLInputElement>(null);
-  const supplementaryInputRef = useRef<HTMLInputElement>(null);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
 
   const [uploading, setUploading] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  // Ensures unembedded chunks get embedded once processing completes (RAG safety net)
+  const embedTriggeredRef = useRef(false);
 
   // Action items grouped by transcript material id
   const [actionItems, setActionItems] = useState<Record<string, api.TranscriptActionItem[]>>({});
@@ -63,6 +64,17 @@ export function MaterialsStep({
       if (allDone && pollInterval) {
         clearInterval(pollInterval);
         setPollInterval(null);
+      }
+      // Once everything is processed, make sure every chunk is embedded so
+      // semantic retrieval (RAG) works — covers upload-time embedding failures.
+      if (allDone && status.materials.length > 0 && !embedTriggeredRef.current) {
+        const key = keyStore.getKey();
+        if (key) {
+          embedTriggeredRef.current = true;
+          api.triggerEmbeddingGeneration(debateId, key).catch(() => {
+            embedTriggeredRef.current = false; // allow retry on next poll cycle
+          });
+        }
       }
     } catch {
       /* ignore polling errors */
@@ -176,7 +188,7 @@ export function MaterialsStep({
     if (!debateId) return;
     const key = keyStore.getKey();
     if (!key) {
-      setActionError('Add your OpenRouter key in Settings to run a committee debate.');
+      setActionError('Add your OpenRouter key in Settings to run a panel discussion.');
       return;
     }
     patchItem(materialId, item.action_id, { status: 'debating' });
@@ -231,8 +243,8 @@ export function MaterialsStep({
     <div className={styles.section}>
       <h2>Knowledge Base</h2>
       <p className={styles.hint}>
-        Organize the documents your committee will study. Everything here is saved and embedded into
-        the agents&apos; memory so they can cite it during the defense.
+        Organize the documents your panel will study. Everything here is saved and embedded into
+        the agents&apos; memory so they can cite it during the review session.
       </p>
 
       {uploadError && <div className={styles.error}>{uploadError}</div>}
@@ -278,9 +290,9 @@ export function MaterialsStep({
 
       {/* ── Section 2: Research & Supplementary ─────────────────────────── */}
       <div className={styles.kbSection}>
-        <h3 className={styles.kbSectionTitle}>2 · Research &amp; Supplementary Files</h3>
+        <h3 className={styles.kbSectionTitle}>2 · Supporting Files</h3>
         <p className={styles.kbSectionDesc}>
-          Supporting papers, datasets, notes, links, or pasted passages. Editable and removable.
+          Supporting papers, datasets, notes, links, or pasted passages — upload them all together. Editable and removable.
         </p>
         <div className={styles.buttonGroup}>
           <input
@@ -293,19 +305,7 @@ export function MaterialsStep({
             disabled={disabled}
           />
           <button className={styles.btnAdd} onClick={() => researchInputRef.current?.click()} disabled={disabled}>
-            <span>📄</span> {uploading === 'research' ? 'Uploading…' : 'Upload Research'}
-          </button>
-          <input
-            ref={supplementaryInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.docx,.txt,.md"
-            style={{ display: 'none' }}
-            onChange={(e) => doUpload(e.target.files, 'supplementary', false, supplementaryInputRef)}
-            disabled={disabled}
-          />
-          <button className={styles.btnAdd} onClick={() => supplementaryInputRef.current?.click()} disabled={disabled}>
-            <span>📎</span> {uploading === 'supplementary' ? 'Uploading…' : 'Upload Supplementary'}
+            <span>📚</span> {uploading === 'research' ? 'Uploading…' : 'Upload Supporting Files'}
           </button>
           <button onClick={() => onAdd('text')} className={styles.btnAdd}>
             <span>📝</span> Add Text
@@ -366,7 +366,7 @@ export function MaterialsStep({
         <h3 className={styles.kbSectionTitle}>3 · Meeting Transcripts &amp; Recordings</h3>
         <p className={styles.kbSectionDesc}>
           Upload a text transcript or an audio recording (transcribed automatically). Then extract
-          action items and let the committee debate each decision.
+          action items and let the panel discuss each decision.
         </p>
         <input
           ref={transcriptInputRef}
@@ -432,11 +432,11 @@ export function MaterialsStep({
                             className={styles.btnSecondary}
                             onClick={() => handleRunDebate(file.material_id, item)}
                           >
-                            🏛️ Run committee debate
+                            🏛️ Run panel discussion
                           </button>
                         )}
                         {item.status === 'debating' && (
-                          <span className={styles.decisionPending}>⚙️ Committee debating…</span>
+                          <span className={styles.decisionPending}>⚙️ Panel discussing…</span>
                         )}
                         {item.status === 'decided' && item.decision && (
                           <div className={styles.decisionBox}>

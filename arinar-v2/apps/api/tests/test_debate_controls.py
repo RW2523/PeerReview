@@ -11,6 +11,20 @@ from src.main import app
 client = TestClient(app)
 
 
+def _add_panelist(debate_id: str):
+    """Sessions can only start with at least one panel member."""
+    resp = client.post(f"/debates/{debate_id}/participants", json={
+        "participants": [{
+            "name": "Test Reviewer",
+            "role_description": "Methodology reviewer",
+            "system_prompt": "You are a methodology reviewer.",
+            "model_id": "openai/gpt-4o-mini",
+            "model_config": {"temperature": 0.5},
+        }]
+    })
+    assert resp.status_code in (200, 201), resp.text
+
+
 def test_create_debate(create_debate_payload):
     resp = client.post("/debates", json=create_debate_payload)
     assert resp.status_code == 201, resp.text
@@ -26,6 +40,7 @@ def test_start_pause_resume_end_flow(create_debate_payload):
     resp = client.post("/debates", json=create_debate_payload)
     assert resp.status_code == 201, resp.text
     debate_id = resp.json()["debate_id"]
+    _add_panelist(debate_id)
 
     # Start
     resp = client.post(f"/debates/{debate_id}/start")
@@ -71,6 +86,7 @@ def test_intervene_running_and_paused(create_debate_payload):
     resp = client.post("/debates", json=create_debate_payload)
     assert resp.status_code == 201, resp.text
     debate_id = resp.json()["debate_id"]
+    _add_panelist(debate_id)
 
     # Must start first
     resp = client.post(f"/debates/{debate_id}/start")

@@ -59,6 +59,52 @@ app.include_router(web_search_router, tags=["web-search"])
 from .routes.defense import router as defense_router
 app.include_router(defense_router, tags=["defense"])
 
+from .routes.assessment import router as assessment_router
+app.include_router(assessment_router, tags=["assessment"])
+
+from .routes.user_settings import router as user_settings_router
+app.include_router(user_settings_router, tags=["user-settings"])
+
+
+# ── Account key resolution ───────────────────────────────────────────────────
+# If a request needs an OpenRouter key but the browser did not send one
+# (X-OpenRouter-Key header), fall back to the authenticated user's stored,
+# encrypted key. Precedence: request header → account key → server default.
+def _resolve_request_user_id(request) -> str:
+    from .config import settings as _settings
+    if not _settings.require_auth:
+        return "test-user"
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        return ""
+    try:
+        from .auth import decode_jwt
+        payload = decode_jwt(auth_header)
+        return str(payload.get("sub") or "")
+    except Exception:
+        return ""
+
+
+@app.middleware("http")
+async def inject_account_openrouter_key(request, call_next):
+    try:
+        if not request.headers.get("x-openrouter-key"):
+            user_id = _resolve_request_user_id(request)
+            if user_id:
+                from .routes.user_settings import get_cached_openrouter_key
+                try:
+                    key = get_cached_openrouter_key(user_id)
+                except Exception:
+                    key = None
+                if key:
+                    request.scope["headers"] = list(request.scope["headers"]) + [
+                        (b"x-openrouter-key", key.encode())
+                    ]
+    except Exception:
+        # Key injection is best-effort — never block the request on it.
+        pass
+    return await call_next(request)
+
 # Document WebSocket endpoint
 from .websocket.document_hub import handle_document_websocket
 

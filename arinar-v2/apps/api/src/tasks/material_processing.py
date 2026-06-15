@@ -317,7 +317,17 @@ def process_material(
         if not chunks:
             raise Exception("No chunks generated from text")
 
-        # Store chunks
+        # Store chunks — idempotent: serialize concurrent runs of this material
+        # with a row lock, then clear chunks from any previous run (retries /
+        # concurrent processing must not duplicate them).
+        cursor.execute(
+            "SELECT material_id FROM meeting_materials WHERE material_id = %s FOR UPDATE",
+            (material_id,),
+        )
+        cursor.execute(
+            "DELETE FROM memory_chunks WHERE source_debate_id = %s AND chunk_metadata->>'material_id' = %s",
+            (debate_id, str(material_id)),
+        )
         chunk_ids: List[str] = []
         chunk_texts: List[str] = []
         for chunk in chunks:
@@ -325,9 +335,9 @@ def process_material(
             cursor.execute(
                 """
                 INSERT INTO memory_chunks (
-                    chunk_id, agent_id, source_debate_id, chunk_text, chunk_metadata
+                    chunk_id, agent_id, source_debate_id, chunk_text, chunk_metadata, embedding_status
                 )
-                VALUES (gen_random_uuid(), NULL, %s, %s, %s)
+                VALUES (gen_random_uuid(), NULL, %s, %s, %s, 'not_started')
                 RETURNING chunk_id
                 """,
                 (debate_id, chunk["chunk_text"], Json(chunk_meta)),
@@ -431,7 +441,7 @@ def generate_debate_embeddings(self, debate_id: str, openrouter_key: str):
             FROM memory_chunks
             WHERE source_debate_id = %s
               AND agent_id IS NULL
-              AND embedding_status IN ('not_started', 'failed')
+              AND (embedding_status IN ('not_started', 'failed') OR embedding_status IS NULL)
             ORDER BY created_at
             """,
             (debate_id,),

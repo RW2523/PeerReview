@@ -402,7 +402,7 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                 
                 # Use the full deep system_prompt if the agent has one (built by persona_suggester);
                 # otherwise fall back to the canonical base prompt for this role.
-                from src.services.persona_prompts import get_base_prompt, resolve_role as _resolve_role
+                from src.services.persona_prompts import get_base_prompt, resolve_role as _resolve_role, ROLE_DISPLAY as _ROLE_DISPLAY
                 if system_prompt and len(system_prompt.strip()) > 150:
                     # Agent already has a rich deep system prompt
                     persona_specific_prompt = system_prompt
@@ -410,8 +410,8 @@ This is a placeholder prep pack generated without OpenRouter key. In production,
                     # Build from canonical base + persona identity
                     _canonical = _resolve_role(role_description or role_for_prep)
                     persona_specific_prompt = (
-                        f"You are {agent_name}, serving as {_canonical.replace('_',' ').title()} "
-                        f"in an academic peer-review committee.\n\n"
+                        f"You are {agent_name}, serving as {_ROLE_DISPLAY.get(_canonical, _canonical.replace('_',' ').title())} "
+                        f"on an academic review panel.\n\n"
                         + get_base_prompt(_canonical)
                     )
                 

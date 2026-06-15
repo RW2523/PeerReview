@@ -2,7 +2,7 @@
  * useSpeechSynthesis — TTS via Web Speech API
  *
  * Each persona maps to a distinct voice pitch/rate so the student
- * can immediately recognise which committee member is speaking.
+ * can immediately recognise which panel member is speaking.
  */
 'use client';
 
@@ -42,7 +42,7 @@ export function roleToVoiceId(role: string): PersonaVoiceId {
   if (r.includes('domain') || r.includes('expert')) return 'domain';
   if (r.includes('skeptic'))       return 'skeptical';
   if (r.includes('friendly'))      return 'friendly';
-  if (r.includes('examiner') || r.includes('external')) return 'examiner';
+  if (r.includes('examiner') || r.includes('external') || r.includes('independent')) return 'examiner';
   return 'default';
 }
 

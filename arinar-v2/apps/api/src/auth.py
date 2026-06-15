@@ -97,7 +97,7 @@ def get_workspace_for_user(user_id: str) -> Optional[str]:
         workspace_id or None if user not mapped to any workspace
     """
     from .database import get_db_connection, get_cursor
-    
+
     try:
         with get_db_connection() as conn:
             cursor = get_cursor(conn)
@@ -108,15 +108,51 @@ def get_workspace_for_user(user_id: str) -> Optional[str]:
                 ORDER BY created_at DESC
                 LIMIT 1
             """, (user_id,))
-            
+
             result = cursor.fetchone()
             if result:
-                return result['workspace_id']
-            
-            return None
+                return str(result['workspace_id'])
+
+            # Lazy provisioning: a Supabase auth user reaching the PeerForge API
+            # for the first time gets their own isolated workspace. This avoids a
+            # trigger on auth.users — important when the Supabase project is shared
+            # with another app, whose signups must not create PeerForge workspaces.
+            return _provision_workspace_for_user(conn, cursor, user_id)
     except Exception:
         # If DB query fails, return None (will be handled by caller)
         return None
+
+
+# Default tenant that owns auto-provisioned personal workspaces.
+_DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+
+
+def _provision_workspace_for_user(conn, cursor, user_id: str) -> Optional[str]:
+    """Create a personal workspace for a first-time PeerForge user and map them to it."""
+    import uuid
+
+    workspace_id = str(uuid.uuid4())
+    short = str(user_id).replace('-', '')[:8]
+
+    cursor.execute("""
+        INSERT INTO tenants (tenant_id, name, slug)
+        VALUES (%s, 'PeerForge', 'peerforge')
+        ON CONFLICT (tenant_id) DO NOTHING
+    """, (_DEFAULT_TENANT_ID,))
+
+    cursor.execute("""
+        INSERT INTO workspaces (workspace_id, tenant_id, name, slug)
+        VALUES (%s, %s, %s, %s)
+    """, (workspace_id, _DEFAULT_TENANT_ID, f'Workspace {short}', f'ws-{short}-{workspace_id[:8]}'))
+
+    cursor.execute("""
+        INSERT INTO user_workspaces (user_id, workspace_id, role)
+        VALUES (%s, %s, 'owner')
+        ON CONFLICT (user_id, workspace_id) DO NOTHING
+    """, (user_id, workspace_id))
+
+    conn.commit()
+    return workspace_id
 
 
 def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:

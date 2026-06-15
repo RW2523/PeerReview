@@ -201,7 +201,7 @@ export function BasicInfoStep({
         </div>
       )}
 
-      <label>Defense Agenda (optional)</label>
+      <label>Session Agenda (optional)</label>
       <div className={styles.listInput}>
         <input
           type="text"
@@ -243,7 +243,7 @@ export function BasicInfoStep({
         </ul>
       )}
 
-      <label>Defense Objectives (optional)</label>
+      <label>Session Objectives (optional)</label>
       <div className={styles.listInput}>
         <input
           type="text"
@@ -294,7 +294,7 @@ export function BasicInfoStep({
               <span className={styles.betaBadge}>AUTO</span>
             </div>
             <div className={styles.yoloDescription}>
-              Fully autonomous defense — committee members run without manual intervention
+              Fully autonomous session — panel members run without manual intervention
             </div>
           </label>
           <label className={styles.toggleSwitch}>
@@ -329,7 +329,7 @@ export function BasicInfoStep({
       </div>
 
       {/* Review Limit Cards */}
-      <label>Defense Session Length</label>
+      <label>Session Length</label>
       <div className={styles.limitCards}>
         <div 
           className={`${styles.limitCard} ${meetingType === 'rounds' ? styles.limitCardActive : ''}`}

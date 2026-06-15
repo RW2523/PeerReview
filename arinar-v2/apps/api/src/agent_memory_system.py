@@ -70,7 +70,7 @@ class AgentMemorySystem:
                 
                 cursor.execute("""
                     UPDATE agent_memories
-                    SET debate_ids = %s,
+                    SET debate_ids = %s::uuid[],
                         confidence = %s,
                         effectiveness = %s,
                         use_count = use_count + 1,
@@ -93,7 +93,7 @@ class AgentMemorySystem:
                     INSERT INTO agent_memories (
                         memory_id, workspace_id, agent_role, memory_type,
                         content, debate_ids, confidence, effectiveness
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s::uuid[], %s, %s)
                     RETURNING memory_id
                 """, (
                     memory_id,

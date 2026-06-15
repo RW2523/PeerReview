@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import Optional
 import httpx
 import asyncio
+import json
+import re
 import logging
 
 router = APIRouter()
@@ -367,3 +369,148 @@ Remember to follow the EXACT format with all four sections: PROBLEM STATEMENT, K
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to improve problem statement: {str(e)}"
         )
+
+
+# ── Panel suggestion ─────────────────────────────────────────────────────────
+
+class PanelTemplateInfo(BaseModel):
+    template_id: str
+    label: str
+    role_title: str = ""
+    category: str = ""
+    character: str = ""
+
+
+class PanelSuggestRequest(BaseModel):
+    title: str
+    abstract: str = ""
+    templates: list[PanelTemplateInfo]
+    n: int = 5
+
+
+class PanelSuggestion(BaseModel):
+    template_id: str
+    reason: str
+
+
+class PanelSuggestResponse(BaseModel):
+    suggestions: list[PanelSuggestion]
+    model_used: str
+
+
+@router.post("/ai/suggest-panel", response_model=PanelSuggestResponse)
+async def suggest_panel(
+    request: PanelSuggestRequest,
+    x_openrouter_key: Optional[str] = Header(None, alias="X-OpenRouter-Key"),
+):
+    """
+    Read the session title + abstract and rank the most relevant agent
+    templates for the review panel. Returns the top-N template ids with a
+    one-sentence reason each, grounded in the research topic.
+    """
+    if not x_openrouter_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OpenRouter API key required (X-OpenRouter-Key header)",
+        )
+    if not request.title.strip() and not request.abstract.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide a title or abstract first so the AI can match panel members.",
+        )
+    if not request.templates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No templates provided.",
+        )
+
+    n = max(1, min(request.n, len(request.templates), 8))
+    catalog = "\n".join(
+        f"- id: {t.template_id} | {t.label} | role: {t.role_title} | category: {t.category}"
+        + (f" | character: {t.character}" if t.character else "")
+        for t in request.templates
+    )
+
+    system_prompt = (
+        "You are an academic review panel designer. Given a research title and "
+        "abstract, select the most relevant reviewer templates from a catalog.\n"
+        "Selection principles:\n"
+        "- Cover complementary review lanes: methodology, domain expertise, "
+        "skeptical claim-checking, clarity/communication, and independent scrutiny.\n"
+        "- Match the research domain: prefer reviewers whose expertise fits the topic.\n"
+        "- Never pick two templates that duplicate the same lane.\n"
+        "- Each reason must reference the specific research topic, not generic praise.\n"
+        f"Return ONLY a JSON array of exactly {n} objects, ordered most relevant first:\n"
+        '[{"template_id": "<id from catalog>", "reason": "<one sentence tied to this research>"}]'
+    )
+    user_prompt = (
+        f"## Research Title\n{request.title.strip() or '(not provided)'}\n\n"
+        f"## Abstract / Research Question\n{request.abstract.strip() or '(not provided)'}\n\n"
+        f"## Template Catalog\n{catalog}\n\n"
+        f"Pick the top {n} templates for this research and return the JSON array."
+    )
+
+    model = "openai/gpt-4o-mini"
+    try:
+        timeout_config = httpx.Timeout(connect=5.0, read=25.0, write=5.0, pool=5.0)
+        async with httpx.AsyncClient(timeout=timeout_config) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {x_openrouter_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "max_tokens": 900,
+                    "temperature": 0.3,
+                },
+            )
+        if response.status_code == 401:
+            raise HTTPException(status_code=401, detail="Invalid API key. Check your OpenRouter key in Settings.")
+        if response.status_code == 402:
+            raise HTTPException(status_code=402, detail="OpenRouter account has insufficient credits.")
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"AI service error ({response.status_code}). Please try again.")
+
+        raw = response.json()["choices"][0]["message"]["content"].strip()
+        raw = re.sub(r"^```(?:json)?\s*\n?", "", raw)
+        raw = re.sub(r"\n?```\s*$", "", raw)
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            match = re.search(r"\[[\s\S]+\]", raw)
+            if not match:
+                raise HTTPException(status_code=502, detail="AI returned an unreadable suggestion. Please try again.")
+            parsed = json.loads(match.group(0))
+
+        valid_ids = {t.template_id for t in request.templates}
+        suggestions: list[PanelSuggestion] = []
+        seen: set = set()
+        for item in parsed:
+            tid = str(item.get("template_id", "")).strip()
+            if tid in valid_ids and tid not in seen:
+                seen.add(tid)
+                suggestions.append(PanelSuggestion(
+                    template_id=tid,
+                    reason=str(item.get("reason", "")).strip() or "Relevant to this research.",
+                ))
+            if len(suggestions) >= n:
+                break
+
+        if not suggestions:
+            raise HTTPException(status_code=502, detail="AI did not match any catalog templates. Please try again.")
+
+        return PanelSuggestResponse(suggestions=suggestions, model_used=model)
+
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="AI service is slow to respond. Please try again.")
+    except Exception as exc:
+        logger.error(f"suggest_panel failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Failed to suggest panel: {exc}")

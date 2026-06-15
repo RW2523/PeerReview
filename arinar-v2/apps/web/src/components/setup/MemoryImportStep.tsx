@@ -43,11 +43,11 @@ export function MemoryImportStep({
       const response = await api.listImportableMemorySources(workspaceId, 20);
       setImportableSources(response.debates);
       if (response.debates.length === 0) {
-        setError('No past defense sessions available to import. Complete a defense session first.');
+        setError('No past review sessions available to import. Complete a review session first.');
       }
     } catch (err: any) {
       console.error('Failed to load importable sources:', err);
-      setError(`Failed to load past defense sessions: ${err.message}`);
+      setError(`Failed to load past review sessions: ${err.message}`);
     } finally {
       setIsLoadingSources(false);
     }
@@ -154,12 +154,12 @@ export function MemoryImportStep({
           )}
 
           {isLoadingSources ? (
-            <div className={styles.loadingState}>Loading past defense sessions...</div>
+            <div className={styles.loadingState}>Loading past review sessions...</div>
           ) : importableSources.length > 0 ? (
             <>
               <div className={styles.subsection}>
-                <h3>1. Pick Past Defense Sessions</h3>
-                <p className={styles.subsectionHint}>Select one or more completed defense sessions to import context from.</p>
+                <h3>1. Pick Past Review Sessions</h3>
+                <p className={styles.subsectionHint}>Select one or more completed review sessions to import context from.</p>
                 <div className={styles.sourceList}>
                   {importableSources.map((debate) => (
                     <label key={debate.debate_id} className={styles.sourceCard}>

@@ -49,3 +49,7 @@ coverage/
 
 # OS
 Thumbs.db
+
+# Test/eval artifacts (generated, not source)
+apps/api/eval_logs/*.json
+!apps/api/eval_logs/.gitkeep
