@@ -200,21 +200,28 @@ def test_user_with_workspace_claim_in_jwt():
     assert data['workspace_id'] == test_workspace_id
 
 
-def test_user_without_workspace_mapping_denied():
-    """Test that user not mapped to any workspace is denied access"""
+def test_user_without_mapping_is_auto_provisioned_then_scoped():
+    """A first-time user (no prior workspace mapping) is lazily provisioned
+    their own workspace, and remains scoped to it — creating a debate in a
+    *foreign* workspace is still denied."""
+    from src.auth import get_workspace_for_user
+
     test_user_id = '00000000-0000-0000-0000-000000000996'
-    
-    # Generate token (no workspace_id claim, no user_workspaces mapping)
+
+    # Lazy provisioning: first resolution creates and returns a personal workspace
+    ws = get_workspace_for_user(test_user_id)
+    assert ws is not None
+    # Idempotent: a second call returns the same workspace, not a new one
+    assert get_workspace_for_user(test_user_id) == ws
+
+    # Still scoped: creating a debate in a workspace that isn't theirs is denied
     token = generate_test_jwt(test_user_id)
-    
     response = client.post(
         "/debates",
         json={
             "workspace_id": "00000000-0000-0000-0000-000000000101",
-            "title": "No Workspace Test"
+            "title": "Foreign Workspace Test"
         },
         headers={"Authorization": f"Bearer {token}"}
     )
-    
     assert response.status_code == 403
-    assert 'not associated with any workspace' in response.json()['detail'].lower()
